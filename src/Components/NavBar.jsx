@@ -2,22 +2,23 @@ import { DownOutlined } from "@ant-design/icons";
 import { Dropdown, Space } from "antd";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { logout } from "../lib/auth";
+import { useNavigate } from "react-router-dom";
 
 const Navbar = () => {
+  const navigate = useNavigate();
   const currentDate = new Date();
   // console.log(currentDate);
 
-  const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    console.log("Logging out...")
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
   };
 
-  // Assuming `user` is accessible globally in your app
   const items = [
     {
       label: (
-        <a href="/dashboard" onClick={handleLogout}>
+        <a onClick={handleLogout}>
           Logout
         </a>
       ),
