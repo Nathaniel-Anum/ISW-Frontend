@@ -18,7 +18,7 @@ const Sidebar = () => {
                 <p className="text-black">Home</p>
               </li>
             </Link>
-            <Link to="requisition">
+            <Link to="requisitions/new">
               <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                 <LuGitPullRequestCreate className=" text-[3rem] w-[43px] text-black" />
                 <p className="text-black">Requisition</p>

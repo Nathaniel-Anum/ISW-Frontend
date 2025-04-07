@@ -4,10 +4,10 @@ import Dashboard from "./Components/Dashboard";
 import Inventory from "./Components/Inventory";
 import Login from "./Components/Login";
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import Requisition from "./Components/Requisition";
 import ForgotPassword from "./Components/ForgotPassword";
 import LoginWithToken from "./Components/LoginWithToken";
 import ResetPassword from "./Components/ResetPassword";
+import NewRequisition from './Components/NewRequisition';
 
 function AppContent() {
   const navigate = useNavigate();
@@ -48,8 +48,8 @@ function AppContent() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       <Route path="/dashboard" element={<Dashboard />}>
+        <Route path="requisitions/new" element={<NewRequisition />} />
         {/* nested routes */}
-        <Route path="requisition" element={<Requisition />} />
       </Route>
 
       {/* catch all 404 */}
