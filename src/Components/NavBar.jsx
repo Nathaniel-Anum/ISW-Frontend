@@ -1,26 +1,27 @@
 import { DownOutlined } from "@ant-design/icons";
 import { Dropdown, Space } from "antd";
+import { Navigate, useNavigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { useUser } from "../utils/userContext";
 
 const Navbar = () => {
+  const { user } = useUser();
   const currentDate = new Date();
   // console.log(currentDate);
 
+  const navigate = useNavigate();
+
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    console.log("Logging out...")
+    localStorage.removeItem("access_token");
+    navigate("/");
+    // console.log("Logging out...")
   };
 
   // Assuming `user` is accessible globally in your app
   const items = [
     {
-      label: (
-        <a href="/dashboard" onClick={handleLogout}>
-          Logout
-        </a>
-      ),
+      label: <a onClick={handleLogout}>Logout</a>,
       key: "0",
     },
   ];
@@ -31,9 +32,7 @@ const Navbar = () => {
         <div className="pl-[200px]">
           {/* <p className="font-semibold text-[23px]">Dashboard</p> */}
 
-          <p className="font-semibold ">
-            {currentDate.toDateString()}
-          </p>
+          <p className="font-semibold ">{currentDate.toDateString()}</p>
           {/* <p>{currentDate.toLocaleTimeString()}</p> */}
         </div>
 
@@ -69,7 +68,7 @@ const Navbar = () => {
               onClick={(e) => e.preventDefault()}
             >
               <Space>
-                <p>Brookes</p>
+                {user?.name}
                 <DownOutlined />
               </Space>
             </a>

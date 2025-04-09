@@ -1,9 +1,9 @@
 import React from "react";
-import { Button, Form, Input, message } from "antd";
+import { Button, Form, Input } from "antd";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import { BASE_URL } from "../utils/config";
-import axios from "axios";
+import api from "../utils/config";
+
 import { useNavigate } from "react-router-dom";
 
 const Login = () => {
@@ -12,13 +12,13 @@ const Login = () => {
 
   const handleSubmit = (values) => {
     console.log(values);
-    axios
-      .post(`${BASE_URL}/auth/login`, values)
+    api
+      .post("/auth/login", values)
       .then((res) => {
         console.log(res.data);
         const { access_token } = res.data;
         if (access_token) {
-          localStorage.setItem("token", access_token);
+          localStorage.setItem("access_token", access_token);
           console.log("Token successfully set!");
           navigate("/dashboard");
         }

@@ -1,10 +1,30 @@
-import React, { useState } from "react";
-import { Modal, Form, Input, Button, Select } from "antd";
+import React, { useEffect, useState } from "react";
+import { toast } from "react-toastify";
+import { Modal, Form, Input, Button, Select, Table, Tag } from "antd";
 import { AiOutlinePlus } from "react-icons/ai";
+import { useUser } from "../utils/userContext";
+import api from "../utils/config";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 const Requisition = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { user } = useUser();
+
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    if (user && isModalOpen) {
+      form.setFieldsValue({
+        staffId: user.staffId,
+        roomNo: user.roomNo,
+        unitId: user.unit.name, // Display name, but send ID later
+        departmentId: user.department.name,
+      });
+    }
+  }, [user, form, isModalOpen]);
+
   const showModal = () => {
     setIsModalOpen(true);
   };
@@ -14,18 +34,123 @@ const Requisition = () => {
     form.resetFields(); // Reset form when closing
   };
 
+  //Mutation to Create Requisition
+  const { mutate: createRequisition, isPending } = useMutation({
+    mutationKey: "createRequisition",
+    mutationFn: (values) => {
+      return api.post("/user/requisitions", values);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["requisition"]);
+      form.resetFields();
+      setIsModalOpen(false);
+      toast.success("Requisition created successfully");
+    },
+    onError: (error) => {
+      toast.error(error?.message);
+    },
+  });
+
   const handleSubmit = (values) => {
-    console.log("Form Values:", values);
+    const payload = {
+      ...values,
+      quantity: Number(values.quantity),
+      unitId: user.unit.id,
+      departmentId: user.department.id,
+      urgency: values.urgency.toUpperCase(),
+    };
+
+    console.log("Final Payload:", payload);
+
+    createRequisition(payload);
+
     setIsModalOpen(false);
     form.resetFields(); // Reset after submission
   };
+
+  //Query to get user requisition
+
+  const { data: requisition } = useQuery({
+    queryKey: ["requisition"],
+    queryFn: () => api.get("/user/requisitions"),
+  });
+  console.log(requisition?.data);
+
+  const columns = [
+    // {
+    //   title: "Requisition ID",
+    //   dataIndex: "requisitionID",
+    //   key: "requisitionID",
+    // },
+    {
+      title: "Description",
+      dataIndex: "itemDescription",
+      key: "itemDescription",
+    },
+    {
+      title: "Quantity",
+      dataIndex: "quantity",
+      key: "quantity",
+    },
+    {
+      title: "Urgency",
+      dataIndex: "urgency",
+      key: "urgency",
+      render: (urgency) => (
+        <Tag
+          color={
+            urgency === "HIGH"
+              ? "red"
+              : urgency === "MEDIUM"
+              ? "orange"
+              : "green"
+          }
+        >
+          {urgency}
+        </Tag>
+      ),
+    },
+    {
+      title: "Purpose",
+      dataIndex: "purpose",
+      key: "purpose",
+    },
+    {
+      title: "Status",
+      dataIndex: "status",
+      key: "status",
+      render: (status) => (
+        <Tag
+          color={
+            status === "PENDING_DEPT_APPROVAL"
+              ? "blue"
+              : status === "APPROVED"
+              ? "green"
+              : "red"
+          }
+        >
+          {status.replaceAll("_", " ")}
+        </Tag>
+      ),
+    },
+    {
+      title: "Created At",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      render: (createdAt) =>
+        new Date(createdAt).toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }),
+    },
+  ];
 
   return (
     <div className="px-[3rem] py-[2rem]">
       {/* Button to Open Modal */}
       <div className=" flex justify-end">
         <Button type="primary" icon={<AiOutlinePlus />} onClick={showModal}>
-          Add Request
+          Create Requisition
         </Button>
       </div>
 
@@ -42,7 +167,7 @@ const Requisition = () => {
             label="Staff ID"
             rules={[{ required: true }]}
           >
-            <Input placeholder="Enter Staff ID" />
+            <Input disabled />
           </Form.Item>
 
           <Form.Item
@@ -67,9 +192,9 @@ const Requisition = () => {
             rules={[{ required: true }]}
           >
             <Select placeholder="Select Urgency">
-              <Select.Option value="low">Low</Select.Option>
-              <Select.Option value="medium">Medium</Select.Option>
-              <Select.Option value="high">High</Select.Option>
+              <Select.Option value="low">LOW</Select.Option>
+              <Select.Option value="medium">MEDIUM</Select.Option>
+              <Select.Option value="high">HIGH</Select.Option>
             </Select>
           </Form.Item>
 
@@ -81,8 +206,8 @@ const Requisition = () => {
             <Input.TextArea placeholder="Enter Purpose" />
           </Form.Item>
 
-          <Form.Item name="unitId" label="Unit ID" rules={[{ required: true }]}>
-            <Input placeholder="Enter Unit ID" />
+          <Form.Item name="unitId" label="Unit ID">
+            <Input disabled />
           </Form.Item>
 
           <Form.Item
@@ -90,7 +215,7 @@ const Requisition = () => {
             label="Department ID"
             rules={[{ required: true }]}
           >
-            <Input placeholder="Enter Department ID" />
+            <Input disabled />
           </Form.Item>
 
           <Form.Item name="roomNo" label="Room No" rules={[{ required: true }]}>
@@ -99,12 +224,20 @@ const Requisition = () => {
 
           {/* Submit Button */}
           <Form.Item>
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" loading={isPending} block>
               Submit
             </Button>
           </Form.Item>
         </Form>
       </Modal>
+
+      <div className="pl-[6rem] pt-6">
+        <Table
+          columns={columns}
+          dataSource={requisition?.data || []}
+          rowKey="requisitionID"
+        />
+      </div>
     </div>
   );
 };
