@@ -2,8 +2,11 @@ import { Link } from "react-router-dom";
 import { LuGitPullRequestCreate } from "react-icons/lu";
 import { MdOutlineInventory2 } from "react-icons/md";
 import { FaHome } from "react-icons/fa";
+import { useUser } from "../utils/userContext";
 
 const Sidebar = () => {
+  const { user } = useUser();
+  console.log(user);
   return (
     <div>
       <div className="w-full h-full bg-center scrollbar-hidden">
@@ -24,12 +27,15 @@ const Sidebar = () => {
                 <p className="text-black">Requisition</p>
               </li>
             </Link>
-            <Link to="itd-approval">
-              <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
-                <LuGitPullRequestCreate className=" text-[3rem] w-[43px] text-black" />
-                <p className="text-black">Approve Requisition</p>
-              </li>
-            </Link>
+            {/* Conditional rendering for supervisor-only link */}
+            {user?.roles?.includes("itd_approver") && (
+              <Link to="itd-approval">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <LuGitPullRequestCreate className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black">Approve Requisition</p>
+                </li>
+              </Link>
+            )}
             <Link to="/locator">
               <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                 <MdOutlineInventory2 className=" text-[3rem] w-[43px] text-black" />

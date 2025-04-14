@@ -80,7 +80,7 @@ const Dashboard = () => {
 
   return (
     <div>
-      <Layout />
+     
       <Outlet />
       <div className="px-[10rem] py-[3rem]">
         <div className="space-y-6 px-2 sm:px-4">
