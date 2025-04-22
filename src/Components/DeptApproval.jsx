@@ -1,32 +1,34 @@
+import { AiOutlineCheck, AiOutlineClose } from "react-icons/ai";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import React, { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import api from "../utils/config";
 import {
-  Button,
-  Input,
-  Modal,
   Popconfirm,
-  Popover,
+  message,
   Space,
   Table,
+  Popover,
   Tag,
+  Modal,
+  Button,
+  Input,
 } from "antd";
-import api from "../utils/config";
-import { AiOutlineCheck, AiOutlineClose } from "react-icons/ai";
 import { toast } from "react-toastify";
+import { GiButterToast } from "react-icons/gi";
+import { useQueryClient } from "@tanstack/react-query";
 
-const ITDApproval = () => {
+const DeptApproval = () => {
   const queryClient = useQueryClient();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const { data: approval } = useQuery({
-    queryKey: ["approval"],
+  const { data } = useQuery({
+    queryKey: ["deptApproval"],
     queryFn: () => {
-      return api.get("/itd/requisitions");
+      return api.get("/dept/requisitions");
     },
   });
-
-  console.log(approval);
+  //   console.log(data?.data);
 
   const columns = [
     // {
@@ -34,16 +36,27 @@ const ITDApproval = () => {
     //   dataIndex: "requisitionID",
     //   key: "requisitionID"
     // },
-    {
-      title: "Staff Name",
-      dataIndex: ["staff", "name"],
-      key: "staffName",
-    },
+    // {
+    //   title: "Staff Name",
+    //   dataIndex: ["staff", "name"],
+    //   key: "staffName"
+    // },
     // {
     //   title: "Staff Email",
     //   dataIndex: ["staff", "email"],
     //   key: "staffEmail"
     // },
+
+    {
+      title: "Staff",
+      dataIndex: ["staff", "name"],
+      key: "staff",
+    },
+    {
+      title: "Room No",
+      dataIndex: "roomNo",
+      key: "roomNo",
+    },
     {
       title: "Item Description",
       dataIndex: "itemDescription",
@@ -55,25 +68,22 @@ const ITDApproval = () => {
       key: "quantity",
     },
     {
-      title: "Urgency",
-      dataIndex: "urgency",
-      key: "urgency",
-    },
-    {
       title: "Purpose",
       dataIndex: "purpose",
       key: "purpose",
     },
     {
+      title: "Urgency",
+      dataIndex: "urgency",
+      key: "urgency",
+    },
+
+    {
       title: "Department",
       dataIndex: ["department", "name"],
       key: "department",
     },
-    {
-      title: "Room No",
-      dataIndex: "roomNo",
-      key: "roomNo",
-    },
+
     {
       title: "Status",
       dataIndex: "status",
@@ -120,7 +130,7 @@ const ITDApproval = () => {
 
   //Mutation function to approve requisition
   const approveRequestMutation = useMutation({
-    mutationFn: (recordId) => api.patch(`/itd/req/${recordId}/approve`),
+    mutationFn: (recordId) => api.patch(`/dept/req/${recordId}/approve`),
     onSuccess: () => {
       toast.success("Request approved!");
 
@@ -135,19 +145,20 @@ const ITDApproval = () => {
     approveRequestMutation.mutate(record?.id);
   };
 
+
   //Mutation to deline request
   const declineRequestMutation = useMutation({
     mutationFn: ({ id, reason }) =>
-      api.patch(`/itd/req/${id}/decline`, { reason }),
-
+      api.patch(`/dept/req/${id}/decline`, { reason }),
+  
     onSuccess: () => {
       toast.success("Requisition declined!");
-      queryClient.invalidateQueries(["requisition"]);
+      queryClient.invalidateQueries(["requisition"]); 
       setIsModalVisible(false);
       setDeclineReason("");
       setSelectedRecord(null);
     },
-
+  
     onError: () => {
       toast.error("Failed to decline requisition.");
     },
@@ -158,12 +169,14 @@ const ITDApproval = () => {
       toast.error("Please provide a reason for declining");
       return;
     }
-
+  
     declineRequestMutation.mutate({
       id: selectedRecord?.id,
       reason: declineReason,
     });
   };
+  
+  
 
   // Function to open modal instead of direct confirmation
   const showDeclineModal = (record) => {
@@ -177,10 +190,11 @@ const ITDApproval = () => {
     setDeclineReason("");
     setSelectedRecord(null);
   };
+
   return (
     <div className="px-[10rem]">
-      <p>Approval</p>
-      <Table dataSource={approval?.data || []} columns={columns} rowKey="id" />
+      <h2 className="p-4">Requisition Approval </h2>
+      <Table dataSource={data?.data || []} columns={columns} rowKey="id" />
       <Modal
         title="Decline Request"
         open={isModalVisible}
@@ -206,4 +220,4 @@ const ITDApproval = () => {
   );
 };
 
-export default ITDApproval;
+export default DeptApproval;

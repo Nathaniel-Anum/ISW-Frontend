@@ -35,6 +35,7 @@ const Dashboard = () => {
       .then((res) => {
         setUser(res.data);
         console.log("Profile:", res.data);
+        localStorage.setItem("user", JSON.stringify(res.data));
       })
       .catch((err) => {
         console.error("Failed to fetch profile:", err);
@@ -80,7 +81,6 @@ const Dashboard = () => {
 
   return (
     <div>
-     
       <Outlet />
       <div className="px-[10rem] py-[3rem]">
         <div className="space-y-6 px-2 sm:px-4">

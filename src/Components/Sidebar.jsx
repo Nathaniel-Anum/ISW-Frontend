@@ -6,7 +6,7 @@ import { useUser } from "../utils/userContext";
 
 const Sidebar = () => {
   const { user } = useUser();
-  console.log(user);
+  // console.log(user);
   return (
     <div>
       <div className="w-full h-full bg-center scrollbar-hidden">
@@ -27,16 +27,34 @@ const Sidebar = () => {
                 <p className="text-black">Requisition</p>
               </li>
             </Link>
-            {/* Conditional rendering for supervisor-only link */}
+            {/* Conditional rendering for department Approver-only link */}
+            {user?.roles?.includes("dept_approver") && (
+              <Link to="dpt-approval">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <LuGitPullRequestCreate className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black">Approve</p>
+                </li>
+              </Link>
+            )}
+            {/* Conditional rendering for ITD Approver-only link */}
             {user?.roles?.includes("itd_approver") && (
               <Link to="itd-approval">
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                   <LuGitPullRequestCreate className=" text-[3rem] w-[43px] text-black" />
-                  <p className="text-black">Approve Requisition</p>
+                  <p className="text-black">Approve</p>
                 </li>
               </Link>
             )}
-            <Link to="/locator">
+            {/* Conditional rendering for ITD Approver-only link */}
+            {user?.roles?.includes("stores_officer") && (
+              <Link to="stores-officer">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <LuGitPullRequestCreate className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black">Stores</p>
+                </li>
+              </Link>
+            )}
+            <Link to="inventory">
               <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                 <MdOutlineInventory2 className=" text-[3rem] w-[43px] text-black" />
                 <p className="text-black">Inventory</p>

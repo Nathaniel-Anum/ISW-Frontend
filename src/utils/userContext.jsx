@@ -5,7 +5,10 @@ const UserContext = createContext(null);
 
 // Export provider
 export const UserProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem("user");
+    return storedUser ? JSON.parse(storedUser) : null;
+  });
 
   return (
     <UserContext.Provider value={{ user, setUser }}>

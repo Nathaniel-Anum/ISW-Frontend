@@ -115,6 +115,7 @@ const Requisition = () => {
       dataIndex: "purpose",
       key: "purpose",
     },
+
     {
       title: "Status",
       dataIndex: "status",
@@ -126,6 +127,11 @@ const Requisition = () => {
               ? "blue"
               : status === "APPROVED"
               ? "green"
+              : status === "PENDING_ITD_APPROVAL"
+              ? "yellow"
+              : status === "ITD_APPROVED" || status === "PROCESSED"
+              ? "green"
+              
               : "red"
           }
         >
@@ -143,6 +149,11 @@ const Requisition = () => {
           timeStyle: "short",
         }),
     },
+    {
+      title: "Decline Reason",
+      dataIndex: "declineReason",
+      key: "declineReason",
+    }
   ];
 
   return (

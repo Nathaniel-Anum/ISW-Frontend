@@ -6,7 +6,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { useUser } from "../utils/userContext";
 
 const Navbar = () => {
-  const { user } = useUser();
+  const { user, setUser } = useUser();
   const currentDate = new Date();
   // console.log(currentDate);
 
@@ -14,8 +14,9 @@ const Navbar = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
+    setUser(null);
     navigate("/");
-    // console.log("Logging out...")
+    localStorage.removeItem("user");
   };
 
   // Assuming `user` is accessible globally in your app
