@@ -27,6 +27,17 @@ const InvOfficer = () => {
   });
   console.log(invuser?.data);
 
+  // get device fields
+  const { data: deviceFieldsData, isLoading: isDeviceFieldsLoading } = useQuery(
+    {
+      queryKey: ["deviceFields"],
+      queryFn: () => api.get("inventory/device-fields"),
+    }
+  );
+  console.log(deviceFieldsData);
+
+  const DEVICE_FIELDS = deviceFieldsData?.data || {};
+
   const showModal = (record) => {
     setSelectedRecord(record);
     setIsModalOpen(true);
@@ -105,22 +116,48 @@ const InvOfficer = () => {
       ),
     },
   ];
+  //   useEffect(() => {
+  //     if (selectedRecord) {
+  //       form.setFieldsValue({
+  //         userId: selectedRecord?.user?.name || "",
+  //         department: selectedRecord?.department?.name || "",
+  //         unit: selectedRecord?.unit?.name || "",
+  //         status: selectedRecord?.status || "",
+  //         remarks: selectedRecord?.remarks || "",
+  //         deviceType: selectedRecord?.itItem?.deviceType || "",
+  //         laptopBrand: selectedRecord?.itItem?.brand || "",
+  //         laptopModel: selectedRecord?.itItem?.model || "",
+  //       });
+  //     }
+  //   }, [selectedRecord, form]);
+
   useEffect(() => {
-    if (selectedRecord) {
-      form.setFieldsValue({
+    if (selectedRecord && DEVICE_FIELDS) {
+      const deviceType = selectedRecord?.itItem?.deviceType || "LAPTOP";
+      const fields = DEVICE_FIELDS[deviceType] || DEVICE_FIELDS.LAPTOP;
+      const formValues = {
         userId: selectedRecord?.user?.name || "",
         department: selectedRecord?.department?.name || "",
         unit: selectedRecord?.unit?.name || "",
         status: selectedRecord?.status || "",
         remarks: selectedRecord?.remarks || "",
-        deviceType: selectedRecord?.itItem?.deviceType || "",
-        laptopBrand: selectedRecord?.itItem?.brand || "",
-        laptopModel: selectedRecord?.itItem?.model || "",
+        deviceType: deviceType,
+      };
+      // Map device-specific fields
+      fields.forEach((field) => {
+        if (field.name.endsWith("Brand")) {
+          formValues[field.name] = selectedRecord?.itItem?.brand || "";
+        } else if (field.name.endsWith("Model")) {
+          formValues[field.name] = selectedRecord?.itItem?.model || "";
+        } else {
+          formValues[field.name] = selectedRecord?.itItem?.[field.name] || "";
+        }
       });
+      form.setFieldsValue(formValues);
     }
-  }, [selectedRecord, form]);
+  }, [selectedRecord, form, DEVICE_FIELDS]);
 
-  //User mutate
+  //Main edit mutate
   const { mutate } = useMutation({
     mutationKey: ["updateInventory"],
     mutationFn: (payload) =>
@@ -153,8 +190,8 @@ const InvOfficer = () => {
     console.log(values);
     const payload = {
       userId: values.userId,
-      department: values.department,
-      unitId: values.unitId,
+      departmentId: values.departmentId,
+      unitId: values.unitIdHidden,
       status: values.status,
       remarks: values.remarks,
     };
@@ -162,32 +199,46 @@ const InvOfficer = () => {
     mutate(payload);
   }
 
+  //   function handleForm(values) {
+  //     console.log(values);
+  //     const payload = {
+  //       deviceType: values.deviceType,
+  //       laptopBrand: values.laptopBrand,
+  //       laptopModel: values.laptopModel,
+  //       laptopSerialNumber: values.laptopSerialNumber,
+  //       laptopMacAddress: values.laptopMacAddress,
+  //       laptopProcessorType: values.laptopProcessorType,
+  //       laptopMemorySize: values.laptopMemorySize,
+  //       laptopStorageDriveType: values.laptopStorageDriveType,
+  //       laptopStorageDriveSize: values.laptopStorageDriveSize,
+  //       laptopOperatingSystem: values.laptopOperatingSystem,
+  //       laptopEndpointSecurity: values.laptopEndpointSecurity,
+  //       laptopSpiceworksMonitoring: values.laptopSpiceworksMonitoring,
+  //     };
+  //     deviceMutate(payload);
+  //   }
+
   function handleForm(values) {
-    console.log(values);
-    const payload = {
-      deviceType: values.deviceType,
-      laptopBrand: values.laptopBrand,
-      laptopModel: values.laptopModel,
-      laptopSerialNumber: values.laptopSerialNumber,
-      laptopMacAddress: values.laptopMacAddress,
-      laptopProcessorType: values.laptopProcessorType,
-      laptopMemorySize: values.laptopMemorySize,
-      laptopStorageDriveType: values.laptopStorageDriveType,
-      laptopStorageDriveSize: values.laptopStorageDriveSize,
-      laptopOperatingSystem: values.laptopOperatingSystem,
-      laptopEndpointSecurity: values.laptopEndpointSecurity,
-      laptopSpiceworksMonitoring: values.laptopSpiceworksMonitoring,
-    };
+    const deviceType = selectedRecord?.itItem?.deviceType || "LAPTOP";
+    const fields = DEVICE_FIELDS[deviceType] || DEVICE_FIELDS.LAPTOP || [];
+    const payload = { deviceType };
+    fields.forEach((field) => {
+      payload[field.name] = values[field.name];
+    });
     deviceMutate(payload);
+  }
+  if (isDeviceFieldsLoading) {
+    return <div>Loading device fields...</div>;
   }
   return (
     <div className="pt-6">
-      <div className="flex justify-center items-center pl-[5.2rem]">
+      <div className="flex justify-center items-center pl-[5.6rem]">
         <Table columns={column} dataSource={data?.data || []} />
         <Modal
           open={isModalOpen}
           onCancel={handleCancel}
           footer={null}
+          bodyStyle={{ maxHeight: "65vh", overflowY: "auto" }}
           title="Edit"
         >
           <div className="flex justify-center gap-4 mb-4">
@@ -208,7 +259,23 @@ const InvOfficer = () => {
           {activeForm === "user" ? (
             <Form form={form} layout="vertical" onFinish={handleSubmit}>
               <Form.Item name="userId" label="Name">
-                <Select placeholder="Select a user">
+                <Select
+                  placeholder="Select a user"
+                  onChange={(value) => {
+                    const selectedUser = invuser?.data?.find(
+                      (u) => u.id === value
+                    );
+
+                    if (selectedUser) {
+                      form.setFieldsValue({
+                        department: selectedUser.department?.name || "",
+                        unitId: selectedUser.unit?.name || "",
+                        departmentId: selectedUser.departmentId,
+                        unitIdHidden: selectedUser.unitId, // needed for backend
+                      });
+                    }
+                  }}
+                >
                   {invuser?.data?.map((user) => (
                     <Select.Option key={user.id} value={user.id}>
                       {user.name}
@@ -218,10 +285,19 @@ const InvOfficer = () => {
               </Form.Item>
 
               <Form.Item name="department" label="Department">
-                <Input />
+                <Input disabled />
               </Form.Item>
 
               <Form.Item name="unitId" label="Unit">
+                <Input disabled />
+              </Form.Item>
+
+              {/* Hidden fields to store IDs for backend */}
+              <Form.Item name="departmentId" hidden>
+                <Input />
+              </Form.Item>
+
+              <Form.Item name="unitIdHidden" hidden>
                 <Input />
               </Form.Item>
 
@@ -243,49 +319,24 @@ const InvOfficer = () => {
           ) : (
             <Form form={form} layout="vertical" onFinish={handleForm}>
               <Form.Item name="deviceType" label="Device Type">
-                <Input />
+                <Input disabled />
               </Form.Item>
-              <Form.Item name="laptopBrand" label="Brand">
-                <Input />
-              </Form.Item>
-              <Form.Item name="laptopModel" label="Model">
-                <Input />
-              </Form.Item>
-              <Form.Item name="laptopSerialNumber" label="Serial Number">
-                <Input />
-              </Form.Item>
-              <Form.Item name="laptopMacAddress" label="MAC Address">
-                <Input />
-              </Form.Item>
-              <Form.Item name="laptopProcessorType" label="Processor">
-                <Input />
-              </Form.Item>
-              <Form.Item name="laptopMemorySize" label="Memory Size">
-                <Input />
-              </Form.Item>
-              <Form.Item name="laptopStorageDriveType" label="Drive Type">
-                <Input />
-              </Form.Item>
-              <Form.Item name="laptopStorageDriveSize" label="Drive Size">
-                <Input />
-              </Form.Item>
-              <Form.Item name="laptopOperatingSystem" label="OS">
-                <Input />
-              </Form.Item>
-              <Form.Item
-                name="laptopEndpointSecurity"
-                label="Endpoint Security"
-                valuePropName="checked"
-              >
-                <Switch />
-              </Form.Item>
-              <Form.Item
-                name="laptopSpiceworksMonitoring"
-                label="Spiceworks Monitoring"
-                valuePropName="checked"
-              >
-                <Switch />
-              </Form.Item>
+              {DEVICE_FIELDS[
+                selectedRecord?.itItem?.deviceType || "LAPTOP"
+              ].map((field) => (
+                <Form.Item
+                  key={field.name}
+                  name={field.name}
+                  label={field.label}
+                  valuePropName={field.type === "switch" ? "checked" : "value"}
+                >
+                  {field.type === "switch" ? (
+                    <Switch disabled={field.disabled} />
+                  ) : (
+                    <Input disabled={field.disabled} />
+                  )}
+                </Form.Item>
+              ))}
               <Button type="primary" htmlType="submit">
                 Submit Device Info
               </Button>
