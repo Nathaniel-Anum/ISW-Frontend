@@ -19,6 +19,14 @@ const InvOfficer = () => {
     queryFn: () => api.get("/inventory/all"),
   });
   console.log(data?.data);
+
+  //useQuery for users
+  const { data: invuser } = useQuery({
+    queryKey: ["invuser"],
+    queryFn: () => api.get("/inventory/users"),
+  });
+  console.log(invuser?.data);
+
   const showModal = (record) => {
     setSelectedRecord(record);
     setIsModalOpen(true);
@@ -100,9 +108,9 @@ const InvOfficer = () => {
   useEffect(() => {
     if (selectedRecord) {
       form.setFieldsValue({
-        name: selectedRecord?.user?.name || "",
+        userId: selectedRecord?.user?.name || "",
         department: selectedRecord?.department?.name || "",
-        unit: selectedRecord?.unitId || "",
+        unit: selectedRecord?.unit?.name || "",
         status: selectedRecord?.status || "",
         remarks: selectedRecord?.remarks || "",
         deviceType: selectedRecord?.itItem?.deviceType || "",
@@ -144,9 +152,9 @@ const InvOfficer = () => {
   function handleSubmit(values) {
     console.log(values);
     const payload = {
-      name: values.name,
+      userId: values.userId,
       department: values.department,
-      unitId: values.unit,
+      unitId: values.unitId,
       status: values.status,
       remarks: values.remarks,
     };
@@ -187,28 +195,34 @@ const InvOfficer = () => {
               type={activeForm === "user" ? "primary" : "default"}
               onClick={() => setActiveForm("user")}
             >
-              User
+              Main
             </Button>
             <Button
               type={activeForm === "device" ? "primary" : "default"}
               onClick={() => setActiveForm("device")}
             >
-              Device
+              Device Details
             </Button>
           </div>
 
           {activeForm === "user" ? (
             <Form form={form} layout="vertical" onFinish={handleSubmit}>
-              <Form.Item name="name" label="Name">
-                <Input />
+              <Form.Item name="userId" label="Name">
+                <Select placeholder="Select a user">
+                  {invuser?.data?.map((user) => (
+                    <Select.Option key={user.id} value={user.id}>
+                      {user.name}
+                    </Select.Option>
+                  ))}
+                </Select>
               </Form.Item>
 
               <Form.Item name="department" label="Department">
                 <Input />
               </Form.Item>
 
-              <Form.Item name="unit" label="Unit">
-                <Input disabled />
+              <Form.Item name="unitId" label="Unit">
+                <Input />
               </Form.Item>
 
               <Form.Item name="status" label="Status">
