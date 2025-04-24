@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useEffect } from "react";
 import api from "../utils/config";
-import { Button, Form, Input, Modal, Select, Switch, Table } from "antd";
+import { Button, Form, Input, Modal, Select, Switch, Table, Tabs, Tag } from "antd";
 import { EyeOutlined } from "@ant-design/icons";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -47,7 +47,16 @@ const InvOfficer = () => {
     setIsModalOpen(false);
     setSelectedRecord(null);
   };
-
+  const tabItems = [
+    {
+      key: "user",
+      label: "Main",
+    },
+    {
+      key: "device",
+      label: "Device Details",
+    },
+  ];
   const column = [
     {
       title: "User",
@@ -83,6 +92,20 @@ const InvOfficer = () => {
       title: "Status",
       dataIndex: "status",
       key: "status",
+      render: (status) => (
+         <Tag
+                  color={
+                    status === "INACTIVE" || status === "DISPOSED" 
+                      ? "red"
+                      : status === "OBSOLETE" || status === "NON_FUNCTIONAL"
+                      ? "orange"
+                      : "green"
+                  }
+                >
+                 {status.replaceAll("_", " ")}
+                </Tag>
+        
+      ),
     },
 
     {
@@ -241,20 +264,11 @@ const InvOfficer = () => {
           bodyStyle={{ maxHeight: "65vh", overflowY: "auto" }}
           title="Edit"
         >
-          <div className="flex justify-center gap-4 mb-4">
-            <Button
-              type={activeForm === "user" ? "primary" : "default"}
-              onClick={() => setActiveForm("user")}
-            >
-              Main
-            </Button>
-            <Button
-              type={activeForm === "device" ? "primary" : "default"}
-              onClick={() => setActiveForm("device")}
-            >
-              Device Details
-            </Button>
-          </div>
+          <Tabs
+            activeKey={activeForm}
+            onChange={(key) => setActiveForm(key)}
+            items={tabItems}
+          />
 
           {activeForm === "user" ? (
             <Form form={form} layout="vertical" onFinish={handleSubmit}>
@@ -305,6 +319,11 @@ const InvOfficer = () => {
                 <Select>
                   <Select.Option value="ACTIVE">Active</Select.Option>
                   <Select.Option value="INACTIVE">Inactive</Select.Option>
+                  <Select.Option value="NON_FUNCTIONAL">
+                    Non Functional
+                  </Select.Option>
+                  <Select.Option value="OBSOLETE">Obsolete</Select.Option>
+                  <Select.Option value="DISPOSED">Disposed</Select.Option>
                 </Select>
               </Form.Item>
 
