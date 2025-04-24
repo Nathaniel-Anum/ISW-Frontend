@@ -139,20 +139,7 @@ const InvOfficer = () => {
       ),
     },
   ];
-  //   useEffect(() => {
-  //     if (selectedRecord) {
-  //       form.setFieldsValue({
-  //         userId: selectedRecord?.user?.name || "",
-  //         department: selectedRecord?.department?.name || "",
-  //         unit: selectedRecord?.unit?.name || "",
-  //         status: selectedRecord?.status || "",
-  //         remarks: selectedRecord?.remarks || "",
-  //         deviceType: selectedRecord?.itItem?.deviceType || "",
-  //         laptopBrand: selectedRecord?.itItem?.brand || "",
-  //         laptopModel: selectedRecord?.itItem?.model || "",
-  //       });
-  //     }
-  //   }, [selectedRecord, form]);
+  
 
   useEffect(() => {
     if (selectedRecord && DEVICE_FIELDS) {
@@ -222,24 +209,7 @@ const InvOfficer = () => {
     mutate(payload);
   }
 
-  //   function handleForm(values) {
-  //     console.log(values);
-  //     const payload = {
-  //       deviceType: values.deviceType,
-  //       laptopBrand: values.laptopBrand,
-  //       laptopModel: values.laptopModel,
-  //       laptopSerialNumber: values.laptopSerialNumber,
-  //       laptopMacAddress: values.laptopMacAddress,
-  //       laptopProcessorType: values.laptopProcessorType,
-  //       laptopMemorySize: values.laptopMemorySize,
-  //       laptopStorageDriveType: values.laptopStorageDriveType,
-  //       laptopStorageDriveSize: values.laptopStorageDriveSize,
-  //       laptopOperatingSystem: values.laptopOperatingSystem,
-  //       laptopEndpointSecurity: values.laptopEndpointSecurity,
-  //       laptopSpiceworksMonitoring: values.laptopSpiceworksMonitoring,
-  //     };
-  //     deviceMutate(payload);
-  //   }
+  
 
   function handleForm(values) {
     const deviceType = selectedRecord?.itItem?.deviceType || "LAPTOP";
@@ -255,7 +225,7 @@ const InvOfficer = () => {
   }
   return (
     <div className="pt-6">
-      <div className="flex justify-center items-center pl-[5.6rem]">
+      <div className="flex justify-center items-center pl-[9rem]">
         <Table columns={column} dataSource={data?.data || []} />
         <Modal
           open={isModalOpen}
