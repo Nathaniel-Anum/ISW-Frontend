@@ -9,6 +9,8 @@ import DashboardLayout from "./Components/DashboardLayout";
 import DeptApproval from "./Components/DeptApproval";
 import StoresOfficer from "./Components/StoresOfficer";
 import InvOfficer from "./Components/Inv.Officer";
+import StoresPage from "./Components/StoresPage";
+
 function App() {
   return (
     <div>
@@ -22,6 +24,7 @@ function App() {
             <Route path="itd-approval" element={<ITDApproval />} />
             <Route path="stores-officer" element={<StoresOfficer />} />
             <Route path="inventory" element={<InvOfficer />} />
+            <Route path="stores" element={<StoresPage />} />
           </Route>
         </Routes>
       </Router>
