@@ -15,7 +15,7 @@ import { AiOutlinePlus } from "react-icons/ai";
 import { toast } from "react-toastify";
 
 const StoresPage = () => {
-    const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
 

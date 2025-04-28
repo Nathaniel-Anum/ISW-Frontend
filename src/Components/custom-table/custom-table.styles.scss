@@ -1,0 +1,15 @@
+:root {
+  --color-primary: #4e67eb;
+}
+
+.custom-table {
+  border-spacing: 0;
+  &__head {
+  }
+
+  &__body {
+    tr:nth-child(even) {
+      //   background-color: rgba(128, 128, 128, 0.051);
+    }
+  }
+}
