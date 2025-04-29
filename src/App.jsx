@@ -18,6 +18,7 @@ import Units from "./BackOffice/Units";
 import Supplier from "./BackOffice/Supplier";
 import Roles from "./BackOffice/Roles";
 import ItItems from "./BackOffice/ItItems";
+import Permissions from "./BackOffice/Permissions";
 
 function App() {
   return (
@@ -40,6 +41,7 @@ function App() {
             <Route path="unit" element={<Units />} />
             <Route path="supplier" element={<Supplier />} />
             <Route path="roles" element={<Roles />} />
+            <Route path="permissions" element={<Permissions />} />
             <Route path="it-items" element={<ItItems />} />
           </Route>
         </Routes>

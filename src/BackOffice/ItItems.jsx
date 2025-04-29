@@ -1,7 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import api from "../utils/config";
-import { Button, Table, Modal, Form, Input, Select, Checkbox } from "antd";
+import {
+  Button,
+  Table,
+  Modal,
+  Form,
+  Input,
+  Select,
+  Checkbox,
+  Popconfirm,
+} from "antd";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { AiOutlinePlus } from "react-icons/ai";
 import { toast } from "react-toastify";
@@ -37,10 +46,18 @@ const ItItems = () => {
     console.log("Editing record:", record);
     // Open modal, set form fields, etc
   };
-
   const handleDelete = (record) => {
-    console.log("Deleting record:", record);
-    // Confirm delete and call your delete API
+    console.log("deleting this id", record?.key);
+    api
+      .delete(`/admin/it-items/${record?.key}`)
+      .then(() => {
+        toast.success("Department deleted successfully!");
+        queryClient.invalidateQueries(["getItItems"]);
+      })
+      .catch((error) => {
+        console.error("Delete failed:", error);
+        toast.error("Failed to delete department.");
+      });
   };
   const { Option } = Select;
   const columns = [
@@ -79,16 +96,21 @@ const ItItems = () => {
       key: "action",
       render: (_, record) => (
         <div className="flex items-center gap-3">
-          <FiEdit
+          {/* <FiEdit
             className="text-blue-500 cursor-pointer"
             size={18}
             onClick={() => handleEdit(record)}
-          />
-          <FiTrash2
-            className="text-red-500 cursor-pointer"
-            size={18}
-            onClick={() => handleDelete(record)}
-          />
+          /> */}
+          <div className="flex items-center gap-3">
+            <Popconfirm
+              title="Are you sure to delete this department?"
+              onConfirm={() => handleDelete(record)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <FiTrash2 className="text-red-500 cursor-pointer" size={18} />
+            </Popconfirm>
+          </div>
         </div>
       ),
     },

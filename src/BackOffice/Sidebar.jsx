@@ -122,7 +122,7 @@ const Sidebar = () => {
             <li>
               <Link
                 className="flex py-4 transition-colors ease-out duration-200 gap-4 items-center justify-start pl-[20%]  group hover:bg-accent"
-                to={"permissions"}
+                to={"/backoffice/dashboard/permissions"}
               >
                 <Permission />
                 <span className="text-white text-sm font-medium group-hover:text-white">
@@ -166,8 +166,6 @@ const Sidebar = () => {
                 </span>
               </Link>
             </li> */}
-
-           
 
             {/* <li>
               <Link

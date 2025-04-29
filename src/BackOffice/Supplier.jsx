@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import api from "../utils/config";
-import { Button, Input, Table, Form, DatePicker, Modal } from "antd";
+import { Button, Input, Table, Form, DatePicker, Modal, Popconfirm } from "antd";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { AiOutlinePlus } from "react-icons/ai";
 import { toast } from "react-toastify";
@@ -34,9 +34,17 @@ const Supplier = () => {
     // Open modal, set form fields, etc
   };
 
-  const handleDelete = (record) => {
-    console.log("Deleting record:", record);
-    // Confirm delete and call your delete API
+  const handleDelete = (id) => {
+    api
+      .delete(`/admin/suppliers/${id}`)
+      .then(() => {
+        toast.success("Department deleted successfully!");
+        queryClient.invalidateQueries(["getAllDepartments"]);
+      })
+      .catch((error) => {
+        console.error("Delete failed:", error);
+        toast.error("Failed to delete department.");
+      });
   };
 
   const columns = [
@@ -76,16 +84,21 @@ const Supplier = () => {
       key: "action",
       render: (_, record) => (
         <div className="flex items-center gap-3">
-          <FiEdit
+          {/* <FiEdit
             className="text-blue-500 cursor-pointer"
             size={18}
             onClick={() => handleEdit(record)}
-          />
-          <FiTrash2
-            className="text-red-500 cursor-pointer"
-            size={18}
-            onClick={() => handleDelete(record)}
-          />
+          /> */}
+          <div className="flex items-center gap-3">
+          <Popconfirm
+            title="Are you sure to delete this department?"
+            onConfirm={() => handleDelete(record.id)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <FiTrash2 className="text-red-500 cursor-pointer" size={18} />
+          </Popconfirm>
+        </div>
         </div>
       ),
     },
