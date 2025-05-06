@@ -1,7 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useState } from "react";
 import api from "../utils/config";
-import { Button, Input, Table, Form, DatePicker, Modal, Popconfirm } from "antd";
+import {
+  Button,
+  Input,
+  Table,
+  Form,
+  DatePicker,
+  Modal,
+  Popconfirm,
+} from "antd";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { AiOutlinePlus } from "react-icons/ai";
 import { toast } from "react-toastify";
@@ -58,22 +66,22 @@ const Supplier = () => {
       dataIndex: "contactDetails",
       key: "contactDetails",
     },
-    {
-      title: "LPO Reference",
-      dataIndex: "lpoReference",
-      key: "lpoReference",
-    },
-    {
-      title: "LPO Date",
-      dataIndex: "lpoDate",
-      key: "lpoDate",
-      render: (text) => new Date(text).toLocaleDateString(), // Format the date nicely
-    },
-    {
-      title: "Voucher Number",
-      dataIndex: "voucherNumber",
-      key: "voucherNumber",
-    },
+    // {
+    //   title: "LPO Reference",
+    //   dataIndex: "lpoReference",
+    //   key: "lpoReference",
+    // },
+    // {
+    //   title: "LPO Date",
+    //   dataIndex: "lpoDate",
+    //   key: "lpoDate",
+    //   render: (text) => new Date(text).toLocaleDateString(), // Format the date nicely
+    // },
+    // {
+    //   title: "Voucher Number",
+    //   dataIndex: "voucherNumber",
+    //   key: "voucherNumber",
+    // },
     {
       title: "Remarks",
       dataIndex: "remarks",
@@ -90,27 +98,27 @@ const Supplier = () => {
             onClick={() => handleEdit(record)}
           /> */}
           <div className="flex items-center gap-3">
-          <Popconfirm
-            title="Are you sure to delete this department?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <FiTrash2 className="text-red-500 cursor-pointer" size={18} />
-          </Popconfirm>
-        </div>
+            <Popconfirm
+              title="Are you sure to delete this department?"
+              onConfirm={() => handleDelete(record.id)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <FiTrash2 className="text-red-500 cursor-pointer" size={18} />
+            </Popconfirm>
+          </div>
         </div>
       ),
     },
   ];
 
   const handleSubmit = (values) => {
-    const payload = {
-      ...values,
-      lpoDate: values.lpoDate.format("YYYY-MM-DD"), // format DatePicker value
-    };
-    console.log(payload);
-    mutate(payload);
+    // const payload = {
+    //   ...values,
+    //   lpoDate: values.lpoDate.format("YYYY-MM-DD"),
+    // };
+    console.log(values);
+    mutate(values);
   };
   return (
     <div className="px-[19rem]">
@@ -155,7 +163,7 @@ const Supplier = () => {
             <Input />
           </Form.Item>
 
-          <Form.Item
+          {/* <Form.Item
             label="LPO Reference"
             name="lpoReference"
             rules={[{ required: true, message: "Please enter LPO reference" }]}
@@ -177,12 +185,8 @@ const Supplier = () => {
             rules={[{ required: true, message: "Please enter voucher number" }]}
           >
             <Input />
-          </Form.Item>
-          <Form.Item
-            label="Remarks"
-            name="remarks"
-            rules={[{ required: true, message: "Please enter a remark" }]}
-          >
+          </Form.Item> */}
+          <Form.Item label="Remarks" name="remarks">
             <Input />
           </Form.Item>
           <Form.Item>

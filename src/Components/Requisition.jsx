@@ -131,7 +131,6 @@ const Requisition = () => {
               ? "yellow"
               : status === "ITD_APPROVED" || status === "PROCESSED"
               ? "green"
-              
               : "red"
           }
         >
@@ -153,7 +152,7 @@ const Requisition = () => {
       title: "Decline Reason",
       dataIndex: "declineReason",
       key: "declineReason",
-    }
+    },
   ];
 
   return (
@@ -217,13 +216,13 @@ const Requisition = () => {
             <Input.TextArea placeholder="Enter Purpose" />
           </Form.Item>
 
-          <Form.Item name="unitId" label="Unit ID">
+          <Form.Item name="unitId" label="Unit ">
             <Input disabled />
           </Form.Item>
 
           <Form.Item
             name="departmentId"
-            label="Department ID"
+            label="Department "
             rules={[{ required: true }]}
           >
             <Input disabled />

@@ -66,6 +66,12 @@ const Sidebar = () => {
                 <p className="text-black">Stores</p>
               </li>
             </Link>
+            <Link to="maintenance">
+              <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                <FaStore className=" text-[3rem] w-[43px] text-black" />
+                <p className="text-black">Maintenance</p>
+              </li>
+            </Link>
           </ul>
         </div>
       </div>

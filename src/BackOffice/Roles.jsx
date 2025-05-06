@@ -29,10 +29,10 @@ const Roles = () => {
     name: role.name,
   }));
 
-//   const handleEdit = (record) => {
-//     console.log("Editing record:", record);
-//     // Open modal, set form fields, etc
-//   };
+  //   const handleEdit = (record) => {
+  //     console.log("Editing record:", record);
+
+  //   };
 
   const handleDelete = (key) => {
     // console.log("This is the id", id);
@@ -42,11 +42,16 @@ const Roles = () => {
         toast.success("Role deleted successfully!");
         queryClient.invalidateQueries(["roles"]);
       })
-      .catch((error) => {
+      .catch((error) => { 
         console.error("Delete failed:", error);
         toast.error("Failed to delete department.");
       });
   };
+
+  const { data: Logs } = useQuery({
+    queryKey: ["logs"],
+    queryFn: () => api.get("admin/audit-logs"),
+  });
 
   const columns = [
     {

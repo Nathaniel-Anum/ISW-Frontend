@@ -19,6 +19,7 @@ import Supplier from "./BackOffice/Supplier";
 import Roles from "./BackOffice/Roles";
 import ItItems from "./BackOffice/ItItems";
 import Permissions from "./BackOffice/Permissions";
+import Maintenance from "./Components/Maintenance";
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
             <Route path="stores-officer" element={<StoresOfficer />} />
             <Route path="inventory" element={<InvOfficer />} />
             <Route path="stores" element={<StoresPage />} />
+            <Route path="maintenance" element={<Maintenance />} />
           </Route>
           <Route path="/backoffice/dashboard" element={<DLayout />}>
             <Route index element={<Employees />} />
