@@ -60,9 +60,9 @@ const Maintenance = () => {
   });
 
   const handleEdit = (record) => {
+    setIsModalOpen(true);
     console.log("Editing record:", record);
     setRecord(record);
-    setIsModalOpen(true);
   };
   const columns = [
     {
@@ -287,7 +287,11 @@ const Maintenance = () => {
       <Modal
         open={isModalOpen}
         title="Resolve Ticket"
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={() => {
+          setIsModalOpen(false);
+          setRecord(null);
+          form.resetFields();
+        }}
         footer={null}
       >
         <Form layout="vertical" onFinish={handleResolve}>
@@ -301,7 +305,7 @@ const Maintenance = () => {
 
           <Form.Item
             name="technicianReturnedById"
-            label="Technician"
+            label="Returned By"
             rules={[{ required: true, message: "Please select a technician" }]}
           >
             <Select placeholder="Select technician">
@@ -323,11 +327,7 @@ const Maintenance = () => {
             <DatePicker style={{ width: "100%" }} />
           </Form.Item>
 
-          <Form.Item
-            name="remarks"
-            label="Remarks"
-            rules={[{ required: true, message: "Please enter remarks" }]}
-          >
+          <Form.Item name="remarks" label="Remarks">
             <Input.TextArea />
           </Form.Item>
 

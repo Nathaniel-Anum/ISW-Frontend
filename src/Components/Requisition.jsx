@@ -158,7 +158,7 @@ const Requisition = () => {
   return (
     <div className="px-[3rem] py-[2rem]">
       {/* Button to Open Modal */}
-      <div className=" flex justify-end">
+      <div className="px-[6rem]">
         <Button type="primary" icon={<AiOutlinePlus />} onClick={showModal}>
           Create Requisition
         </Button>
