@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import React from "react";
+import React, { useState } from "react";
 import api from "../utils/config";
-import { Button, Input, Table } from "antd";
+import { Button, DatePicker, Form, Input, Modal, Select, Table } from "antd";
 
 import {
   DownloadOutlined,
@@ -11,6 +11,11 @@ import {
 import * as XLSX from "xlsx";
 
 const TotalTicket = () => {
+  const { Option } = Select;
+  const [form] = Form.useForm();
+  const [searchText, setSearchText] = useState("");
+  const [filteredTickets, setFilteredTickets] = useState(null);
+  const [open, setOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ["totalTicket"],
     queryFn: () => {
@@ -18,6 +23,12 @@ const TotalTicket = () => {
     },
   });
 
+  const { data: department } = useQuery({
+    queryKey: ["department"],
+    queryFn: () => {
+      return api.get("admin/departments");
+    },
+  });
   const columns = [
     {
       title: "No.",
@@ -39,6 +50,20 @@ const TotalTicket = () => {
     {
       title: "User Name",
       dataIndex: "userName",
+      filteredValue: [searchText],
+      onFilter: (value, record) => {
+        return (
+          record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.technicianReceivedName
+            .toLowerCase()
+            .includes(searchText.toLowerCase()) ||
+          record.technicianReturnedName
+            .toLowerCase()
+            .includes(searchText.toLowerCase())
+        );
+      },
     },
     {
       title: "Issue Type",
@@ -123,20 +148,100 @@ const TotalTicket = () => {
     XLSX.writeFile(workbook, "AllTickets.xlsx");
   };
 
+  const formatDate = (date) => {
+    if (!date) return null;
+    return new Date(date.$d).toISOString().split("T")[0]; // 'YYYY-MM-DD'
+  };
+
+  const handleCancel = () => {
+    setOpen(false);
+    form.resetFields();
+  };
+
+  const tickets = filteredTickets || data?.data?.tickets || [];
+
+  const handleFinish = (values) => {
+    //This is formatting the date to YYYY-MM-DD
+    const filters = {
+      startDate: values.startDate ? formatDate(values.startDate) : null,
+      endDate: values.endDate ? formatDate(values.endDate) : null,
+      issueType: values.issueType || null,
+      department: values.department || null,
+    };
+    console.log("Filtering with:", filters);
+
+    const params = new URLSearchParams();
+
+    if (filters.startDate) params.append("startDate", filters.startDate);
+    if (filters.endDate) params.append("endDate", filters.endDate);
+    if (filters.issueType) params.append("issueType", filters.issueType);
+    if (values.department) params.append("departmentId", values.department);
+
+    const url = `http://localhost:3000/reports/workshop?${params.toString()}`;
+    console.log("Fetching from:", url);
+
+    api
+      .get(url)
+      .then((res) => {
+        console.log("Filtered data:", res.data);
+        setFilteredTickets(res.data.tickets);
+      })
+      .catch((err) => {
+        console.error("Error fetching filtered data:", err);
+      });
+
+    setOpen(false);
+    form.resetFields();
+  };
+
   return (
     <div className=" py-[2rem]">
-      <div className="flex justify-end items-center gap-2 pr-[4.4rem] mb-4">
+      <div className="flex justify-end items-center gap-2 pr-[9rem] mb-4">
         <Input
           placeholder="Search..."
-          onChange={() => {}}
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
           prefix={<SearchOutlined />}
           style={{ width: "200px" }}
         />
-        <Button icon={<FilterOutlined />} onClick={() => {}} />
+        <Button icon={<FilterOutlined />} onClick={() => setOpen(true)} />
         <Button icon={<DownloadOutlined />} onClick={handleDownload} />
       </div>
       <div className="flex justify-center px-[8.9rem]">
-        <Table dataSource={data?.data?.tickets || []} columns={columns} />
+        <Table dataSource={tickets} columns={columns} />
+        <Modal title="Filter" open={open} onCancel={handleCancel} footer={null}>
+          <Form form={form} layout="vertical" onFinish={handleFinish}>
+            <Form.Item label="Start Date" name="startDate">
+              <DatePicker style={{ width: "100%" }} />
+            </Form.Item>
+
+            <Form.Item label="End Date" name="endDate">
+              <DatePicker style={{ width: "100%" }} />
+            </Form.Item>
+
+            <Form.Item label="Issue Type" name="issueType">
+              <Select placeholder="Select issue type">
+                <Option value="HARDWARE">HARDWARE</Option>
+                <Option value="SOFTWARE">SOFTWARE</Option>
+              </Select>
+            </Form.Item>
+            <Form.Item name="department" label="Select Department">
+              <Select placeholder="Choose a department">
+                {department?.data.map((dept) => (
+                  <Option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </Option>
+                ))}
+              </Select>
+            </Form.Item>
+
+            <Form.Item>
+              <Button type="primary" htmlType="submit" className="w-full">
+                Submit
+              </Button>
+            </Form.Item>
+          </Form>
+        </Modal>
       </div>
     </div>
   );

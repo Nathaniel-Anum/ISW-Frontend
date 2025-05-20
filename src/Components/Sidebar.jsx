@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
 import { LuGitPullRequestCreate } from "react-icons/lu";
-import { MdOutlineInventory2 } from "react-icons/md";
+import { MdOutlineInventory, MdOutlineInventory2 } from "react-icons/md";
 import { FaHome, FaStore } from "react-icons/fa";
 import { useUser } from "../utils/userContext";
+import { TbReport } from "react-icons/tb";
+import { GrVmMaintenance } from "react-icons/gr";
 
 const Sidebar = () => {
   const { user } = useUser();
@@ -54,18 +56,23 @@ const Sidebar = () => {
                 </li>
               </Link>
             )}
-            <Link to="inventory">
-              <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
-                <MdOutlineInventory2 className=" text-[3rem] w-[43px] text-black" />
-                <p className="text-black">Inventory</p>
-              </li>
-            </Link>
-            <Link to="stores">
-              <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
-                <FaStore className=" text-[3rem] w-[43px] text-black" />
-                <p className="text-black">Stores</p>
-              </li>
-            </Link>
+
+            {user?.roles?.includes("inventory_officer") && (
+              <Link to="inventory">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <MdOutlineInventory2 className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black">Inventory</p>
+                </li>
+              </Link>
+            )}
+            {user?.roles?.includes("stores_approver") && (
+              <Link to="stores">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <FaStore className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black">Stores</p>
+                </li>
+              </Link>
+            )}
 
             {user?.roles?.includes("hardware_technician") && (
               <Link to="maintenance">
@@ -78,8 +85,16 @@ const Sidebar = () => {
             {user?.roles?.includes("supervisor") && (
               <Link to="maintenance-report">
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
-                  <FaStore className=" text-[3rem] w-[43px] text-black" />
+                  <GrVmMaintenance className=" text-[3rem] w-[43px] text-black" />
                   <p className="text-black text-center ">Maintenance Report</p>
+                </li>
+              </Link>
+            )}
+            {user?.roles?.includes("supervisor") && (
+              <Link to="inventory-report">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <MdOutlineInventory className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black text-center ">Inventory Report</p>
                 </li>
               </Link>
             )}

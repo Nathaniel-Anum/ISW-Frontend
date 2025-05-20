@@ -24,6 +24,8 @@ import MaintenanceReport from "./Components/MaintenanceReport";
 import TotalTicket from "./Components/TotalTicket";
 import Resolved from "./Components/Resolved";
 import Unresolved from "./Components/Unresolved";
+import InventoryReport from "./Components/InventoryReport";
+import TotalAssets from "./Components/TotalAssets";
 
 function App() {
   return (
@@ -41,9 +43,11 @@ function App() {
             <Route path="stores" element={<StoresPage />} />
             <Route path="maintenance" element={<Maintenance />} />
             <Route path="maintenance-report" element={<MaintenanceReport />} />
+            <Route path="inventory-report" element={<InventoryReport />} />
             <Route path="total-ticket" element={<TotalTicket />} />
             <Route path="resolved" element={<Resolved />} />
             <Route path="unresolved" element={<Unresolved />} />
+            <Route path="total-asset" element={<TotalAssets />} />
           </Route>
           <Route path="/backoffice/dashboard" element={<DLayout />}>
             <Route index element={<Employees />} />

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import React from "react";
+import React, { useState } from "react";
 import { IoLocationOutline } from "react-icons/io5";
 import { LuSearch } from "react-icons/lu";
 import { Link } from "react-router-dom";
@@ -12,6 +12,8 @@ const MaintenanceReport = () => {
       return api.get("reports/workshop");
     },
   });
+
+ 
 
   const resolved = data?.data?.tickets.filter((ticket) => ticket.dateResolved);
   console.log("Resolved tickets are: ", resolved);
@@ -39,13 +41,13 @@ const MaintenanceReport = () => {
 
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <h2 className="text-xl text-center font-bold text-gray-800">
+                    <h2 className="text-xl text-center text-gray-800">
                       Total Tickets
                     </h2>
                   </div>
 
                   <div className="space-y-2">
-                    <p className="font-mono text-gray-700 text-[8rem] text-center font-semibold">
+                    <p className="font-mono text-gray-700 text-[8rem] text-center ">
                       {data?.data?.summary?.totalTickets}
                     </p>
                   </div>
@@ -69,13 +71,13 @@ const MaintenanceReport = () => {
 
                 <div className="space-y-6">
                   <div className="space-y-2">
-                    <h2 className="text-xl text-center font-bold text-gray-800">
+                    <h2 className="text-xl text-center text-gray-800">
                       Resolved
                     </h2>
                   </div>
 
                   <div className="space-y-2">
-                    <p className="font-mono text-gray-700 text-[8rem] text-center font-semibold">
+                    <p className="font-mono text-gray-700 text-[8rem] text-center ">
                       {data?.data?.summary?.resolved}
                     </p>
                   </div>
@@ -99,13 +101,13 @@ const MaintenanceReport = () => {
 
                 <div className="space-y-6">
                   <div className="space-y-2 ">
-                    <h2 className="text-xl text-center font-bold  text-gray-800">
+                    <h2 className="text-xl text-center  text-gray-800">
                       Unresolved
                     </h2>
                   </div>
 
                   <div className="space-y-2">
-                    <p className="font-mono text-gray-700 text-center text-[8rem] font-semibold">
+                    <p className="font-mono text-gray-700 text-center text-[8rem] ">
                       {data?.data?.summary?.unresolved}
                     </p>
                   </div>

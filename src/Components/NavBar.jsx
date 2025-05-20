@@ -56,7 +56,10 @@ const Navbar = () => {
 
         <div className="pr-[51px] flex gap-2 items-center">
           <p className=" border  px-3 py-2 font-semibold rounded-md text-[18px]">
-            IS
+            {user?.name
+              ?.split(" ")
+              .map((n) => n[0])
+              .join(".")}
           </p>
           <Dropdown
             menu={{
