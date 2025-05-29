@@ -26,6 +26,7 @@ import Resolved from "./Components/Resolved";
 import Unresolved from "./Components/Unresolved";
 import InventoryReport from "./Components/InventoryReport";
 import TotalAssets from "./Components/TotalAssets";
+import TotalDevices from "./Components/TotalDevices";
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
             <Route path="resolved" element={<Resolved />} />
             <Route path="unresolved" element={<Unresolved />} />
             <Route path="total-asset" element={<TotalAssets />} />
+            <Route path="total-devices" element={<TotalDevices/>} />
           </Route>
           <Route path="/backoffice/dashboard" element={<DLayout />}>
             <Route index element={<Employees />} />

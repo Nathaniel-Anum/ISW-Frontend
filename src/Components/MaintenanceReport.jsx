@@ -3,10 +3,11 @@ import React, { useState } from "react";
 import { IoLocationOutline } from "react-icons/io5";
 import { LuSearch } from "react-icons/lu";
 import { Link } from "react-router-dom";
+import { Spin } from "antd"; 
 import api from "../utils/config";
 
 const MaintenanceReport = () => {
-  const { data } = useQuery({
+  const { data, isLoading} = useQuery({
     queryKey: ["totalTicket"],
     queryFn: () => {
       return api.get("reports/workshop");
@@ -48,7 +49,11 @@ const MaintenanceReport = () => {
 
                   <div className="space-y-2">
                     <p className="font-mono text-gray-700 text-[8rem] text-center ">
-                      {data?.data?.summary?.totalTickets}
+                    {isLoading ? (
+      <Spin /> 
+    ) : (
+      <div>{data?.data?.summary?.totalTickets}</div>
+    )}
                     </p>
                   </div>
                 </div>
@@ -78,7 +83,11 @@ const MaintenanceReport = () => {
 
                   <div className="space-y-2">
                     <p className="font-mono text-gray-700 text-[8rem] text-center ">
-                      {data?.data?.summary?.resolved}
+                    {isLoading ? (
+      <Spin /> 
+    ) : (
+      <div>{data?.data?.summary?.resolved}</div>
+    )}
                     </p>
                   </div>
                 </div>
@@ -108,7 +117,11 @@ const MaintenanceReport = () => {
 
                   <div className="space-y-2">
                     <p className="font-mono text-gray-700 text-center text-[8rem] ">
-                      {data?.data?.summary?.unresolved}
+                    {isLoading ? (
+      <Spin /> 
+    ) : (
+      <div>{data?.data?.summary?.unresolved}</div>
+    )}
                     </p>
                   </div>
                 </div>

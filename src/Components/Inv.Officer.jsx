@@ -1,7 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useEffect } from "react";
 import api from "../utils/config";
-import { Button, Form, Input, Modal, Select, Switch, Table, Tabs, Tag } from "antd";
+import {
+  Button,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Switch,
+  Table,
+  Tabs,
+  Tag,
+} from "antd";
 import { EyeOutlined } from "@ant-design/icons";
 import { useState } from "react";
 import { toast } from "react-toastify";
@@ -14,18 +24,21 @@ const InvOfficer = () => {
   const queryClient = useQueryClient();
 
   const [form] = Form.useForm();
+
+  //useQuery for inventory
+  //get all inventory
   const { data } = useQuery({
     queryKey: ["inventory"],
     queryFn: () => api.get("/inventory/all"),
   });
-  console.log(data?.data);
+  // console.log(data?.data);
 
   //useQuery for users
   const { data: invuser } = useQuery({
     queryKey: ["invuser"],
     queryFn: () => api.get("/inventory/users"),
   });
-  console.log(invuser?.data);
+  // console.log(invuser?.data);
 
   // get device fields
   const { data: deviceFieldsData, isLoading: isDeviceFieldsLoading } = useQuery(
@@ -34,12 +47,13 @@ const InvOfficer = () => {
       queryFn: () => api.get("inventory/device-fields"),
     }
   );
-  console.log(deviceFieldsData);
+  // console.log(deviceFieldsData);
 
   const DEVICE_FIELDS = deviceFieldsData?.data || {};
 
   const showModal = (record) => {
     setSelectedRecord(record);
+    // console.log(record);
     setIsModalOpen(true);
   };
 
@@ -93,18 +107,17 @@ const InvOfficer = () => {
       dataIndex: "status",
       key: "status",
       render: (status) => (
-         <Tag
-                  color={
-                    status === "INACTIVE" || status === "DISPOSED" 
-                      ? "red"
-                      : status === "OBSOLETE" || status === "NON_FUNCTIONAL"
-                      ? "orange"
-                      : "green"
-                  }
-                >
-                 {status.replaceAll("_", " ")}
-                </Tag>
-        
+        <Tag
+          color={
+            status === "INACTIVE" || status === "DISPOSED"
+              ? "red"
+              : status === "OBSOLETE" || status === "NON_FUNCTIONAL"
+              ? "orange"
+              : "green"
+          }
+        >
+          {status.replaceAll("_", " ")}
+        </Tag>
       ),
     },
 
@@ -139,14 +152,13 @@ const InvOfficer = () => {
       ),
     },
   ];
-  
 
   useEffect(() => {
     if (selectedRecord && DEVICE_FIELDS) {
       const deviceType = selectedRecord?.itItem?.deviceType || "LAPTOP";
       const fields = DEVICE_FIELDS[deviceType] || DEVICE_FIELDS.LAPTOP;
       const formValues = {
-        userId: selectedRecord?.user?.name || "",
+        userId: selectedRecord?.user?.userId || "",
         department: selectedRecord?.department?.name || "",
         unit: selectedRecord?.unit?.name || "",
         status: selectedRecord?.status || "",
@@ -178,6 +190,11 @@ const InvOfficer = () => {
       toast.success("updated successfully!");
       queryClient.invalidateQueries(["inventory"]);
     },
+
+    onError: (error) => {
+      console.error("Error updating inventory:", error);
+      toast.error("Failed to update inventory");
+    },
   });
 
   //Device mutate
@@ -206,10 +223,9 @@ const InvOfficer = () => {
       remarks: values.remarks,
     };
 
+    // console.log(payload);
     mutate(payload);
   }
-
-  
 
   function handleForm(values) {
     const deviceType = selectedRecord?.itItem?.deviceType || "LAPTOP";
@@ -231,7 +247,6 @@ const InvOfficer = () => {
           open={isModalOpen}
           onCancel={handleCancel}
           footer={null}
-          bodyStyle={{ maxHeight: "65vh", overflowY: "auto" }}
           title="Edit"
         >
           <Tabs
@@ -249,13 +264,13 @@ const InvOfficer = () => {
                     const selectedUser = invuser?.data?.find(
                       (u) => u.id === value
                     );
-
+                    console.log(selectedUser);
                     if (selectedUser) {
                       form.setFieldsValue({
                         department: selectedUser.department?.name || "",
                         unitId: selectedUser.unit?.name || "",
                         departmentId: selectedUser.departmentId,
-                        unitIdHidden: selectedUser.unitId, // needed for backend
+                        unitIdHidden: selectedUser.unitId, //this has to go to the backend
                       });
                     }
                   }}
@@ -272,7 +287,7 @@ const InvOfficer = () => {
                 <Input disabled />
               </Form.Item>
 
-              <Form.Item name="unitId" label="Unit">
+              <Form.Item name="unit" label="Unit">
                 <Input disabled />
               </Form.Item>
 

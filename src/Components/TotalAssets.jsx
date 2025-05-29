@@ -22,7 +22,7 @@ const TotalAssets = () => {
   const [searchText, setSearchText] = useState("");
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
-
+const [filteredTickets, setFilteredTickets] = useState(null)
   const { data } = useQuery({
     queryKey: ["inventory"],
     queryFn: () => {
@@ -30,6 +30,8 @@ const TotalAssets = () => {
     },
   });
   //   console.log(data?.data?.assets);
+
+  const tickets = filteredTickets || data?.data?.assets || [];
 
   const { data: department } = useQuery({
     queryKey: ["department"],
@@ -50,12 +52,7 @@ const TotalAssets = () => {
       return api.get("stores/suppliers");
     },
   });
-  const { data: devieDetails } = useQuery({
-    queryKey: ["deviceDetails"],
-    queryFn: () => {
-      return api.get("reports/inventory/device-details");
-    },
-  });
+ 
 
   const formatDate = (date) => {
     if (!date) return null;
@@ -267,7 +264,7 @@ const TotalAssets = () => {
       .get(url)
       .then((res) => {
         console.log("Filtered data:", res.data);
-        // setFilteredTickets(res.data.tickets);
+        setFilteredTickets(res.data.assets);
       })
       .catch((err) => {
         console.error("Error fetching filtered data:", err);
@@ -291,7 +288,7 @@ const TotalAssets = () => {
         <Button icon={<DownloadOutlined />} onClick={handleDownload} />
       </div>
       <div className="flex justify-center px-[8.9rem]">
-        <Table dataSource={data?.data?.assets || []} columns={columns} />
+        <Table dataSource={tickets} columns={columns} />
         <Modal
           open={open}
           title="Filter"
