@@ -60,24 +60,24 @@ const StoresOfficer = () => {
       dataIndex: "itemDescription",
       key: "itemDescription",
     },
-    {
-      title: "Urgency",
-      dataIndex: "urgency",
-      key: "urgency",
-      render: (urgency) => (
-        <Tag
-          color={
-            urgency === "HIGH"
-              ? "red"
-              : urgency === "MEDIUM"
-              ? "orange"
-              : "green"
-          }
-        >
-          {urgency}
-        </Tag>
-      ),
-    },
+    // {
+    //   title: "Urgency",
+    //   dataIndex: "urgency",
+    //   key: "urgency",
+    //   render: (urgency) => (
+    //     <Tag
+    //       color={
+    //         urgency === "HIGH"
+    //           ? "red"
+    //           : urgency === "MEDIUM"
+    //           ? "orange"
+    //           : "green"
+    //       }
+    //     >
+    //       {urgency}
+    //     </Tag>
+    //   ),
+    // },
     {
       title: "Quantity",
       dataIndex: "quantity",

@@ -22,7 +22,7 @@ export const Division = () => (
     viewBox="0 0 24 24"
     strokeWidth={1.5}
     stroke="#fff"
-    className="w-6 h-6 group-hover:fill-primary"
+    className="w-6 h-6 bg-black group-hover:fill-primary"
   >
     <path
       strokeLinecap="round"
@@ -39,7 +39,7 @@ export const Department = () => (
     viewBox="0 0 24 24"
     strokeWidth={1.5}
     stroke="#fff"
-    className="w-6 h-6 group-hover:fill-primary"
+    className="w-6 h-6 bg-black group-hover:fill-primary"
   >
     <path
       strokeLinecap="round"
@@ -73,7 +73,7 @@ export const Districts = () => (
     viewBox="0 0 24 24"
     strokeWidth={1.5}
     stroke="#fff"
-    className="w-6 h-6 group-hover:fill-primary"
+    className="w-6 h-6 bg-black group-hover:fill-primary"
   >
     <path
       strokeLinecap="round"
@@ -90,7 +90,7 @@ export const Employees = () => (
     viewBox="0 0 24 24"
     strokeWidth={1.5}
     stroke="#fff"
-    className="w-6 h-6 group-hover:fill-primary"
+    className="w-6 h-6 bg-black group-hover:fill-primary"
   >
     <path
       strokeLinecap="round"
@@ -107,7 +107,7 @@ export const Roles = () => (
     viewBox="0 0 24 24"
     strokeWidth={1.5}
     stroke="#fff"
-    className="w-6 h-6 group-hover:fill-primary"
+    className="w-6 bg-black h-6 group-hover:fill-primary"
   >
     <path
       strokeLinecap="round"
@@ -204,7 +204,7 @@ export const Permission = () => {
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="#fff"
-      className="w-6 h-6 group-hover:fill-primary"
+      className="w-6 bg-black h-6 group-hover:fill-primary"
     >
       <path
         strokeLinecap="round"
@@ -273,7 +273,7 @@ export const AppConfigIcon = () => (
     viewBox="0 0 24 24"
     strokeWidth="1.5"
     stroke="#fff"
-    className="w-6 h-6 group-hover:fill-primary"
+    className="w-6  bg-black h-6 group-hover:fill-primary"
   >
     <path
       strokeLinecap="round"

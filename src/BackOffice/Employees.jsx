@@ -133,10 +133,10 @@ const Employees = () => {
       queryClient.invalidateQueries(["getAllUsers"]);
     },
   });
-  
+
   // handleDelete function
   const handleDelete = (record) => {
-    console.log('Deleting record:', record);
+    console.log("Deleting record:", record);
     deleteStaff(record.staffId);
   };
 
@@ -192,13 +192,18 @@ const Employees = () => {
 
   return (
     <div className="px-[15rem] py-[2rem]">
-      <p>This is the Employees Page</p>
-      <div className=" flex justify-end">
-        <Button type="primary" icon={<AiOutlinePlus />} onClick={handleCreate}>
+      {/* <p>This is the Employees Page</p> */}
+      <div className=" flex justify-end py-4">
+        <Button
+          type="primary"
+          icon={<AiOutlinePlus />}
+          onClick={handleCreate}
+          className=""
+        >
           Create Staff
         </Button>
       </div>
-      
+
       <Table
         columns={columns}
         dataSource={getAllUsers?.data || []}
