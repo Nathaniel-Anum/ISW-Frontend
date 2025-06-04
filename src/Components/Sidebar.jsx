@@ -5,6 +5,7 @@ import { FaHome, FaStore } from "react-icons/fa";
 import { useUser } from "../utils/userContext";
 import { TbReport } from "react-icons/tb";
 import { GrVmMaintenance } from "react-icons/gr";
+import { GiCheckMark } from "react-icons/gi";
 
 const Sidebar = () => {
   const { user } = useUser();
@@ -82,6 +83,15 @@ const Sidebar = () => {
                 </li>
               </Link>
             )}
+
+            <Link to="acknowledge">
+              <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                <GiCheckMark className=" text-[3rem] w-[43px] text-black" />
+
+                <p className="text-black">Acknowledge</p>
+              </li>
+            </Link>
+
             {user?.roles?.includes("supervisor") && (
               <Link to="maintenance-report">
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
