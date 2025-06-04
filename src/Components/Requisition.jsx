@@ -47,7 +47,9 @@ const Requisition = () => {
       toast.success("Requisition created successfully");
     },
     onError: (error) => {
-      toast.error(error?.message);
+      toast.error(
+        error?.response?.data?.message || "Failed to create requisition"
+      );
     },
   });
 
@@ -57,7 +59,7 @@ const Requisition = () => {
       quantity: Number(values.quantity),
       unitId: user.unit.id,
       departmentId: user.department.id,
-      urgency: values.urgency.toUpperCase(),
+      // urgency: values.urgency.toUpperCase(),
     };
 
     console.log("Final Payload:", payload);
@@ -92,24 +94,24 @@ const Requisition = () => {
       dataIndex: "quantity",
       key: "quantity",
     },
-    {
-      title: "Urgency",
-      dataIndex: "urgency",
-      key: "urgency",
-      render: (urgency) => (
-        <Tag
-          color={
-            urgency === "HIGH"
-              ? "red"
-              : urgency === "MEDIUM"
-              ? "orange"
-              : "green"
-          }
-        >
-          {urgency}
-        </Tag>
-      ),
-    },
+    // {
+    //   title: "Urgency",
+    //   dataIndex: "urgency",
+    //   key: "urgency",
+    //   render: (urgency) => (
+    //     <Tag
+    //       color={
+    //         urgency === "HIGH"
+    //           ? "red"
+    //           : urgency === "MEDIUM"
+    //           ? "orange"
+    //           : "green"
+    //       }
+    //     >
+    //       {urgency}
+    //     </Tag>
+    //   ),
+    // },
     {
       title: "Purpose",
       dataIndex: "purpose",
@@ -196,7 +198,7 @@ const Requisition = () => {
             <Input type="number" placeholder="Enter Quantity" />
           </Form.Item>
 
-          <Form.Item
+          {/* <Form.Item
             name="urgency"
             label="Urgency"
             rules={[{ required: true }]}
@@ -206,7 +208,7 @@ const Requisition = () => {
               <Select.Option value="medium">MEDIUM</Select.Option>
               <Select.Option value="high">HIGH</Select.Option>
             </Select>
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item
             name="purpose"
