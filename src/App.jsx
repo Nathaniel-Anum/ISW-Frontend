@@ -28,6 +28,7 @@ import InventoryReport from "./Components/InventoryReport";
 import TotalAssets from "./Components/TotalAssets";
 import TotalDevices from "./Components/TotalDevices";
 import Acknowledge from "./Components/Acknowledge";
+import StatusTable from "./Components/StatusTable";
 
 function App() {
   return (
@@ -52,6 +53,8 @@ function App() {
             <Route path="total-asset" element={<TotalAssets />} />
             <Route path="total-devices" element={<TotalDevices />} />
             <Route path="acknowledge" element={<Acknowledge />} />
+            <Route path="acknowledge" element={<Acknowledge />} />
+            <Route path="status-table" element={<StatusTable />} />
           </Route>
           <Route path="/backoffice/dashboard" element={<DLayout />}>
             <Route index element={<Employees />} />

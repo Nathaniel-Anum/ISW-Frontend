@@ -160,7 +160,7 @@ const Requisition = () => {
   return (
     <div className="px-[3rem] py-[2rem]">
       {/* Button to Open Modal */}
-      <div className="px-[6rem]">
+      <div className="flex justify-end">
         <Button type="primary" icon={<AiOutlinePlus />} onClick={showModal}>
           Create Requisition
         </Button>
@@ -195,7 +195,7 @@ const Requisition = () => {
             label="Quantity"
             rules={[{ required: true }]}
           >
-            <Input type="number" placeholder="Enter Quantity" />
+            <Input placeholder="Enter Quantity" />
           </Form.Item>
 
           {/* <Form.Item
@@ -230,7 +230,7 @@ const Requisition = () => {
             <Input disabled />
           </Form.Item>
 
-          <Form.Item name="roomNo" label="Room No" rules={[{ required: true }]}>
+          <Form.Item name="roomNo" label="Room No">
             <Input placeholder="Enter Room Number" />
           </Form.Item>
 
