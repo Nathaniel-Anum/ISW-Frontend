@@ -47,6 +47,9 @@ const Dashboard = () => {
   const declined = requisitions?.data?.filter(
     (i) => i.status === "ITD_DECLINED"
   );
+  const dept_declined = requisitions?.data?.filter(
+    (i) => i.status === "DEPT_DECLINED"
+  );
   const pending = requisitions?.data?.filter(
     (i) => i.status === "PENDING_DEPT_APPROVAL"
   );
@@ -65,7 +68,7 @@ const Dashboard = () => {
           </h2>
 
           {/* All Cards in One Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 lg:pr-[41rem] gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 lg:pr-[21rem] gap-3 sm:gap-4">
             {/* === INVENTORY CARDS === */}
 
             {/* Requisitions Card */}
@@ -113,7 +116,7 @@ const Dashboard = () => {
                     size={20}
                   />
                   <h3 className="text-gray-600 font-medium text-sm sm:text-base">
-                    Requisition Approved
+                    Approved
                   </h3>
                 </div>
                 <div className="mt-1 sm:mt-2">
@@ -202,6 +205,36 @@ const Dashboard = () => {
               onClick={() =>
                 navigate("/dashboard/status-table", {
                   state: {
+                    status: "DEPT_DECLINED",
+                    requisitions: requisitions?.data,
+                  },
+                })
+              }
+              className="bg-white hover:bg-gray-100 transition-colors cursor-pointer duration-200 shadow-md rounded-xl hover:shadow-lg overflow-hidden border border-gray-200"
+            >
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center mb-2 sm:mb-4">
+                  <FaTools className="text-red-500 mr-2 sm:mr-3" size={20} />
+                  <h3 className="text-gray-600 font-medium text-sm sm:text-base">
+                    Department Declined
+                  </h3>
+                </div>
+                <div className="mt-1 sm:mt-2">
+                  <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800">
+                    {dept_declined?.length || 0}
+                  </p>
+                </div>
+                <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-gray-100">
+                  <span className="text-xs sm:text-sm text-gray-500">
+                    Updated today
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div
+              onClick={() =>
+                navigate("/dashboard/status-table", {
+                  state: {
                     status: "ITD_DECLINED",
                     requisitions: requisitions?.data,
                   },
@@ -213,7 +246,7 @@ const Dashboard = () => {
                 <div className="flex items-center mb-2 sm:mb-4">
                   <FaTools className="text-red-500 mr-2 sm:mr-3" size={20} />
                   <h3 className="text-gray-600 font-medium text-sm sm:text-base">
-                    Requisitions Declined
+                    ITD Declined
                   </h3>
                 </div>
                 <div className="mt-1 sm:mt-2">

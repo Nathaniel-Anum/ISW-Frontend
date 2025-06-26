@@ -61,6 +61,8 @@ const InvOfficer = () => {
     setIsModalOpen(false);
     setSelectedRecord(null);
   };
+
+  
   const tabItems = [
     {
       key: "user",
@@ -240,8 +242,8 @@ const InvOfficer = () => {
     return <div>Loading device fields...</div>;
   }
   return (
-    <div className="pt-6">
-      <div className="flex justify-center items-center pl-[9rem]">
+    <div className="px-[3rem] py-[2rem]">
+      <div className="pl-[6rem] pt-6">
         <Table columns={column} dataSource={data?.data || []} />
         <Modal
           open={isModalOpen}

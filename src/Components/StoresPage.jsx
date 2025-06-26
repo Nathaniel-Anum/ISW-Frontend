@@ -147,13 +147,13 @@ const StoresPage = () => {
     },
   ];
   return (
-    <div className="pt-10 px-6">
+    <div className="px-[3rem] py-[2rem]">
       <div className=" flex justify-end">
         <Button type="primary" icon={<AiOutlinePlus />} onClick={showModal}>
           Create Stock
         </Button>
       </div>
-      <div className="flex justify-center items-center pl-[9rem]">
+      <div className="pl-[6rem] pt-6">
         <Table columns={columns} dataSource={data?.data?.data || []} />
         {/* Modal with Vertical Form */}
         <Modal

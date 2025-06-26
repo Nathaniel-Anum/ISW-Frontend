@@ -168,7 +168,7 @@ const Requisition = () => {
 
       {/* Modal with Vertical Form */}
       <Modal
-        title="New Request"
+        title="Create Requisition"
         open={isModalOpen}
         onCancel={handleCancel}
         footer={null} // Removing default footer
@@ -195,7 +195,7 @@ const Requisition = () => {
             label="Quantity"
             rules={[{ required: true }]}
           >
-            <Input placeholder="Enter Quantity" />
+            <Input type="number" placeholder="Enter Quantity" />
           </Form.Item>
 
           {/* <Form.Item

@@ -80,17 +80,17 @@ const Maintenance = () => {
       dataIndex: "userName",
       key: "user",
     },
-    {
-      title: "Priority",
-      dataIndex: "priority",
-    },
+    // {
+    //   title: "Priority",
+    //   dataIndex: "priority",
+    // },
     {
       title: "Logged By",
       dataIndex: "technicianReceivedName",
     },
     {
-      title: "Unit ",
-      dataIndex: "unitName",
+      title: "Department ",
+      dataIndex: "departmentName",
     },
     {
       title: "Description",
@@ -100,10 +100,10 @@ const Maintenance = () => {
       title: "Received By",
       dataIndex: "technicianReceivedName",
     },
-    {
-      title: "Remarks",
-      dataIndex: "remarks",
-    },
+    // {
+    //   title: "Remarks",
+    //   dataIndex: "remarks",
+    // },
     {
       title: "Date Logged",
       dataIndex: "dateLogged",

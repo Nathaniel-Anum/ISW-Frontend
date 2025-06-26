@@ -29,6 +29,7 @@ import TotalAssets from "./Components/TotalAssets";
 import TotalDevices from "./Components/TotalDevices";
 import Acknowledge from "./Components/Acknowledge";
 import StatusTable from "./Components/StatusTable";
+import StoresReport from "./Components/StoresReport";
 
 function App() {
   return (
@@ -46,6 +47,7 @@ function App() {
             <Route path="stores" element={<StoresPage />} />
             <Route path="maintenance" element={<Maintenance />} />
             <Route path="maintenance-report" element={<MaintenanceReport />} />
+            <Route path="stores-report" element={<StoresReport />} />
             <Route path="inventory-report" element={<InventoryReport />} />
             <Route path="total-ticket" element={<TotalTicket />} />
             <Route path="resolved" element={<Resolved />} />

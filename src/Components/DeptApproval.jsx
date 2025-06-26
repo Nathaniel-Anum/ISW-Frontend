@@ -72,11 +72,6 @@ const DeptApproval = () => {
       dataIndex: "purpose",
       key: "purpose",
     },
-    {
-      title: "Urgency",
-      dataIndex: "urgency",
-      key: "urgency",
-    },
 
     {
       title: "Department",
@@ -145,20 +140,19 @@ const DeptApproval = () => {
     approveRequestMutation.mutate(record?.id);
   };
 
-
   //Mutation to deline request
   const declineRequestMutation = useMutation({
     mutationFn: ({ id, reason }) =>
       api.patch(`/dept/req/${id}/decline`, { reason }),
-  
+
     onSuccess: () => {
       toast.success("Requisition declined!");
-      queryClient.invalidateQueries(["requisition"]); 
+      queryClient.invalidateQueries(["requisition"]);
       setIsModalVisible(false);
       setDeclineReason("");
       setSelectedRecord(null);
     },
-  
+
     onError: () => {
       toast.error("Failed to decline requisition.");
     },
@@ -169,14 +163,12 @@ const DeptApproval = () => {
       toast.error("Please provide a reason for declining");
       return;
     }
-  
+
     declineRequestMutation.mutate({
       id: selectedRecord?.id,
       reason: declineReason,
     });
   };
-  
-  
 
   // Function to open modal instead of direct confirmation
   const showDeclineModal = (record) => {

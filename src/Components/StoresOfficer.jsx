@@ -146,10 +146,9 @@ const StoresOfficer = () => {
     },
   });
   return (
-    <div className=" flex justify-center ">
+    <div className="px-[3rem] py-[2rem]">
       <div>
-        <p>Stores Officer Page.</p>
-        <div>
+        <div className="pl-[6rem] pt-6">
           <Table
             columns={columns}
             dataSource={approved?.data || []}

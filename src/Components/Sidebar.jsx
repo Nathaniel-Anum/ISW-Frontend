@@ -88,7 +88,7 @@ const Sidebar = () => {
               <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                 <GiCheckMark className=" text-[3rem] w-[43px] text-black" />
 
-                <p className="text-black">Acknowledge</p>
+                <p className="text-black">Confirm Receipt</p>
               </li>
             </Link>
 
@@ -105,6 +105,14 @@ const Sidebar = () => {
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                   <MdOutlineInventory className=" text-[3rem] w-[43px] text-black" />
                   <p className="text-black text-center ">Inventory Report</p>
+                </li>
+              </Link>
+            )}
+            {user?.roles?.includes("stores_officer") && (
+              <Link to="stores-report">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <MdOutlineInventory className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black text-center "> Report</p>
                 </li>
               </Link>
             )}
