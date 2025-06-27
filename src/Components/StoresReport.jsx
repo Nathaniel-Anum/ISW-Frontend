@@ -12,12 +12,12 @@ const StoresReport = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
-  const { data: report } = useQuery({
-    queryKey: ["storesReport"],
-    queryFn: () => {
-      return api.get("/stores/reports?reportType=stock_received");
-    },
-  });
+  // const { data: report } = useQuery({
+  //   queryKey: ["storesReport"],
+  //   queryFn: () => {
+  //     return api.get("/stores/reports?reportType=stock_received");
+  //   },
+  // });
 
   const formatDate = (date) => {
     if (!date) return null;
@@ -253,7 +253,7 @@ const StoresReport = () => {
         onCancel={() => setOpen(false)}
         footer={null}
       >
-        <Form form={form} onFinish={onFinish}>
+        <Form form={form} layout="vertical" onFinish={onFinish}>
           <Form.Item
             name="reportType"
             label="Report Type"

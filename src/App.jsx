@@ -31,6 +31,9 @@ import Acknowledge from "./Components/Acknowledge";
 import StatusTable from "./Components/StatusTable";
 import StoresReport from "./Components/StoresReport";
 
+import TechReport from "./Components/TechReport";
+import InvOfficerReport from "./Components/InvOfficerReport";
+
 function App() {
   return (
     <div>
@@ -48,6 +51,8 @@ function App() {
             <Route path="maintenance" element={<Maintenance />} />
             <Route path="maintenance-report" element={<MaintenanceReport />} />
             <Route path="stores-report" element={<StoresReport />} />
+            <Route path="technician-report" element={<TechReport />} />
+            <Route path="inv-officer-report" element={<InvOfficerReport />} />
             <Route path="inventory-report" element={<InventoryReport />} />
             <Route path="total-ticket" element={<TotalTicket />} />
             <Route path="resolved" element={<Resolved />} />
