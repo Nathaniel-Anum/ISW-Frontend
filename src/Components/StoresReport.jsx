@@ -253,95 +253,101 @@ const StoresReport = () => {
         onCancel={() => setOpen(false)}
         footer={null}
       >
-        <Form form={form} layout="vertical" onFinish={onFinish}>
-          <Form.Item
-            name="reportType"
-            label="Report Type"
-            rules={[{ required: true, message: "Select report type" }]}
-          >
-            <Select placeholder="Filter by" style={{ width: "100%" }}>
-              <Option value="stock_received">Stock Received</Option>
-              <Option value="stock_issued">Stock Issued</Option>
-              <Option value="requisitions">Requisitions</Option>
-              <Option value="inventory">Inventory</Option>
-            </Select>
-          </Form.Item>
+        <div className="max-h-[39rem] overflow-y-auto pr-2 no-scrollbar">
+          <Form form={form} layout="vertical" onFinish={onFinish}>
+            <Form.Item
+              name="reportType"
+              label="Report Type"
+              rules={[{ required: true, message: "Select report type" }]}
+            >
+              <Select placeholder="Filter by" style={{ width: "100%" }}>
+                <Option value="stock_received">Stock Received</Option>
+                <Option value="stock_issued">Stock Issued</Option>
+                <Option value="requisitions">Requisitions</Option>
+                <Option value="inventory">Inventory</Option>
+              </Select>
+            </Form.Item>
 
-          <Form.Item label="Item Class" name="itemClass">
-            <Select
-              placeholder="Item Class"
-              allowClear
-              style={{ width: "100%" }}
-            >
-              <Select.Option value="CONSUMABLE">Consumable Asset</Select.Option>
-              <Select.Option value="FIXED_ASSET">Fixed Asset</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="Start Date" name="startDate">
-            <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
+            <Form.Item label="Item Class" name="itemClass">
+              <Select
+                placeholder="Item Class"
+                allowClear
+                style={{ width: "100%" }}
+              >
+                <Select.Option value="CONSUMABLE">
+                  Consumable Asset
+                </Select.Option>
+                <Select.Option value="FIXED_ASSET">Fixed Asset</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item label="Start Date" name="startDate">
+              <DatePicker style={{ width: "100%" }} />
+            </Form.Item>
 
-          <Form.Item label="End Date" name="endDate">
-            <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
-          <Form.Item label="Status" name="status">
-            <Select placeholder="Status" allowClear style={{ width: "100%" }}>
-              <Select.Option value="ACTIVE">ACTIVE</Select.Option>
-              <Select.Option value="INACTIVE">INACTIVE</Select.Option>
-              <Select.Option value="NON_FUNCTIONAL">
-                NON FUNCTIONAL
-              </Select.Option>
-              <Select.Option value="OBSOLETE">OBSOLETE</Select.Option>
-              <Select.Option value="DISPOSED">DISPOSED</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="Requisition Status" name="reqStatus">
-            <Select
-              placeholder="Requisition status"
-              allowClear
-              style={{ width: "100%" }}
-            >
-              <Select.Option value="DEPT_DECLINED">
-                Department Declined
-              </Select.Option>
-              <Select.Option value="PROCESSED">Processed</Select.Option>
-              <Select.Option value="ITD_DECLINED">ITD Declined</Select.Option>
-              <Select.Option value="ITD_APPROVED,">ITD Approved</Select.Option>
-              <Select.Option value="DEPT_APPROVED">
-                Department Approved
-              </Select.Option>
-              <Select.Option value="PENDING_DEPT_APPROVAL">
-                Pending Department Approval
-              </Select.Option>
-              <Select.Option value="PENDING_DEPT_APPROVAL">
-                Pending ITD Approval
-              </Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="Device Type" name="deviceType">
-            <Select
-              placeholder="Device Type"
-              allowClear
-              style={{ width: "100%" }}
-            >
-              <Select.Option value="LAPTOP">LAPTOP</Select.Option>
-              <Select.Option value="DESKTOP">DESKTOP</Select.Option>
-              <Select.Option value="PRINTER">PRINTER</Select.Option>
-              <Select.Option value="OTHER">OTHER</Select.Option>
-            </Select>
-          </Form.Item>
+            <Form.Item label="End Date" name="endDate">
+              <DatePicker style={{ width: "100%" }} />
+            </Form.Item>
+            <Form.Item label="Status" name="status">
+              <Select placeholder="Status" allowClear style={{ width: "100%" }}>
+                <Select.Option value="ACTIVE">ACTIVE</Select.Option>
+                <Select.Option value="INACTIVE">INACTIVE</Select.Option>
+                <Select.Option value="NON_FUNCTIONAL">
+                  NON FUNCTIONAL
+                </Select.Option>
+                <Select.Option value="OBSOLETE">OBSOLETE</Select.Option>
+                <Select.Option value="DISPOSED">DISPOSED</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item label="Requisition Status" name="reqStatus">
+              <Select
+                placeholder="Requisition status"
+                allowClear
+                style={{ width: "100%" }}
+              >
+                <Select.Option value="DEPT_DECLINED">
+                  Department Declined
+                </Select.Option>
+                <Select.Option value="PROCESSED">Processed</Select.Option>
+                <Select.Option value="ITD_DECLINED">ITD Declined</Select.Option>
+                <Select.Option value="ITD_APPROVED,">
+                  ITD Approved
+                </Select.Option>
+                <Select.Option value="DEPT_APPROVED">
+                  Department Approved
+                </Select.Option>
+                <Select.Option value="PENDING_DEPT_APPROVAL">
+                  Pending Department Approval
+                </Select.Option>
+                <Select.Option value="PENDING_DEPT_APPROVAL">
+                  Pending ITD Approval
+                </Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item label="Device Type" name="deviceType">
+              <Select
+                placeholder="Device Type"
+                allowClear
+                style={{ width: "100%" }}
+              >
+                <Select.Option value="LAPTOP">LAPTOP</Select.Option>
+                <Select.Option value="DESKTOP">DESKTOP</Select.Option>
+                <Select.Option value="PRINTER">PRINTER</Select.Option>
+                <Select.Option value="OTHER">OTHER</Select.Option>
+              </Select>
+            </Form.Item>
 
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={loading}
-              className="w-full"
-            >
-              Submit
-            </Button>
-          </Form.Item>
-        </Form>
+            <Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                className="w-full"
+              >
+                Submit
+              </Button>
+            </Form.Item>
+          </Form>
+        </div>
       </Modal>
     </div>
   );

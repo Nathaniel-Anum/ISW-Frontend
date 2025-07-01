@@ -56,13 +56,12 @@ const TechReport = () => {
   const getColumns = () => {
     if (selectedReport === "maintenance_tickets") {
       return [
-       
         {
           title: "User Name",
           dataIndex: "userName",
           key: "userName",
         },
-         {
+        {
           title: "Unit Name",
           dataIndex: "unitName",
           key: "unitName",
@@ -78,7 +77,7 @@ const TechReport = () => {
           key: "actionTaken",
           render: (text) => (text ? text : "-"),
         },
-        
+
         // {
         //   title: "Description",
         //   dataIndex: "description",
@@ -148,27 +147,27 @@ const TechReport = () => {
           ? new Date(item.dateReceived).toLocaleDateString()
           : "-",
       }));
-    // } else if (selectedReport === "hardware_issues") {
-    //   cleanData = reportData?.data.map((item, index) => ({
-    //     No: index + 1,
-    //     UserName: item.userName || "-",
-    //     UnitName: item.unitName || "-",
-    //     DepartmentName: item.departmentName || "-",
-    //     ActionTaken: item.actionTaken || "-",
-    //     IssueType: item.issueType || "-",
-    //     DeviceType: item.deviceType || "-",
-    //     Brand: item.brand || "-",
-    //     Model: item.model || "-",
-    //     Remarks: item.remarks || "-",
-    //     TechnicianReceivedName: item.technicianReceivedName || "-",
-    //     TechnicianReturnedName: item.technicianReturnedName || "-",
-    //     DateLogged: new Date(item.dateLogged).toLocaleDateString(),
-    //     DateResolved:
-    //       item.dateResolved !== null
-    //         ? new Date(item.dateResolved).toLocaleDateString()
-    //         : "-",
-    //   }));
-    // }
+      // } else if (selectedReport === "hardware_issues") {
+      //   cleanData = reportData?.data.map((item, index) => ({
+      //     No: index + 1,
+      //     UserName: item.userName || "-",
+      //     UnitName: item.unitName || "-",
+      //     DepartmentName: item.departmentName || "-",
+      //     ActionTaken: item.actionTaken || "-",
+      //     IssueType: item.issueType || "-",
+      //     DeviceType: item.deviceType || "-",
+      //     Brand: item.brand || "-",
+      //     Model: item.model || "-",
+      //     Remarks: item.remarks || "-",
+      //     TechnicianReceivedName: item.technicianReceivedName || "-",
+      //     TechnicianReturnedName: item.technicianReturnedName || "-",
+      //     DateLogged: new Date(item.dateLogged).toLocaleDateString(),
+      //     DateResolved:
+      //       item.dateResolved !== null
+      //         ? new Date(item.dateResolved).toLocaleDateString()
+      //         : "-",
+      //   }));
+    }
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
@@ -213,76 +212,78 @@ const TechReport = () => {
         onCancel={() => setOpen(false)}
         footer={null}
       >
-        <Form form={form} onFinish={onFinish} layout="vertical">
-          <Form.Item
-            name="reportType"
-            label="Report Type"
-            rules={[{ required: true, message: "Select report type" }]}
-          >
-            <Select placeholder="Filter by" style={{ width: "100%" }}>
-              <Option value="maintenance_tickets">Maintenance Ticket</Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item label="Start Date" name="startDate">
-            <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
-
-          <Form.Item label="End Date" name="endDate">
-            <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
-          <Form.Item label="Status" name="status">
-            <Select placeholder="Status" allowClear style={{ width: "100%" }}>
-              <Select.Option value="OPEN">OPEN</Select.Option>
-              <Select.Option value="CLOSED">CLOSED</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="Issue Type" name="issueType">
-            <Select
-              placeholder="Issue Type"
-              allowClear
-              style={{ width: "100%" }}
+        <div className="max-h-[39rem] overflow-y-auto pr-2 no-scrollbar">
+          <Form form={form} onFinish={onFinish} layout="vertical">
+            <Form.Item
+              name="reportType"
+              label="Report Type"
+              rules={[{ required: true, message: "Select report type" }]}
             >
-              <Select.Option value="HARDWARE">HARDWARE</Select.Option>
-              <Select.Option value="SOFTWARE">SOFTWARE</Select.Option>
-            </Select>
-          </Form.Item>
+              <Select placeholder="Filter by" style={{ width: "100%" }}>
+                <Option value="maintenance_tickets">Maintenance Ticket</Option>
+              </Select>
+            </Form.Item>
 
-          <Form.Item label="Device Type" name="deviceType">
-            <Select
-              placeholder="Device Type"
-              allowClear
-              style={{ width: "100%" }}
-            >
-              <Select.Option value="LAPTOP">LAPTOP</Select.Option>
-              <Select.Option value="DESKTOP">DESKTOP</Select.Option>
-              <Select.Option value="PRINTER">PRINTER</Select.Option>
-              <Select.Option value="OTHER">OTHER</Select.Option>
-            </Select>
-          </Form.Item>
-          <Form.Item label="Department" name="departmentId">
-            <Select
-              placeholder="Select Department"
-              allowClear
-              style={{ width: "100%" }}
-              options={data?.data.map((dept) => ({
-                label: dept.name,
-                value: dept.id,
-              }))}
-            />
-          </Form.Item>
+            <Form.Item label="Start Date" name="startDate">
+              <DatePicker style={{ width: "100%" }} />
+            </Form.Item>
 
-          <Form.Item>
-            <Button
-              type="primary"
-              htmlType="submit"
-              loading={loading}
-              className="w-full"
-            >
-              Submit
-            </Button>
-          </Form.Item>
-        </Form>
+            <Form.Item label="End Date" name="endDate">
+              <DatePicker style={{ width: "100%" }} />
+            </Form.Item>
+            <Form.Item label="Status" name="status">
+              <Select placeholder="Status" allowClear style={{ width: "100%" }}>
+                <Select.Option value="OPEN">OPEN</Select.Option>
+                <Select.Option value="CLOSED">CLOSED</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item label="Issue Type" name="issueType">
+              <Select
+                placeholder="Issue Type"
+                allowClear
+                style={{ width: "100%" }}
+              >
+                <Select.Option value="HARDWARE">HARDWARE</Select.Option>
+                <Select.Option value="SOFTWARE">SOFTWARE</Select.Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item label="Device Type" name="deviceType">
+              <Select
+                placeholder="Device Type"
+                allowClear
+                style={{ width: "100%" }}
+              >
+                <Select.Option value="LAPTOP">LAPTOP</Select.Option>
+                <Select.Option value="DESKTOP">DESKTOP</Select.Option>
+                <Select.Option value="PRINTER">PRINTER</Select.Option>
+                <Select.Option value="OTHER">OTHER</Select.Option>
+              </Select>
+            </Form.Item>
+            <Form.Item label="Department" name="departmentId">
+              <Select
+                placeholder="Select Department"
+                allowClear
+                style={{ width: "100%" }}
+                options={data?.data.map((dept) => ({
+                  label: dept.name,
+                  value: dept.id,
+                }))}
+              />
+            </Form.Item>
+
+            <Form.Item>
+              <Button
+                type="primary"
+                htmlType="submit"
+                loading={loading}
+                className="w-full"
+              >
+                Submit
+              </Button>
+            </Form.Item>
+          </Form>
+        </div>
       </Modal>
     </div>
   );
