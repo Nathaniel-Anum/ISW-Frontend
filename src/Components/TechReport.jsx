@@ -56,39 +56,51 @@ const TechReport = () => {
   const getColumns = () => {
     if (selectedReport === "maintenance_tickets") {
       return [
+       
         {
-          title: "Action Taken",
-          dataIndex: "actionTaken",
-          key: "actionTaken",
-          render: (text) => (text ? text : "-"),
+          title: "User Name",
+          dataIndex: "userName",
+          key: "userName",
         },
-        { title: "Brand", dataIndex: "brand", key: "brand" },
-        { title: "Model", dataIndex: "model", key: "model" },
+         {
+          title: "Unit Name",
+          dataIndex: "unitName",
+          key: "unitName",
+        },
         {
           title: "Department",
           dataIndex: "departmentName",
           key: "departmentName",
         },
         {
-          title: "Description",
-          dataIndex: "description",
-          key: "description",
+          title: "Action Taken",
+          dataIndex: "actionTaken",
+          key: "actionTaken",
+          render: (text) => (text ? text : "-"),
         },
-        {
-          title: "Device Type",
-          dataIndex: "deviceType",
-          key: "deviceType",
-        },
+        
+        // {
+        //   title: "Description",
+        //   dataIndex: "description",
+        //   key: "description",
+        // },
         {
           title: "Issue Type",
           dataIndex: "issueType",
           key: "issueType",
         },
         {
-          title: "Priority",
-          dataIndex: "priority",
-          key: "priority",
+          title: "Device Type",
+          dataIndex: "deviceType",
+          key: "deviceType",
         },
+        { title: "Brand", dataIndex: "brand", key: "brand" },
+        { title: "Model", dataIndex: "model", key: "model" },
+        // {
+        //   title: "Priority",
+        //   dataIndex: "priority",
+        //   key: "priority",
+        // },
         {
           title: "Remarks",
           dataIndex: "remarks",
@@ -103,21 +115,6 @@ const TechReport = () => {
           title: "Sent By",
           dataIndex: "technicianReturnedName",
           key: "technicianReturnedName",
-        },
-        {
-          title: "Ticket ID",
-          dataIndex: "ticketId",
-          key: "ticketId",
-        },
-        {
-          title: "Unit Name",
-          dataIndex: "unitName",
-          key: "unitName",
-        },
-        {
-          title: "User Name",
-          dataIndex: "userName",
-          key: "userName",
         },
 
         {
@@ -151,7 +148,27 @@ const TechReport = () => {
           ? new Date(item.dateReceived).toLocaleDateString()
           : "-",
       }));
-    }
+    // } else if (selectedReport === "hardware_issues") {
+    //   cleanData = reportData?.data.map((item, index) => ({
+    //     No: index + 1,
+    //     UserName: item.userName || "-",
+    //     UnitName: item.unitName || "-",
+    //     DepartmentName: item.departmentName || "-",
+    //     ActionTaken: item.actionTaken || "-",
+    //     IssueType: item.issueType || "-",
+    //     DeviceType: item.deviceType || "-",
+    //     Brand: item.brand || "-",
+    //     Model: item.model || "-",
+    //     Remarks: item.remarks || "-",
+    //     TechnicianReceivedName: item.technicianReceivedName || "-",
+    //     TechnicianReturnedName: item.technicianReturnedName || "-",
+    //     DateLogged: new Date(item.dateLogged).toLocaleDateString(),
+    //     DateResolved:
+    //       item.dateResolved !== null
+    //         ? new Date(item.dateResolved).toLocaleDateString()
+    //         : "-",
+    //   }));
+    // }
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
