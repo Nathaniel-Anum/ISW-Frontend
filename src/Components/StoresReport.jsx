@@ -264,7 +264,7 @@ const StoresReport = () => {
                 <Option value="stock_received">Stock Received</Option>
                 <Option value="stock_issued">Stock Issued</Option>
                 <Option value="requisitions">Requisitions</Option>
-                <Option value="inventory">Inventory</Option>
+                <Option value="inventory">Stock</Option>
               </Select>
             </Form.Item>
 

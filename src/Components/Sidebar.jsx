@@ -6,6 +6,7 @@ import { useUser } from "../utils/userContext";
 import { TbReport } from "react-icons/tb";
 import { GrVmMaintenance } from "react-icons/gr";
 import { GiCheckMark } from "react-icons/gi";
+import { SiOpensourcehardware } from "react-icons/si";
 
 const Sidebar = () => {
   const { user } = useUser();
@@ -30,6 +31,16 @@ const Sidebar = () => {
                 <p className="text-black">Requisition</p>
               </li>
             </Link>
+
+            <Link to="acknowledge">
+              <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                <GiCheckMark className=" text-[3rem] w-[43px] text-black" />
+
+                <p className="text-black">Confirm Receipt</p>
+              </li>
+            </Link>
+
+            <div className="bg-black/40 w-full h-[2px]"></div>
             {/* Conditional rendering for department Approver-only link */}
             {user?.roles?.includes("dept_approver") && (
               <Link to="dpt-approval">
@@ -53,7 +64,7 @@ const Sidebar = () => {
               <Link to="stores-officer">
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                   <LuGitPullRequestCreate className=" text-[3rem] w-[43px] text-black" />
-                  <p className="text-black">Approve</p>
+                  <p className="text-black">Issue</p>
                 </li>
               </Link>
             )}
@@ -78,19 +89,11 @@ const Sidebar = () => {
             {user?.roles?.includes("hardware_technician") && (
               <Link to="maintenance">
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
-                  <FaStore className=" text-[3rem] w-[43px] text-black" />
+                  <SiOpensourcehardware className=" text-[3rem] w-[43px] text-black" />
                   <p className="text-black">Maintenance</p>
                 </li>
               </Link>
             )}
-
-            <Link to="acknowledge">
-              <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
-                <GiCheckMark className=" text-[3rem] w-[43px] text-black" />
-
-                <p className="text-black">Confirm Receipt</p>
-              </li>
-            </Link>
 
             {user?.roles?.includes("supervisor") && (
               <Link to="maintenance-report">

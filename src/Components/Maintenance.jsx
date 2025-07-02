@@ -14,6 +14,7 @@ import {
 import { AiOutlinePlus } from "react-icons/ai";
 import { FiEdit } from "react-icons/fi";
 import { toast } from "react-toastify";
+import { Link } from "react-router-dom";
 
 const Maintenance = () => {
   const [form] = Form.useForm();
@@ -95,7 +96,7 @@ const Maintenance = () => {
     {
       title: "Dpt Location ",
       dataIndex: "departmentLocation",
-      render: (text) => text || "N/A", 
+      render: (text) => text || "N/A",
     },
     {
       title: "Description",
@@ -147,7 +148,7 @@ const Maintenance = () => {
   });
 
   const onFinish = (values) => {
-     console.log("Submitting ticket data:", values);
+    console.log("Submitting ticket data:", values);
     const ticketData = {
       assetId: selectedDevice.inventoryId,
       userId: selectedDevice.userId,
@@ -190,10 +191,8 @@ const Maintenance = () => {
   };
 
   return (
-    <div className="px-[10rem]">
-      <p>Maintenance page</p>
-
-      <div className="py-6 ">
+    <div className="px-[3rem] py-[2rem]">
+      <div className=" flex gap-2 justify-end">
         <Button
           type="primary"
           icon={<AiOutlinePlus />}
@@ -201,8 +200,13 @@ const Maintenance = () => {
         >
           Create Ticket
         </Button>
+        <Link to="/dashboard/resolved-tickets">
+          <Button type="primary">View Resolved</Button>
+        </Link>
       </div>
-      <Table columns={columns} dataSource={Tickets?.data || []} />
+      <div className="pl-[6rem] pt-6">
+        <Table columns={columns} dataSource={Tickets?.data || []} />
+      </div>
       {/* Modal for creating ticket */}
       <Modal
         open={open}
@@ -278,19 +282,21 @@ const Maintenance = () => {
               <Input.TextArea rows={2} disabled/>
             </Form.Item> */}
 
-             <Form.Item
-            name="technicianReceivedById"
-            label="Received By"
-            rules={[{ required: true, message: "Please select a technician" }]}
-          >
-            <Select placeholder="Select technician">
-              {technicians?.data?.map((tech) => (
-                <Select.Option key={tech.id} value={tech.id}>
-                  {tech.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
+            <Form.Item
+              name="technicianReceivedById"
+              label="Received By"
+              rules={[
+                { required: true, message: "Please select a technician" },
+              ]}
+            >
+              <Select placeholder="Select technician">
+                {technicians?.data?.map((tech) => (
+                  <Select.Option key={tech.id} value={tech.id}>
+                    {tech.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
 
             <Form.Item label="Description" name="description">
               <Input.TextArea rows={3} />

@@ -269,7 +269,7 @@ const Dashboard = () => {
           </div>
 
           <Divider />
-          <div
+          {/* <div
             onClick={() =>
               navigate("/dashboard/resolved-tickets", {
                 state: {
@@ -301,7 +301,7 @@ const Dashboard = () => {
                 </span>
               </div>
             </div>
-          </div>
+          </div> */}
           {/* Two Graphs in a Grid */}
         </div>
       </div>

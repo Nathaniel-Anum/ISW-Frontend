@@ -61,7 +61,7 @@ function App() {
             <Route path="total-asset" element={<TotalAssets />} />
             <Route path="total-devices" element={<TotalDevices />} />
             <Route path="acknowledge" element={<Acknowledge />} />
-            <Route path="acknowledge" element={<Acknowledge />} />
+            {/* <Route path="acknowledge" element={<Acknowledge />} /> */}
             <Route path="status-table" element={<StatusTable />} />
             <Route path="resolved-tickets" element={<TicketsResolved />} />
           </Route>

@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import api from "../utils/config";
-import { Table } from "antd";
+import { Button, Table } from "antd";
+import { IoArrowBackSharp } from "react-icons/io5";
+import { Link } from "react-router-dom";
 
 const TicketsResolved = () => {
   const { data: ticketsResolved } = useQuery({
@@ -92,6 +94,17 @@ const TicketsResolved = () => {
   return (
     <div className="px-[3rem] py-[2rem]">
       <div className="pl-[6rem] pt-6">
+        <div className="pb-4 pl-2">
+          <Link to="/dashboard/maintenance">
+            <Button
+              type="primary"
+              icon={<IoArrowBackSharp />}
+              className="go-back-button"
+            >
+              Go Back
+            </Button>
+          </Link>
+        </div>
         <Table columns={column} dataSource={ticketsResolved?.data || []} />
       </div>
     </div>

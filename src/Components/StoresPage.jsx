@@ -81,7 +81,7 @@ const StoresPage = () => {
 
   const columns = [
     {
-      title: "L.P.O",
+      title: "L.P.O Number",
       dataIndex: "lpoReference",
       key: "lpoReference",
     },
@@ -150,7 +150,7 @@ const StoresPage = () => {
     <div className="px-[3rem] py-[2rem]">
       <div className=" flex justify-end">
         <Button type="primary" icon={<AiOutlinePlus />} onClick={showModal}>
-          Create Stock
+          Receive Stock
         </Button>
       </div>
       <div className="pl-[6rem] pt-6">

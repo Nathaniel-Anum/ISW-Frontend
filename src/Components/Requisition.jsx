@@ -141,7 +141,7 @@ const Requisition = () => {
       ),
     },
     {
-      title: "Created At",
+      title: "Date Created",
       dataIndex: "createdAt",
       key: "createdAt",
       render: (createdAt) =>
@@ -151,7 +151,7 @@ const Requisition = () => {
         }),
     },
     {
-      title: "Decline Reason",
+      title: "Remarks",
       dataIndex: "declineReason",
       key: "declineReason",
     },
