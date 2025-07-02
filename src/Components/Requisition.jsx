@@ -195,7 +195,7 @@ const Requisition = () => {
             label="Quantity"
             rules={[{ required: true }]}
           >
-            <Input type="number" placeholder="Enter Quantity" />
+            <Input type="number" min={0} placeholder="Enter Quantity" />
           </Form.Item>
 
           {/* <Form.Item

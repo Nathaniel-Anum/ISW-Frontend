@@ -62,7 +62,6 @@ const InvOfficer = () => {
     setSelectedRecord(null);
   };
 
-  
   const tabItems = [
     {
       key: "user",
@@ -99,6 +98,11 @@ const InvOfficer = () => {
       dataIndex: ["department", "name"],
       key: "department",
     },
+    {
+      title: "Dpt Location ",
+      dataIndex: "departmentLocation",
+      render: (text) => text || "N/A",
+    },  
     {
       title: "Warranty Period",
       dataIndex: "warrantyPeriod",

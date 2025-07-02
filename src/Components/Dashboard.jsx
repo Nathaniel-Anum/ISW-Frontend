@@ -1,4 +1,4 @@
-import React, { useEffect} from "react";
+import React, { useEffect } from "react";
 import Layout from "./Layout";
 import { Link, Outlet, useNavigate } from "react-router-dom";
 
@@ -57,6 +57,11 @@ const Dashboard = () => {
     (i) => i.status === "PENDING_ITD_APPROVAL"
   );
 
+  const { data: ticketsResolved } = useQuery({
+    queryKey: ["ticketsResolved"],
+    queryFn: () => api.get("/hardware/tickets?status=RESOLVED"),
+  });
+  // console.log(ticketsResolved?.length);
   return (
     <div>
       <Outlet />
@@ -264,6 +269,39 @@ const Dashboard = () => {
           </div>
 
           <Divider />
+          <div
+            onClick={() =>
+              navigate("/dashboard/resolved-tickets", {
+                state: {
+                  status: "ITD_DECLINED",
+                  requisitions: requisitions?.data,
+                },
+              })
+            }
+            className="bg-white hover:bg-gray-100 w-[24rem] transition-colors cursor-pointer duration-200 shadow-md rounded-xl hover:shadow-lg overflow-hidden border border-gray-200"
+          >
+            <div className="p-4 sm:p-6">
+              <div className="flex items-center mb-2 sm:mb-4">
+                <FaCheckCircle
+                  className="text-green-500 mr-2 sm:mr-3"
+                  size={25}
+                />
+                <h3 className="text-gray-600 font-medium text-sm sm:text-base">
+                  Resolved Tickets
+                </h3>
+              </div>
+              <div className="mt-1 sm:mt-2">
+                <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800">
+                  {ticketsResolved?.data?.length || 0}
+                </p>
+              </div>
+              <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-gray-100">
+                <span className="text-xs sm:text-sm text-gray-500">
+                  Updated today
+                </span>
+              </div>
+            </div>
+          </div>
           {/* Two Graphs in a Grid */}
         </div>
       </div>

@@ -211,7 +211,7 @@ const ItItems = () => {
             </Select>
           </Form.Item>
 
-          <Form.Item name="requiresAssetTag" valuePropName="checked">
+          {/* <Form.Item name="requiresAssetTag" valuePropName="checked">
             <Checkbox>Requires Asset Tag?</Checkbox>
           </Form.Item>
 
@@ -221,7 +221,7 @@ const ItItems = () => {
             rules={[{ required: true }]}
           >
             <Input placeholder="e.g., Standard User" />
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item label="Specifications">
             <Form.Item

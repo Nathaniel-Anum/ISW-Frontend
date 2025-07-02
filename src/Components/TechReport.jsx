@@ -213,7 +213,8 @@ const TechReport = () => {
         footer={null}
       >
         <div className="max-h-[39rem] overflow-y-auto pr-2 no-scrollbar">
-          <Form form={form} onFinish={onFinish} layout="vertical">
+          <Form form={form} onFinish={onFinish} 
+          layout="vertical">
             <Form.Item
               name="reportType"
               label="Report Type"

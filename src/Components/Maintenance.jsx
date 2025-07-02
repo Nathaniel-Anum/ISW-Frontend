@@ -93,6 +93,11 @@ const Maintenance = () => {
       dataIndex: "departmentName",
     },
     {
+      title: "Dpt Location ",
+      dataIndex: "departmentLocation",
+      render: (text) => text || "N/A", 
+    },
+    {
       title: "Description",
       dataIndex: "description",
     },
@@ -142,16 +147,19 @@ const Maintenance = () => {
   });
 
   const onFinish = (values) => {
+     console.log("Submitting ticket data:", values);
     const ticketData = {
       assetId: selectedDevice.inventoryId,
       userId: selectedDevice.userId,
       departmentId: selectedDevice.departmentId,
       unitId: selectedDevice.unitId,
-      remarks: values.remarks,
+      // remarks: values.remarks,
+      priority: values.priority,
       description: values.description,
       issueType: values.issueType,
-      priority: values.priority,
     };
+
+    // console.log("Submitting ticket data:", ticketData);
 
     createTicket(ticketData);
   };
@@ -259,16 +267,30 @@ const Maintenance = () => {
             </Form.Item>
 
             <Form.Item label="Priority" name="priority" initialValue="MEDIUM">
-              <Select>
+              <Select disabled>
                 <Select.Option value="HIGH">HIGH</Select.Option>
                 <Select.Option value="MEDIUM">MEDIUM</Select.Option>
                 <Select.Option value="LOW">LOW</Select.Option>
               </Select>
             </Form.Item>
 
-            <Form.Item label="Remarks" name="remarks">
-              <Input.TextArea rows={2} />
-            </Form.Item>
+            {/* <Form.Item label="Remarks" name="remarks">
+              <Input.TextArea rows={2} disabled/>
+            </Form.Item> */}
+
+             <Form.Item
+            name="technicianReceivedById"
+            label="Received By"
+            rules={[{ required: true, message: "Please select a technician" }]}
+          >
+            <Select placeholder="Select technician">
+              {technicians?.data?.map((tech) => (
+                <Select.Option key={tech.id} value={tech.id}>
+                  {tech.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
 
             <Form.Item label="Description" name="description">
               <Input.TextArea rows={3} />
