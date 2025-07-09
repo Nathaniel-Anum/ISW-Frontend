@@ -12,10 +12,12 @@ import {
   InputNumber,
 } from "antd";
 import { AiOutlinePlus } from "react-icons/ai";
+import { SearchOutlined } from "@ant-design/icons";
 import { toast } from "react-toastify";
 
 const StoresPage = () => {
   const queryClient = useQueryClient();
+  const [searchText, setSearchText] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
 
@@ -84,6 +86,15 @@ const StoresPage = () => {
       title: "L.P.O Number",
       dataIndex: "lpoReference",
       key: "lpoReference",
+      filteredValue: [searchText],
+      onFilter: (value, record) => {
+        return (
+          record.itItem?.brand?.toLowerCase().includes(value.toLowerCase()) ||
+          record.itItem?.model?.toLowerCase().includes(value.toLowerCase()) ||
+          record.lpoReference.toLowerCase().includes(value.toLowerCase()) ||
+          record.warrantyPeriod?.toString().includes(value.toLowerCase())
+        );
+      },
     },
     {
       title: "Voucher No",
@@ -148,7 +159,14 @@ const StoresPage = () => {
   ];
   return (
     <div className="px-[3rem] py-[2rem]">
-      <div className=" flex justify-end">
+      <div className=" flex gap-1 justify-end">
+        <Input
+          placeholder="Search..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          prefix={<SearchOutlined />}
+          style={{ width: "200px" }}
+        />
         <Button type="primary" icon={<AiOutlinePlus />} onClick={showModal}>
           Receive Stock
         </Button>

@@ -135,31 +135,34 @@ const StoresReport = () => {
           render: (date) => new Date(date).toLocaleDateString(),
         },
       ];
-    } else if (selectedReport === "inventory") {
+    } else if (selectedReport === "stock_levels") {
       return [
         {
-          title: "Department",
-          dataIndex: ["department", "name"],
-          key: "department",
+          title: "Brand",
+          dataIndex: "brand",
+          key: "brand",
         },
-        { title: "Brand", dataIndex: ["itItem", "brand"], key: "brand" },
+        {
+          title: "Model",
+          dataIndex: "model",
+          key: "model",
+        },
         {
           title: "Device Type",
-          dataIndex: ["itItem", "deviceType"],
+          dataIndex: "deviceType",
           key: "deviceType",
         },
         {
           title: "Item Class",
-          dataIndex: ["itItem", "itemClass"],
+          dataIndex: "itemClass",
           key: "itemClass",
         },
-        { title: "Model", dataIndex: ["itItem", "model"], key: "model" },
         {
-          title: "Purchase Date",
-          dataIndex: "purchaseDate",
-          key: "purchaseDate",
-          render: (date) => new Date(date).toLocaleDateString(),
+          title: "Quantity In Stock",
+          dataIndex: "quantityInStock",
+          key: "quantityInStock",
         },
+       
       ];
     } else {
       return [];
@@ -264,7 +267,7 @@ const StoresReport = () => {
                 <Option value="stock_received">Stock Received</Option>
                 <Option value="stock_issued">Stock Issued</Option>
                 <Option value="requisitions">Requisitions</Option>
-                <Option value="inventory">Stock</Option>
+                <Option value="stock_levels">Stock</Option>
               </Select>
             </Form.Item>
 

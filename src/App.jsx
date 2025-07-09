@@ -34,6 +34,7 @@ import StoresReport from "./Components/StoresReport";
 import TechReport from "./Components/TechReport";
 import InvOfficerReport from "./Components/InvOfficerReport";
 import TicketsResolved from "./Components/TicketsResolved";
+import Stock from "./Components/Stock";
 
 function App() {
   return (
@@ -64,6 +65,7 @@ function App() {
             {/* <Route path="acknowledge" element={<Acknowledge />} /> */}
             <Route path="status-table" element={<StatusTable />} />
             <Route path="resolved-tickets" element={<TicketsResolved />} />
+            <Route path="stock" element={<Stock />} />
           </Route>
           <Route path="/backoffice/dashboard" element={<DLayout />}>
             <Route index element={<Employees />} />

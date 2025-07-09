@@ -15,10 +15,12 @@ import { AiOutlinePlus } from "react-icons/ai";
 import { FiEdit } from "react-icons/fi";
 import { toast } from "react-toastify";
 import { Link } from "react-router-dom";
+import { SearchOutlined } from "@ant-design/icons";
 
 const Maintenance = () => {
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -80,6 +82,20 @@ const Maintenance = () => {
       title: "User",
       dataIndex: "userName",
       key: "user",
+      filteredValue: [searchText],
+      onFilter: (value, record) => {
+        return (
+          record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.technicianReceivedName
+            .toLowerCase()
+            .includes(searchText.toLowerCase()) ||
+          record.technicianReturnedName
+            .toLowerCase()
+            .includes(searchText.toLowerCase())
+        );
+      },
     },
     // {
     //   title: "Priority",
@@ -193,15 +209,22 @@ const Maintenance = () => {
   return (
     <div className="px-[3rem] py-[2rem]">
       <div className=" flex gap-2 justify-end">
+        <Input
+          placeholder="Search..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          prefix={<SearchOutlined />}
+          style={{ width: "200px" }}
+        />
         <Button
           type="primary"
           icon={<AiOutlinePlus />}
           onClick={() => setOpen(true)}
         >
-          Create Ticket
+          Create New Ticket
         </Button>
         <Link to="/dashboard/resolved-tickets">
-          <Button type="primary">View Resolved</Button>
+          <Button type="primary">View Resolved Tickets</Button>
         </Link>
       </div>
       <div className="pl-[6rem] pt-6">

@@ -14,15 +14,15 @@ const Acknowledge = () => {
 
   const column = [
     {
-      title: "device Type",
+      title: "Device Type",
       dataIndex: "deviceType",
       key: "deviceType",
     },
-    {
-      title: "Disbursement Note",
-      dataIndex: "disbursementNote",
-      key: "disbursementNote",
-    },
+    // {
+    //   title: "Disbursement Note",
+    //   dataIndex: "disbursementNote",
+    //   key: "disbursementNote",
+    // },
     {
       title: "Item Name",
       dataIndex: "itemName",

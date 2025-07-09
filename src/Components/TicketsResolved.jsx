@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import React from "react";
+import React, { useState } from "react";
 import api from "../utils/config";
-import { Button, Table } from "antd";
+import { Button, Input, Table } from "antd";
 import { IoArrowBackSharp } from "react-icons/io5";
 import { Link } from "react-router-dom";
+import { SearchOutlined } from "@ant-design/icons";
 
 const TicketsResolved = () => {
+  const [searchText, setSearchText] = useState("");
   const { data: ticketsResolved } = useQuery({
     queryKey: ["ticketsResolved"],
     queryFn: () => api.get("/hardware/tickets?status=RESOLVED"),
@@ -16,6 +18,23 @@ const TicketsResolved = () => {
       title: "User Name",
       dataIndex: "userName",
       key: "userName",
+      filteredValue: [searchText],
+      onFilter: (value, record) => {
+        return (
+          record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.departmentName
+            .toLowerCase()
+            .includes(searchText.toLowerCase()) ||
+          record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.technicianReceivedName
+            .toLowerCase()
+            .includes(searchText.toLowerCase()) ||
+          record.technicianReturnedName
+            .toLowerCase()
+            .includes(searchText.toLowerCase())
+        );
+      },
     },
     {
       title: "Unit Name",
@@ -50,11 +69,7 @@ const TicketsResolved = () => {
       dataIndex: "issueType",
       key: "issueType",
     },
-    {
-      title: "Device Type",
-      dataIndex: "deviceType",
-      key: "deviceType",
-    },
+
     { title: "Brand", dataIndex: "brand", key: "brand" },
     { title: "Model", dataIndex: "model", key: "model" },
     // {
@@ -94,7 +109,7 @@ const TicketsResolved = () => {
   return (
     <div className="px-[3rem] py-[2rem]">
       <div className="pl-[6rem] pt-6">
-        <div className="pb-4 pl-2">
+        <div className="flex justify-between items-center mb-4 p-2">
           <Link to="/dashboard/maintenance">
             <Button
               type="primary"
@@ -104,6 +119,13 @@ const TicketsResolved = () => {
               Go Back
             </Button>
           </Link>
+          <Input
+            placeholder="Search..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            prefix={<SearchOutlined />}
+            style={{ width: "200px" }}
+          />
         </div>
         <Table columns={column} dataSource={ticketsResolved?.data || []} />
       </div>
