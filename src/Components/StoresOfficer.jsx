@@ -12,7 +12,7 @@ const StoresOfficer = () => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [selectedBatch, setSelectedBatch] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const [disbursementNote, setDisbursementNote] = useState("");
+  // const [disbursementNote, setDisbursementNote] = useState("");
   const [remarks, setRemarks] = useState("");
 
   //useQuery for stores items
@@ -45,7 +45,6 @@ const StoresOfficer = () => {
   });
 
   //useQuery for ITD Approved
-
   const { data: approved } = useQuery({
     queryKey: ["ITD-Approved"],
     queryFn: () => {
@@ -142,7 +141,7 @@ const StoresOfficer = () => {
       setSelectedItem(null);
       setSelectedRecord(null);
       setRemarks("");
-      setDisbursementNote("");
+      // setDisbursementNote("");
     },
   });
   return (
@@ -176,7 +175,7 @@ const StoresOfficer = () => {
                 itItemId: selectedItem,
                 quantity,
                 stockBatchId: selectedBatch,
-                disbursementNote,
+
                 remarks,
               };
               console.log("Issuing payload:", payload); // 👈 this logs to your console
@@ -243,14 +242,14 @@ const StoresOfficer = () => {
             onChange={(e) => setQuantity(Number(e.target.value))}
           />
         </div>
-        {/* Disbursement Note */}
+        {/* Disbursement Note
         <div className="mb-4">
           <label className="block mb-1 font-semibold">Disbursement Note</label>
           <Input
             value={disbursementNote}
             onChange={(e) => setDisbursementNote(e.target.value)}
           />
-        </div>
+        </div> */}
         {/* Remarks */}
         <div className="mb-4">
           <label className="block mb-1 font-semibold">Remarks</label>

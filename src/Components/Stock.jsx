@@ -25,12 +25,27 @@ const Stock = () => {
       const metaData = response.data.meta || {};
 
       setData(
-        stockData.map((item, index) => ({
-          key: index,
-          ...item,
-          stockStatus: item.quantityInStock <= 1 ? "Low" : "Okay",
-        }))
+        stockData.map((item, index) => {
+          let stockStatus = "";
+
+          if (item.quantityInStock === 0) {
+            stockStatus = "Not Available";
+          } else if (item.quantityInStock <= 5) {
+            stockStatus = "Low";
+          } else if (item.quantityInStock <= 15) {
+            stockStatus = "Medium";
+          } else {
+            stockStatus = "High";
+          }
+
+          return {
+            key: index,
+            ...item,
+            stockStatus,
+          };
+        })
       );
+
       setMeta(metaData);
     } catch (error) {
       console.error("Failed to fetch stock:", error);
@@ -104,13 +119,19 @@ const Stock = () => {
       key: "quantityInStock",
     },
     {
-      title: "Stock Status",
+      title: "Stock Level",
       dataIndex: "stockStatus",
       key: "stockStatus",
       render: (status) => (
         <span
           className={`font-semibold ${
-            status === "Low" ? "text-red-600" : "text-green-600"
+            status === "Not Available"
+              ? "text-black"
+              : status === "Low"
+              ? "text-red-600"
+              : status === "Medium"
+              ? "text-yellow-600"
+              : "text-green-600"
           }`}
         >
           {status}

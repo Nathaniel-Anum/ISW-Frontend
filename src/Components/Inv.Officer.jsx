@@ -12,12 +12,13 @@ import {
   Tabs,
   Tag,
 } from "antd";
-import { EyeOutlined } from "@ant-design/icons";
+import { EyeOutlined, SearchOutlined } from "@ant-design/icons";
 import { useState } from "react";
 import { toast } from "react-toastify";
 
 const InvOfficer = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
   const [activeForm, setActiveForm] = useState("user");
   const [selectedRecord, setSelectedRecord] = useState(null);
 
@@ -77,6 +78,22 @@ const InvOfficer = () => {
       title: "User",
       dataIndex: ["user", "name"],
       key: "user",
+        filteredValue: [searchText],
+        onFilter: (value, record) => {
+          return (
+            record.user.name.toLowerCase().includes(value.toLowerCase()) ||
+           
+            record.status.toLowerCase().includes(value.toLowerCase()) ||
+            record.department.name
+              .toLowerCase()
+              .includes(value.toLowerCase()) ||
+            record.itItem.brand.toLowerCase().includes(value.toLowerCase()) ||
+            record.itItem.model.toLowerCase().includes(value.toLowerCase()) ||
+            record.itItem.deviceType.toLowerCase().includes(value.toLowerCase()) ||
+            record.unit.name.toLowerCase().includes(value.toLowerCase()
+          )
+        )
+        }
     },
     {
       title: "Brand",
@@ -84,7 +101,7 @@ const InvOfficer = () => {
       key: "item",
     },
     {
-      title: "Item",
+      title: "Model",
       dataIndex: ["itItem", "model"],
       key: "item",
     },
@@ -102,7 +119,7 @@ const InvOfficer = () => {
       title: "Dpt Location ",
       dataIndex: "departmentLocation",
       render: (text) => text || "N/A",
-    },  
+    },
     {
       title: "Warranty Period",
       dataIndex: "warrantyPeriod",
@@ -247,7 +264,16 @@ const InvOfficer = () => {
   }
   return (
     <div className="px-[3rem] py-[2rem]">
-      <div className="pl-[6rem] pt-6">
+      <div className="flex justify-end ">
+        <Input
+          placeholder="Search..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          prefix={<SearchOutlined />}
+          style={{ width: "200px" }}
+        />
+      </div>
+      <div className="pl-[6rem] pt-2">
         <Table columns={column} dataSource={data?.data || []} />
         <Modal
           open={isModalOpen}

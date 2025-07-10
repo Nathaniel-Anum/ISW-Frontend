@@ -91,8 +91,11 @@ const StoresPage = () => {
         return (
           record.itItem?.brand?.toLowerCase().includes(value.toLowerCase()) ||
           record.itItem?.model?.toLowerCase().includes(value.toLowerCase()) ||
+          record.supplier?.name?.toLowerCase().includes(value.toLowerCase()) ||
           record.lpoReference.toLowerCase().includes(value.toLowerCase()) ||
-          record.warrantyPeriod?.toString().includes(value.toLowerCase())
+          record.quantityReceived.toString().includes(value.toLowerCase()) ||
+          record.warrantyPeriod?.toString().includes(value.toLowerCase()) ||
+          record.voucherNumber?.toString().includes(value.toLowerCase())
         );
       },
     },

@@ -1,13 +1,24 @@
 import React, { useState } from "react";
-import { FilterOutlined } from "@ant-design/icons";
-import { Button, DatePicker, Form, Modal, Select, Spin, Table } from "antd";
+import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Spin,
+  Table,
+} from "antd";
 import api from "../utils/config";
 import * as XLSX from "xlsx";
 import { useQuery } from "@tanstack/react-query";
+import { Department } from "./icons/icons.components";
 
 const TechReport = () => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportData, setReportData] = useState([]);
   const [form] = Form.useForm();
@@ -60,6 +71,41 @@ const TechReport = () => {
           title: "User Name",
           dataIndex: "userName",
           key: "userName",
+          filteredValue: [searchText],
+          onFilter: (value, record) => {
+            return (
+              record.userName
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.actionTaken
+                ?.toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.departmentName
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.unitName
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.deviceType
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.issueType
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.brand?.toLowerCase().includes(searchText.toLowerCase()) ||
+              record.model?.toLowerCase().includes(searchText.toLowerCase()) ||
+              record.remarks
+                ?.toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.technicianReceivedName
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.technicianReturnedName
+                .toString()
+                .toLowerCase()
+                .includes(searchText.toLowerCase())
+            );
+          },
         },
         {
           title: "Unit Name",
@@ -138,35 +184,53 @@ const TechReport = () => {
     let cleanData = [];
 
     if (selectedReport === "maintenance_tickets") {
-      cleanData = reportData?.data.map((item, index) => ({
-        No: index + 1,
-        Item: item?.itItem?.model || "-",
-        Supplier: item?.supplier?.name || "-",
-        QuantityReceived: item?.quantityReceived || 0,
-        DateReceived: item?.dateReceived
-          ? new Date(item.dateReceived).toLocaleDateString()
-          : "-",
-      }));
-      // } else if (selectedReport === "hardware_issues") {
-      //   cleanData = reportData?.data.map((item, index) => ({
-      //     No: index + 1,
-      //     UserName: item.userName || "-",
-      //     UnitName: item.unitName || "-",
-      //     DepartmentName: item.departmentName || "-",
-      //     ActionTaken: item.actionTaken || "-",
-      //     IssueType: item.issueType || "-",
-      //     DeviceType: item.deviceType || "-",
-      //     Brand: item.brand || "-",
-      //     Model: item.model || "-",
-      //     Remarks: item.remarks || "-",
-      //     TechnicianReceivedName: item.technicianReceivedName || "-",
-      //     TechnicianReturnedName: item.technicianReturnedName || "-",
-      //     DateLogged: new Date(item.dateLogged).toLocaleDateString(),
-      //     DateResolved:
-      //       item.dateResolved !== null
-      //         ? new Date(item.dateResolved).toLocaleDateString()
-      //         : "-",
-      //   }));
+      cleanData = reportData?.data
+        .filter(
+          (record) =>
+            record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
+            record?.actionTaken
+              ?.toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record.departmentName
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record.unitName.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.deviceType
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record.issueType.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.brand?.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.model?.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.remarks?.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.technicianReceivedName
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record.technicianReturnedName
+              .toString()
+              .toLowerCase()
+              .includes(searchText.toLowerCase())
+        )
+
+        .map((item, index) => ({
+          No: index + 1,
+          UserName: item?.name || "-",
+          UnitName: item?.unitName || "-",
+          Department: item?.departmentName || "-",
+          ActionTaken: item?.actionTaken || "-",
+          IssueType: item?.issueType || "-",
+          DeviceType: item?.deviceType || "-",
+          Brand: item?.brand || "-",
+          Model: item?.model || "-",
+          Remarks: item?.remarks || "-",
+          ReceivedBy: item?.technicianReceivedName || "-",
+          SentBy: item?.technicianReturnedName || "-",
+          DateLogged: item?.dateLogged
+            ? new Date(item.dateLogged).toLocaleDateString()
+            : "-",
+          DateResolved: item?.dateResolved
+            ? new Date(item.dateResolved).toLocaleDateString()
+            : "-",
+        }));
     }
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
@@ -185,6 +249,14 @@ const TechReport = () => {
         >
           Filter
         </Button>
+        <Input
+          disabled={!reportData?.data?.length}
+          placeholder="Search..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          prefix={<SearchOutlined />}
+          style={{ width: "200px" }}
+        />
         <Button
           type="primary"
           onClick={downloadExcel}
@@ -213,8 +285,7 @@ const TechReport = () => {
         footer={null}
       >
         <div className="max-h-[39rem] overflow-y-auto pr-2 no-scrollbar">
-          <Form form={form} onFinish={onFinish} 
-          layout="vertical">
+          <Form form={form} onFinish={onFinish} layout="vertical">
             <Form.Item
               name="reportType"
               label="Report Type"

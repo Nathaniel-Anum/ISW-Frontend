@@ -26,6 +26,8 @@ const TicketsResolved = () => {
             .toLowerCase()
             .includes(searchText.toLowerCase()) ||
           record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.issueType.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.unitName.toLowerCase().includes(searchText.toLowerCase()) ||
           record.model.toLowerCase().includes(searchText.toLowerCase()) ||
           record.technicianReceivedName
             .toLowerCase()

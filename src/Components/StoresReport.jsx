@@ -1,14 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
-import { Select, Table, Spin, Button, Modal, Form, DatePicker } from "antd";
+import {
+  Select,
+  Table,
+  Spin,
+  Button,
+  Modal,
+  Form,
+  DatePicker,
+  Input,
+} from "antd";
 import api from "../utils/config";
 import { useState } from "react";
 import * as XLSX from "xlsx";
-import { FilterOutlined } from "@ant-design/icons";
+import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
 const { Option } = Select;
 
 const StoresReport = () => {
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportData, setReportData] = useState([]);
+  const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
@@ -56,7 +66,35 @@ const StoresReport = () => {
   const getColumns = () => {
     if (selectedReport === "stock_received") {
       return [
-        { title: "Item", dataIndex: ["itItem", "model"], key: "model" },
+        {
+          title: "Model",
+          dataIndex: ["itItem", "model"],
+          key: "model",
+          filteredValue: [searchText],
+          onFilter: (value, record) => {
+            return (
+              record?.voucherNumber
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.lpoReference
+                ?.toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.supplier?.name
+                ?.toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.receivedBy?.name
+                ?.toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.itItem?.model
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.itItem?.brand
+                .toLowerCase()
+                .includes(searchText.toLowerCase())
+            );
+          },
+        },
+
         { title: "Brand", dataIndex: ["itItem", "brand"], key: "brand" },
         {
           title: "Quantity Received",
@@ -84,7 +122,32 @@ const StoresReport = () => {
       ];
     } else if (selectedReport === "stock_issued") {
       return [
-        { title: "Item", dataIndex: ["itItem", "model"], key: "model" },
+        {
+          title: "Model",
+          dataIndex: ["itItem", "model"],
+          key: "model",
+          filteredValue: [searchText],
+          onFilter: (value, record) => {
+            return (
+              record?.itItem?.model
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.itItem?.brand
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.quantityIssued
+                .toString()
+                .includes(searchText.toLowerCase()) ||
+              record?.issuedBy?.name
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.requisition?.staff?.name
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.remarks.toLowerCase().includes(searchText.toLowerCase())
+            );
+          },
+        },
         { title: "Brand", dataIndex: ["itItem", "brand"], key: "brand" },
         {
           title: "Quantity Issued",
@@ -103,9 +166,9 @@ const StoresReport = () => {
           render: (date) => new Date(date).toLocaleDateString(),
         },
         {
-          title: "Disbursement Note",
-          dataIndex: "disbursementNote",
-          key: "disbursementNote",
+          title: "Remarks",
+          dataIndex: "remarks",
+          key: "remarks",
         },
         {
           title: "Requested By",
@@ -119,17 +182,66 @@ const StoresReport = () => {
           title: "Requisition ID",
           dataIndex: "requisitionID",
           key: "requisitionID",
+          filteredValue: [searchText],
+          onFilter: (value, record) => {
+            return (
+              record?.requisitionID
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.staff?.name
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.roomNo.toString().includes(searchText.toLowerCase()) ||
+              record?.itItem?.model
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.itItem?.brand
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.itItem?.deviceType
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.itemDescription
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.purpose.toLowerCase().includes(searchText.toLowerCase())
+            );
+          },
+        },
+        {
+          title: "Issued By",
+          dataIndex: ["staff", "name"],
+          key: "issuedBy",
         },
         { title: "Room No.", dataIndex: "roomNo", key: "roomNo" },
         {
-          title: "Item Description",
+          title: "Brand",
+          dataIndex: ["itItem", "brand"],
+          key: "brand",
+          render: (text) => text || "-",
+        },
+        {
+          title: "Model",
+          dataIndex: ["itItem", "model"],
+          key: "model",
+          render: (text) => text || "-",
+        },
+        {
+          title: "Device Type",
+          dataIndex: ["itItem", "deviceType"],
+          key: "deviceType",
+          render: (text) => text || "-",
+        },
+
+        {
+          title: " Description",
           dataIndex: "itemDescription",
           key: "itemDescription",
         },
         { title: "Purpose", dataIndex: "purpose", key: "purpose" },
         { title: "Quantity", dataIndex: "quantity", key: "quantity" },
         {
-          title: "Created At",
+          title: "Date Created",
           dataIndex: "createdAt",
           key: "createdAt",
           render: (date) => new Date(date).toLocaleDateString(),
@@ -141,6 +253,22 @@ const StoresReport = () => {
           title: "Brand",
           dataIndex: "brand",
           key: "brand",
+          filteredValue: [searchText],
+          onFilter: (value, record) => {
+            return (
+              record?.model.toLowerCase().includes(searchText.toLowerCase()) ||
+              record?.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+              record?.deviceType
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.itemClass
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record?.quantityInStock
+                .toString()
+                .includes(searchText.toLowerCase())
+            );
+          },
         },
         {
           title: "Model",
@@ -162,7 +290,6 @@ const StoresReport = () => {
           dataIndex: "quantityInStock",
           key: "quantityInStock",
         },
-       
       ];
     } else {
       return [];
@@ -175,41 +302,140 @@ const StoresReport = () => {
     let cleanData = [];
 
     if (selectedReport === "stock_received") {
-      cleanData = reportData?.data.map((item, index) => ({
-        No: index + 1,
-        Item: item?.itItem?.model || "-",
-        Supplier: item?.supplier?.name || "-",
-        QuantityReceived: item?.quantityReceived || 0,
-        DateReceived: item?.dateReceived
-          ? new Date(item.dateReceived).toLocaleDateString()
-          : "-",
-      }));
+      cleanData = reportData?.data
+        .filter(
+          (record) =>
+            record?.voucherNumber
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.lpoReference
+              ?.toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.supplier?.name
+              ?.toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.receivedBy?.name
+              ?.toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.itItem?.model
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.itItem?.brand
+              .toLowerCase()
+              .includes(searchText.toLowerCase())
+        )
+        .map((item, index) => ({
+          No: index + 1,
+          Model: item?.itItem?.model || "-",
+          Brand: item?.itItem?.model || "-",
+          QuantityReceived: item?.quantityReceived || 0,
+          Supplier: item?.supplier?.name || "-",
+          ReceivedBy: item?.receivedBy?.name || "-",
+          LPOReference: item?.lpoReference || "-",
+          VoucherNumber: item?.voucherNumber || "-",
+          DateReceived: item?.dateReceived
+            ? new Date(item.dateReceived).toLocaleDateString()
+            : "-",
+        }));
     } else if (selectedReport === "stock_issued") {
-      cleanData = reportData?.data.map((item, index) => ({
-        No: index + 1,
-        Item: item?.itItem?.model || "-",
-        QuantityIssued: item?.quantityIssued || 0,
-        IssuedBy: item?.issuedBy?.name || "-",
-        IssueDate: item?.issueDate
-          ? new Date(item.issueDate).toLocaleDateString()
-          : "-",
-      }));
-    } else if (selectedReport === "requisition") {
-      cleanData = reportData?.data.map((item, index) => ({
-        No: index + 1,
-        RequisitionID: item?.requisitionID || "-",
-        Purpose: item?.purpose || "-",
-        Quantity: item?.quantity || 0,
-        RoomNo: item?.roomNo || "-",
-      }));
-    } else if (selectedReport === "inventory") {
-      cleanData = reportData?.data.map((item, index) => ({
-        No: index + 1,
-        Item: item?.itItem?.model || "-",
-        Stock: item?.stock || 0,
-        MinimumStock: item?.minStock || 0,
-        MaximumStock: item?.maxStock || 0,
-      }));
+      cleanData = reportData?.data
+        .filter(
+          (record) =>
+            record?.itItem?.model
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.itItem?.brand
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.quantityIssued
+              .toString()
+              .includes(searchText.toLowerCase()) ||
+            record?.issuedBy?.name
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.requisition?.staff?.name
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.remarks.toLowerCase().includes(searchText.toLowerCase())
+        )
+        .map((item, index) => ({
+          No: index + 1,
+          Model: item?.itItem?.model || "-",
+          Brand: item?.itItem?.brand || "-",
+          QuantityIssued: item?.quantityIssued || 0,
+          IssuedBy: item?.issuedBy?.name || "-",
+          RequestedBy: item?.requisition?.staff?.name || "-",
+          Remarks: item?.remarks || "-",
+          IssueDate: item?.issueDate
+            ? new Date(item.issueDate).toLocaleDateString()
+            : "-",
+        }));
+    } else if (selectedReport === "requisitions") {
+      cleanData = reportData?.data
+        .filter(
+          (record) =>
+            record?.requisitionID
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.staff?.name
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.roomNo.toString().includes(searchText.toLowerCase()) ||
+            record?.itItem?.model
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.itItem?.brand
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.itItem?.deviceType
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.itemDescription
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.purpose.toLowerCase().includes(searchText.toLowerCase())
+        )
+
+        .map((item, index) => ({
+          No: index + 1,
+          RequisitionID: item?.requisitionID || "-",
+          IssuedBy: item?.staff?.name || "-",
+          RoomNo: item?.roomNo || "-",
+          Brand: item?.itItem?.brand || "-",
+          Model: item?.itItem?.model || "-",
+          DeviceType: item?.itItem?.deviceType || "-",
+          Description: item?.description || "-",
+          Purpose: item?.purpose || "-",
+          Quantity: item?.quantity || 0,
+          DateCreated: item?.createdAt
+            ? new Date(item.createdAt).toLocaleDateString()
+            : "-",
+        }));
+    } else if (selectedReport === "stock_levels") {
+      cleanData = reportData?.data
+        .filter(
+          (record) =>
+            record?.model.toLowerCase().includes(searchText.toLowerCase()) ||
+            record?.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+            record?.deviceType
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.itemClass
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record?.quantityInStock
+              .toString()
+              .includes(searchText.toLowerCase())
+        )
+
+        .map((item, index) => ({
+          No: index + 1,
+          Model: item?.model || "-",
+          Brand: item?.brand || "-",
+          DeviceType: item?.deviceType || "-",
+          ItemClass: item?.itemClass || "-",
+          QuantityInStock: item?.quantityInStock || 0,
+        }));
     }
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
@@ -229,6 +455,14 @@ const StoresReport = () => {
         >
           Filter
         </Button>
+        <Input
+          disabled={!reportData?.data?.length}
+          placeholder="Search..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          prefix={<SearchOutlined />}
+          style={{ width: "200px" }}
+        />
         <Button
           type="primary"
           onClick={downloadExcel}

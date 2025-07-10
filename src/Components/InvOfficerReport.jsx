@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { FilterOutlined } from "@ant-design/icons";
-import { Button, DatePicker, Form, Modal, Select, Spin, Table } from "antd";
+import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
+import {
+  Button,
+  DatePicker,
+  Form,
+  Input,
+  Modal,
+  Select,
+  Spin,
+  Table,
+} from "antd";
 import api from "../utils/config";
 import * as XLSX from "xlsx";
 import { useQuery } from "@tanstack/react-query";
@@ -8,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 const InvOfficerReport = () => {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportData, setReportData] = useState([]);
   const [form] = Form.useForm();
@@ -96,6 +106,36 @@ const InvOfficerReport = () => {
           title: "User Name",
           dataIndex: "userName",
           key: "userName",
+          filteredValue: [searchText],
+          onFilter: (value, record) => {
+            return (
+              record.userName
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.userEmail
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.departmentName
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.unitName
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.deviceType
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+              record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+              record.serialNumber
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              record.status.toLowerCase().includes(searchText.toLowerCase()) ||
+              record.warrantyPeriod
+                .toString()
+                .toLowerCase()
+                .includes(searchText.toLowerCase())
+            );
+          },
         },
         {
           title: "User Email",
@@ -152,16 +192,46 @@ const InvOfficerReport = () => {
 
     let cleanData = [];
 
-    if (selectedReport === "maintenance_tickets") {
-      cleanData = reportData?.data.map((item, index) => ({
-        No: index + 1,
-        Item: item?.itItem?.model || "-",
-        Supplier: item?.supplier?.name || "-",
-        QuantityReceived: item?.quantityReceived || 0,
-        DateReceived: item?.dateReceived
-          ? new Date(item.dateReceived).toLocaleDateString()
-          : "-",
-      }));
+    if (selectedReport === "inventory") {
+      cleanData = reportData?.data
+        .filter(
+          (record) =>
+            record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.userEmail.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.departmentName
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record.unitName.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.deviceType
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.serialNumber
+              .toLowerCase()
+              .includes(searchText.toLowerCase()) ||
+            record.status.toLowerCase().includes(searchText.toLowerCase()) ||
+            record.warrantyPeriod
+              .toString()
+              .toLowerCase()
+              .includes(searchText.toLowerCase())
+        )
+        .map((item, index) => ({
+          No: index + 1,
+          UserName: item?.userName || "-",
+          Email: item?.userEmail || "-",
+          Department: item?.departmentName || "-",
+          UnitName: item?.unitName || "-",
+          DeviceType: item?.deviceType || "-",
+          Brand: item?.brand || "-",
+          Model: item?.model || "-",
+          SerialNumber: item?.serialNumber || "-",
+          Status: item?.status || "-",
+          WarrantyPeriod: item?.warrantyPeriod || "-",
+          PurchaseDate: item?.purchaseDate
+            ? new Date(item.purchaseDate).toLocaleDateString()
+            : "-",
+        }));
     }
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
@@ -180,6 +250,15 @@ const InvOfficerReport = () => {
         >
           Filter
         </Button>
+        <Input
+          disabled={!reportData?.data?.length}
+          placeholder="Search..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          prefix={<SearchOutlined />}
+          style={{ width: "200px" }}
+        />
+
         <Button
           type="primary"
           onClick={downloadExcel}

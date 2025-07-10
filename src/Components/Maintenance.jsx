@@ -88,6 +88,9 @@ const Maintenance = () => {
           record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
           record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
           record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.departmentName
+            .toLowerCase()
+            .includes(searchText.toLowerCase()) ||
           record.technicianReceivedName
             .toLowerCase()
             .includes(searchText.toLowerCase()) ||
@@ -137,8 +140,8 @@ const Maintenance = () => {
       render: (_, record) => (
         <div className="flex items-center gap-3">
           <FiEdit
-            className="text-blue-500 cursor-pointer"
-            size={18}
+            className="text-red-500 cursor-pointer"
+            size={23}
             onClick={() => handleEdit(record)}
           />
         </div>

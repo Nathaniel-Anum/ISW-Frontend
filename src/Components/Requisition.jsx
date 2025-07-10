@@ -154,6 +154,7 @@ const Requisition = () => {
       title: "Remarks",
       dataIndex: "declineReason",
       key: "declineReason",
+      render: (text) => (text ? text : "-"),
     },
   ];
 
