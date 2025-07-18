@@ -90,8 +90,8 @@ const Acknowledge = () => {
   };
 
   return (
-    <div className="pt-12">
-      <div className="px-[10rem] ">
+    <div className="px-[3rem] py-[2rem]">
+      <div className="pl-[6rem] pt-6 ">
         <Table columns={column} dataSource={data?.data || []} />
         <Modal
           open={open}

@@ -79,25 +79,40 @@ const Resolved = () => {
   const handleDownload = () => {
     const tickets = data?.data?.tickets;
 
-    const cleanData = tickets.map((item, index) => ({
-      No: index + 1,
-      TicketID: item.ticketId,
-      User: item.userName,
-      Priority: item.priority,
-      IssueType: item.issueType,
-      Brand: item.brand,
-      Model: item.model,
-      ReceivedBy: item.technicianReceivedName,
-      ReturnedBy: item.technicianReturnedName,
-      ActionTaken: item.actionTaken || "-",
-      Remarks: item.remarks || "-",
-      DateLogged: item.dateLogged
-        ? new Date(item.dateLogged).toLocaleDateString()
-        : "-",
-      DateResolved: item.dateResolved
-        ? new Date(item.dateResolved).toLocaleDateString()
-        : "-",
-    }));
+    const cleanData = tickets
+      .filter(
+        (record) =>
+          record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.technicianReceivedName
+            .toLowerCase()
+            .includes(searchText.toLowerCase()) ||
+          record.technicianReturnedName
+            .toLowerCase()
+            .includes(searchText.toLowerCase()) ||
+          record.remarks.toLowerCase().includes(searchText.toLowerCase())
+      )
+
+      .map((item, index) => ({
+        No: index + 1,
+        TicketID: item.ticketId,
+        User: item.userName,
+        Priority: item.priority,
+        IssueType: item.issueType,
+        Brand: item.brand,
+        Model: item.model,
+        ReceivedBy: item.technicianReceivedName,
+        ReturnedBy: item.technicianReturnedName,
+        ActionTaken: item.actionTaken || "-",
+        Remarks: item.remarks || "-",
+        DateLogged: item.dateLogged
+          ? new Date(item.dateLogged).toLocaleDateString()
+          : "-",
+        DateResolved: item.dateResolved
+          ? new Date(item.dateResolved).toLocaleDateString()
+          : "-",
+      }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
@@ -197,8 +212,8 @@ const Resolved = () => {
   ];
 
   return (
-    <div className=" py-[2rem]">
-      <div className="flex justify-end items-center gap-2 pr-[9rem] mb-4">
+    <div className=" px-[3rem] py-[2rem]">
+      <div className="flex gap-2 justify-end">
         <Input
           placeholder="Search..."
           value={searchText}
@@ -209,7 +224,7 @@ const Resolved = () => {
         <Button icon={<FilterOutlined />} onClick={() => setOpen(true)} />
         <Button icon={<DownloadOutlined />} onClick={handleDownload} />
       </div>
-      <div className="flex justify-center px-[8.9rem]">
+      <div className="pl-[6rem] pt-6">
         <Table dataSource={tickets} columns={columns} />
         <Modal title="Filter" open={open} onCancel={handleCancel} footer={null}>
           <Form form={form} layout="vertical" onFinish={handleFinish}>

@@ -19,8 +19,21 @@ const Navbar = () => {
     localStorage.removeItem("user");
   };
 
+  const isAdmin = user?.roles?.includes("admin");
+
   // Assuming `user` is accessible globally in your app
   const items = [
+    // If user is admin, add this item first
+    ...(isAdmin
+      ? [
+          {
+            label: <a href="/backoffice/dashboard"> Go to Backoffice</a>,
+            key: "1",
+          },
+        ]
+      : []),
+
+    // Logout is always present
     {
       label: <a onClick={handleLogout}>Logout</a>,
       key: "0",

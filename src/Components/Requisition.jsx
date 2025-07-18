@@ -141,7 +141,7 @@ const Requisition = () => {
       ),
     },
     {
-      title: "Date Created",
+      title: "Date & Time Created",
       dataIndex: "createdAt",
       key: "createdAt",
       render: (createdAt) =>

@@ -22,7 +22,7 @@ const TotalAssets = () => {
   const [searchText, setSearchText] = useState("");
   const [form] = Form.useForm();
   const [open, setOpen] = useState(false);
-const [filteredTickets, setFilteredTickets] = useState(null)
+  const [filteredTickets, setFilteredTickets] = useState(null);
   const { data } = useQuery({
     queryKey: ["inventory"],
     queryFn: () => {
@@ -52,7 +52,6 @@ const [filteredTickets, setFilteredTickets] = useState(null)
       return api.get("stores/suppliers");
     },
   });
- 
 
   const formatDate = (date) => {
     if (!date) return null;
@@ -106,8 +105,8 @@ const [filteredTickets, setFilteredTickets] = useState(null)
           record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
           record.model.toLowerCase().includes(searchText.toLowerCase()) ||
           record.deviceType.toLowerCase().includes(searchText.toLowerCase()) ||
-          record.deviceDetails.serialNumber
-            .toLowerCase()
+          record.deviceDetails?.serialNumber
+            ?.toLowerCase()
             .includes(searchText.toLowerCase()) ||
           record.departmentName.toLowerCase().includes(searchText.toLowerCase())
         );
@@ -185,30 +184,42 @@ const [filteredTickets, setFilteredTickets] = useState(null)
   const handleDownload = () => {
     const tickets = data?.data?.assets;
 
-    const cleanData = tickets.map((item, index) => ({
-      No: index + 1,
-      TicketID: item.assetId,
-      User: item.userName,
-      DeviceType: item.deviceType,
-      SerialNumber: item.deviceDetails.serialNumber,
-      Brand: item.brand,
-      Model: item.model,
-      Department: item.departmentName,
-      Unit: item.unitName,
-      PurchaseDate: item.purchaseDate
-        ? new Date(item.purchaseDate).toLocaleDateString()
-        : "-",
-      WarrantyExpiry: item.warrantyExpiry
-        ? new Date(item.warrantyExpiry).toLocaleDateString()
-        : "-",
-      WarrantyMonths: item.warrantyPeriodMonths,
-      Status: item.status,
-      SupplierName: item.supplierName,
-      LPOReference: item.lpoReference,
-      ExpiryDays: item.daysToWarrantyExpiry
-        ? Math.round(item.daysToWarrantyExpiry)
-        : "-",
-    }));
+    const cleanData = tickets
+      .filter(
+        (record) =>
+          record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.deviceType.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.deviceDetails?.serialNumber
+            ?.toLowerCase()
+            .includes(searchText.toLowerCase()) ||
+          record.departmentName.toLowerCase().includes(searchText.toLowerCase())
+      )
+      .map((item, index) => ({
+        No: index + 1,
+        TicketID: item.assetId,
+        User: item.userName,
+        DeviceType: item.deviceType,
+        SerialNumber: item.deviceDetails.serialNumber,
+        Brand: item.brand,
+        Model: item.model,
+        Department: item.departmentName,
+        Unit: item.unitName,
+        PurchaseDate: item.purchaseDate
+          ? new Date(item.purchaseDate).toLocaleDateString()
+          : "-",
+        WarrantyExpiry: item.warrantyExpiry
+          ? new Date(item.warrantyExpiry).toLocaleDateString()
+          : "-",
+        WarrantyMonths: item.warrantyPeriodMonths,
+        Status: item.status,
+        SupplierName: item.supplierName,
+        LPOReference: item.lpoReference,
+        ExpiryDays: item.daysToWarrantyExpiry
+          ? Math.round(item.daysToWarrantyExpiry)
+          : "-",
+      }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
@@ -275,8 +286,8 @@ const [filteredTickets, setFilteredTickets] = useState(null)
   };
 
   return (
-    <div className="py-[2rem]">
-      <div className="flex justify-end items-center gap-2 pr-[9rem] mb-4">
+    <div className="px-[3rem] py-[2rem]">
+      <div className="flex gap-2 justify-end">
         <Input
           placeholder="Search..."
           value={searchText}
@@ -287,7 +298,7 @@ const [filteredTickets, setFilteredTickets] = useState(null)
         <Button icon={<FilterOutlined />} onClick={() => setOpen(true)} />
         <Button icon={<DownloadOutlined />} onClick={handleDownload} />
       </div>
-      <div className="flex justify-center px-[8.9rem]">
+      <div className="pl-[6rem] pt-6">
         <Table dataSource={tickets} columns={columns} />
         <Modal
           open={open}

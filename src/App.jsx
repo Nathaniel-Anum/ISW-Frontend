@@ -35,6 +35,7 @@ import TechReport from "./Components/TechReport";
 import InvOfficerReport from "./Components/InvOfficerReport";
 import TicketsResolved from "./Components/TicketsResolved";
 import Stock from "./Components/Stock";
+import AdminLogs from "./Components/AdminLogs";
 
 function App() {
   return (
@@ -66,6 +67,7 @@ function App() {
             <Route path="status-table" element={<StatusTable />} />
             <Route path="resolved-tickets" element={<TicketsResolved />} />
             <Route path="stock" element={<Stock />} />
+            <Route path="admin-logs" element={<AdminLogs />} />
           </Route>
           <Route path="/backoffice/dashboard" element={<DLayout />}>
             <Route index element={<Employees />} />

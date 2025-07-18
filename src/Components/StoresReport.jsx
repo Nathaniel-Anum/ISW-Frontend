@@ -22,12 +22,45 @@ const StoresReport = () => {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
-  // const { data: report } = useQuery({
-  //   queryKey: ["storesReport"],
-  //   queryFn: () => {
-  //     return api.get("/stores/reports?reportType=stock_received");
-  //   },
-  // });
+
+  //useQuery to get all users
+  const { data: users } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => {
+      return api.get("/admin/users");
+    },
+  });
+
+  //to get suppliers
+  const { data } = useQuery({
+    queryKey: ["suppliers"],
+    queryFn: () => {
+      return api.get("/stores/suppliers");
+    },
+  });
+
+  //to get it-Item
+  const { data: itItem } = useQuery({
+    queryKey: ["itItem"],
+    queryFn: () => {
+      return api.get("/stores/it-items");
+    },
+  });
+
+  const userOptions = users?.data?.map((user) => ({
+    label: `${user.name}`,
+    value: user.id,
+  }));
+
+  const supplierOptions = data?.data?.map((supplier) => ({
+    label: `${supplier.name}`,
+    value: supplier.id,
+  }));
+
+  const itItemOptions = itItem?.data?.map((item) => ({
+    label: `${item.brand} - ${item.model}`,
+    value: item.id,
+  }));
 
   const formatDate = (date) => {
     if (!date) return null;
@@ -35,7 +68,19 @@ const StoresReport = () => {
   };
 
   const onFinish = async (values) => {
-    const { reportType, itemClass, status, deviceType, reqStatus } = values;
+    const {
+      reportType,
+      itemClass,
+      status,
+      deviceType,
+      reqStatus,
+      model,
+      brand,
+      lpoReference,
+      technicianReceivedById,
+      supplierId,
+      itItemId,
+    } = values;
     const filters = {
       startDate: values.startDate ? formatDate(values.startDate) : null,
       endDate: values.endDate ? formatDate(values.endDate) : null,
@@ -46,6 +91,13 @@ const StoresReport = () => {
     if (status) params.append("status", status);
     if (deviceType) params.append("deviceType", deviceType);
     if (reqStatus) params.append("reqStatus", reqStatus);
+    if (model) params.append("model", model);
+    if (brand) params.append("brand", brand);
+    if (technicianReceivedById)
+      params.append("technicianReceivedById", technicianReceivedById);
+    if (lpoReference) params.append("lpoReference", lpoReference);
+    if (supplierId) params.append("supplierId", supplierId);
+    if (itItemId) params.append("itItemId", itItemId);
 
     if (filters.startDate) params.append("startDate", filters.startDate);
     if (filters.endDate) params.append("endDate", filters.endDate);
@@ -516,6 +568,48 @@ const StoresReport = () => {
                 </Select.Option>
                 <Select.Option value="FIXED_ASSET">Fixed Asset</Select.Option>
               </Select>
+            </Form.Item>
+            <Form.Item label="Model" name="model">
+              <Input placeholder=" Model" />
+            </Form.Item>
+            <Form.Item label="Brand" name="brand">
+              <Input placeholder="Brand" />
+            </Form.Item>
+            <Form.Item label="L.P.O Reference" name="lpoReference">
+              <Input placeholder="L.P.O Reference" />
+            </Form.Item>
+            <Form.Item
+              name="technicianReceivedById"
+              label="Select Technician Received"
+            >
+              <Select
+                showSearch
+                placeholder="Technician Received By"
+                options={userOptions}
+                filterOption={(input, option) =>
+                  option.label.toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+            <Form.Item name="supplierId" label="Select Supplier">
+              <Select
+                showSearch
+                placeholder="Select Supplier"
+                options={supplierOptions}
+                filterOption={(input, option) =>
+                  option.label.toLowerCase().includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+            <Form.Item name="itItemId" label="Select It Item">
+              <Select
+                showSearch
+                placeholder="Select It Item"
+                options={itItemOptions}
+                filterOption={(input, option) =>
+                  option.label.toLowerCase().includes(input.toLowerCase())
+                }
+              />
             </Form.Item>
             <Form.Item label="Start Date" name="startDate">
               <DatePicker style={{ width: "100%" }} />

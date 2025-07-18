@@ -48,25 +48,37 @@ const TotalDevices = () => {
   const handleDownload = () => {
     const tickets = data?.data?.assets;
 
-    const cleanData = tickets.map((item, index) => ({
-      No: index + 1,
-      TicketID: item.assetId,
-      User: item.userName,
-      DeviceType: item.deviceType,
-      SerialNumber: item.deviceDetails.serialNumber,
-      Brand: item.brand,
-      Model: item.model,
-      Department: item.departmentName,
-      Unit: item.unitName,
-      PurchaseDate: item.purchaseDate
-        ? new Date(item.purchaseDate).toLocaleDateString()
-        : "-",
+    const cleanData = tickets
+      .filter(
+        (record) =>
+          record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.model.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.deviceType.toLowerCase().includes(searchText.toLowerCase()) ||
+          record.deviceDetails.serialNumber
+            ?.toLowerCase()
+            .includes(searchText.toLowerCase()) ||
+          record.departmentName.toLowerCase().includes(searchText.toLowerCase())
+      )
+      .map((item, index) => ({
+        No: index + 1,
+        TicketID: item.assetId,
+        User: item.userName,
+        DeviceType: item.deviceType,
+        SerialNumber: item.deviceDetails.serialNumber,
+        Brand: item.brand,
+        Model: item.model,
+        Department: item.departmentName,
+        Unit: item.unitName,
+        PurchaseDate: item.purchaseDate
+          ? new Date(item.purchaseDate).toLocaleDateString()
+          : "-",
 
-      WarrantyMonths: item.warrantyPeriodMonths,
-      Status: item.status,
-      SupplierName: item.supplierName,
-      LPOReference: item.lpoReference,
-    }));
+        WarrantyMonths: item.warrantyPeriodMonths,
+        Status: item.status,
+        SupplierName: item.supplierName,
+        LPOReference: item.lpoReference,
+      }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
@@ -123,7 +135,7 @@ const TotalDevices = () => {
           record.model.toLowerCase().includes(searchText.toLowerCase()) ||
           record.deviceType.toLowerCase().includes(searchText.toLowerCase()) ||
           record.deviceDetails.serialNumber
-            .toLowerCase()
+            ?.toLowerCase()
             .includes(searchText.toLowerCase()) ||
           record.departmentName.toLowerCase().includes(searchText.toLowerCase())
         );
@@ -173,8 +185,8 @@ const TotalDevices = () => {
     },
   ];
   return (
-    <div className="py-[2rem]">
-      <div className="flex justify-end items-center gap-2 pr-[18rem] mb-4">
+    <div className="px-[3rem] py-[2rem]">
+      <div className="flex justify-end gap-2">
         <Input
           placeholder="Search..."
           value={searchText}
@@ -185,7 +197,7 @@ const TotalDevices = () => {
         <Button icon={<FilterOutlined />} onClick={() => setOpen(true)} />
         <Button icon={<DownloadOutlined />} onClick={handleDownload} />
       </div>
-      <div className="flex items-center justify-center">
+      <div className="pl-[6rem] pt-6">
         <Table dataSource={tickets} columns={columns} />
         <Modal title="Filter" open={open} onCancel={handleCancel} footer={null}>
           <div className="max-h-[75vh] overflow-y-auto p-6  no-scrollbar">

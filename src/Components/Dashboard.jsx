@@ -77,8 +77,8 @@ const Dashboard = () => {
             {/* === INVENTORY CARDS === */}
 
             {/* Requisitions Card */}
-            <Link to="/dashboard/requisition">
-              <div className="bg-white hover:bg-gray-100 cursor-pointer transition-colors duration-200 shadow-md rounded-xl hover:shadow-lg overflow-hidden border border-gray-200">
+            {/* <Link to="/dashboard/requisition">
+              <div className="bg-white hover:bg-gray-100 transition-colors cursor-pointer duration-200 shadow-md rounded-xl hover:shadow-lg overflow-hidden border border-gray-200">
                 <div className="p-4 sm:p-6">
                   <div className="flex items-center mb-2 sm:mb-4">
                     <FaFileAlt
@@ -101,8 +101,31 @@ const Dashboard = () => {
                   </div>
                 </div>
               </div>
-            </Link>
-            {/* Tickets Resolved Card */}
+            </Link> */}
+            {/* Total Requisition Card */}
+            <div
+              onClick={() => navigate("/dashboard/requisition")}
+              className="bg-white hover:bg-gray-100 transition-colors cursor-pointer duration-200 shadow-md rounded-xl hover:shadow-lg overflow-hidden border border-gray-200"
+            >
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center mb-2 sm:mb-4">
+                  <FaFileAlt className="text-blue-500 mr-2 sm:mr-3" size={20} />
+                  <h3 className="text-gray-600 font-medium text-sm sm:text-base">
+                    Total Requisition
+                  </h3>
+                </div>
+                <div className="mt-1 sm:mt-2">
+                  <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-800">
+                    {requisitions?.data?.length || 0}
+                  </p>
+                </div>
+                <div className="mt-2 sm:mt-4 pt-2 sm:pt-4 border-t border-gray-100">
+                  <span className="text-xs sm:text-sm text-gray-500">
+                    Updated today
+                  </span>
+                </div>
+              </div>
+            </div>
             <div
               onClick={() =>
                 navigate("/dashboard/status-table", {

@@ -11,7 +11,7 @@ import { TbReport } from "react-icons/tb";
 import { GrVmMaintenance } from "react-icons/gr";
 import { GiCheckMark } from "react-icons/gi";
 import { SiOpensourcehardware } from "react-icons/si";
-import { AiOutlineStock } from "react-icons/ai";
+import { AiOutlineAudit, AiOutlineStock } from "react-icons/ai";
 
 const Sidebar = () => {
   const { user } = useUser();
@@ -108,16 +108,42 @@ const Sidebar = () => {
               </Link>
             )}
 
-            {user?.roles?.includes("supervisor") && (
+            {/* {user?.roles?.includes("supervisor") && (
               <Link to="maintenance-report">
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                   <GrVmMaintenance className=" text-[3rem] w-[43px] text-black" />
                   <p className="text-black text-center ">Maintenance Report</p>
                 </li>
               </Link>
-            )}
+            )} */}
+
             {user?.roles?.includes("supervisor") && (
+              <Link to="technician-report">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <GrVmMaintenance className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black text-center ">Maintenance Report</p>
+                </li>
+              </Link>
+            )}
+            {user?.roles?.includes("admin") && (
+              <Link to="admin-logs">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <AiOutlineAudit className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black text-center ">Admin Logs</p>
+                </li>
+              </Link>
+            )}
+
+            {/* {user?.roles?.includes("supervisor") && (
               <Link to="inventory-report">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <MdOutlineInventory className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black text-center ">Inventory Report</p>
+                </li>
+              </Link>
+            )} */}
+            {user?.roles?.includes("supervisor") && (
+              <Link to="inv-officer-report">
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                   <MdOutlineInventory className=" text-[3rem] w-[43px] text-black" />
                   <p className="text-black text-center ">Inventory Report</p>
@@ -129,6 +155,14 @@ const Sidebar = () => {
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                   <MdOutlineInventory className=" text-[3rem] w-[43px] text-black" />
                   <p className="text-black text-center "> Report</p>
+                </li>
+              </Link>
+            )}
+            {user?.roles?.includes("supervisor") && (
+              <Link to="stores-report">
+                <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10 duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
+                  <MdOutlineStore className=" text-[3rem] w-[43px] text-black" />
+                  <p className="text-black text-center ">Stores Report</p>
                 </li>
               </Link>
             )}
