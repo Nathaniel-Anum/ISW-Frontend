@@ -9,6 +9,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 const Requisition = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const { user } = useUser();
 
@@ -84,6 +86,11 @@ const Requisition = () => {
     //   dataIndex: "requisitionID",
     //   key: "requisitionID",
     // },
+    {
+      title: "No",
+      key: "index",
+      render: (text, record, index) => (currentPage - 1) * pageSize + index + 1,
+    },
     {
       title: "Description",
       dataIndex: "itemDescription",
@@ -248,6 +255,14 @@ const Requisition = () => {
         <Table
           columns={columns}
           dataSource={requisition?.data || []}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, pageSize) => {
+              setCurrentPage(page);
+              setPageSize(pageSize);
+            },
+          }}
           rowKey="requisitionID"
         />
       </div>

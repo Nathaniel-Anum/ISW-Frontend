@@ -387,7 +387,7 @@ const Maintenance = () => {
 
           <Form.Item>
             <Button htmlType="submit" type="primary" block>
-              Update
+              Resolve
             </Button>
           </Form.Item>
         </Form>

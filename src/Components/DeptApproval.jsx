@@ -184,9 +184,10 @@ const DeptApproval = () => {
   };
 
   return (
-    <div className="px-[10rem]">
-      <h2 className="p-4">Requisition Approval </h2>
-      <Table dataSource={data?.data || []} columns={columns} rowKey="id" />
+    <div className="px-[3rem] py-[2rem]">
+      <div className="pl-[6rem] pt-6">
+        <Table dataSource={data?.data || []} columns={columns} rowKey="id" />
+      </div>
       <Modal
         title="Decline Request"
         open={isModalVisible}

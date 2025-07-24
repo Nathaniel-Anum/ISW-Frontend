@@ -51,7 +51,7 @@ const StatusTable = () => {
       ),
     },
     {
-      title: "Created At",
+      title: "Date Created",
       dataIndex: "createdAt",
       key: "createdAt",
       render: (createdAt) =>

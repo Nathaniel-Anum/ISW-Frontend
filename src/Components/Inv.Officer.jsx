@@ -78,22 +78,20 @@ const InvOfficer = () => {
       title: "User",
       dataIndex: ["user", "name"],
       key: "user",
-        filteredValue: [searchText],
-        onFilter: (value, record) => {
-          return (
-            record.user.name.toLowerCase().includes(value.toLowerCase()) ||
-           
-            record.status.toLowerCase().includes(value.toLowerCase()) ||
-            record.department.name
-              .toLowerCase()
-              .includes(value.toLowerCase()) ||
-            record.itItem.brand.toLowerCase().includes(value.toLowerCase()) ||
-            record.itItem.model.toLowerCase().includes(value.toLowerCase()) ||
-            record.itItem.deviceType.toLowerCase().includes(value.toLowerCase()) ||
-            record.unit.name.toLowerCase().includes(value.toLowerCase()
-          )
-        )
-        }
+      filteredValue: [searchText],
+      onFilter: (value, record) => {
+        return (
+          record.user.name.toLowerCase().includes(value.toLowerCase()) ||
+          record.status.toLowerCase().includes(value.toLowerCase()) ||
+          record.department.name.toLowerCase().includes(value.toLowerCase()) ||
+          record.itItem.brand.toLowerCase().includes(value.toLowerCase()) ||
+          record.itItem.model.toLowerCase().includes(value.toLowerCase()) ||
+          record.itItem.deviceType
+            .toLowerCase()
+            .includes(value.toLowerCase()) ||
+          record.unit.name.toLowerCase().includes(value.toLowerCase())
+        );
+      },
     },
     {
       title: "Brand",
@@ -116,7 +114,7 @@ const InvOfficer = () => {
       key: "department",
     },
     {
-      title: "Dpt Location ",
+      title: "Location ",
       dataIndex: "departmentLocation",
       render: (text) => text || "N/A",
     },
@@ -155,7 +153,7 @@ const InvOfficer = () => {
         }),
     },
     {
-      title: "Created At",
+      title: "Date Created",
       dataIndex: "createdAt",
       key: "createdAt",
       render: (createdAt) =>

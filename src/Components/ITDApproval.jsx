@@ -122,7 +122,7 @@ const ITDApproval = () => {
   const approveRequestMutation = useMutation({
     mutationFn: (recordId) => api.patch(`/itd/req/${recordId}/approve`),
     onSuccess: () => {
-      toast.success("Request approved!");
+      toast.success("Requisition approved!");
 
       queryClient.invalidateQueries(["requisition"]);
     },
@@ -178,9 +178,14 @@ const ITDApproval = () => {
     setSelectedRecord(null);
   };
   return (
-    <div className="px-[10rem]">
-      <p>Approval</p>
-      <Table dataSource={approval?.data || []} columns={columns} rowKey="id" />
+    <div className="px-[3rem] py-[2rem]">
+      <div className="pl-[6rem] pt-6">
+        <Table
+          dataSource={approval?.data || []}
+          columns={columns}
+          rowKey="id"
+        />
+      </div>
       <Modal
         title="Decline Request"
         open={isModalVisible}

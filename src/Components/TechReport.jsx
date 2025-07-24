@@ -21,6 +21,8 @@ const TechReport = () => {
   const [searchText, setSearchText] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
   const [reportData, setReportData] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm();
 
   const { data } = useQuery({
@@ -67,6 +69,11 @@ const TechReport = () => {
   const getColumns = () => {
     if (selectedReport === "maintenance_tickets") {
       return [
+        {
+          title: "No",
+          key: "index",
+          render: (_text, _record, index) => index + 1,
+        },
         {
           title: "User Name",
           dataIndex: "userName",
@@ -275,6 +282,14 @@ const TechReport = () => {
             columns={getColumns()}
             dataSource={reportData?.data || []}
             rowKey={(record) => record.id || record.key}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              onChange: (page, pageSize) => {
+                setCurrentPage(page);
+                setPageSize(pageSize);
+              },
+            }}
           />
         )}
       </div>

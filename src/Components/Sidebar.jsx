@@ -86,7 +86,7 @@ const Sidebar = () => {
               <Link to="stores">
                 <li className="flex flex-col justify-center items-center gap-1 hover:bg-white/10  duration-500 py-2 px-2 hover:scale-105 hover:rounded-md ">
                   <MdOutlineStore className=" text-[3rem] w-[43px] text-black" />
-                  <p className="text-black">Stores</p>
+                  <p className="text-black text-center">Receive Stock</p>
                 </li>
               </Link>
             )}

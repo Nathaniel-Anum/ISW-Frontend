@@ -23,6 +23,8 @@ const InvOfficerReport = () => {
   const [form] = Form.useForm();
   const [departments, setDepartments] = useState([]);
   const [units, setUnits] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const { data } = useQuery({
     queryKey: ["department"],
@@ -102,6 +104,11 @@ const InvOfficerReport = () => {
   const getColumns = () => {
     if (selectedReport === "inventory") {
       return [
+        {
+          title: "No",
+          key: "index",
+          render: (_text, _record, index) => index + 1,
+        },
         {
           title: "User Name",
           dataIndex: "userName",
@@ -277,6 +284,14 @@ const InvOfficerReport = () => {
             columns={getColumns()}
             dataSource={reportData?.data || []}
             rowKey={(record) => record.id || record.key}
+            pagination={{
+              current: currentPage,
+              pageSize: pageSize,
+              onChange: (page, pageSize) => {
+                setCurrentPage(page);
+                setPageSize(pageSize);
+              },
+            }}
           />
         )}
       </div>

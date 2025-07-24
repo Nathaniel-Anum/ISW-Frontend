@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React from "react";
+import React, { useState } from "react";
 import api from "../utils/config";
 import { Button, Form, Input, Modal, Table } from "antd";
 
@@ -11,8 +11,15 @@ const Acknowledge = () => {
   const queryClient = useQueryClient();
   const [open, setOpen] = React.useState(false);
   const [selected, setSelected] = React.useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const column = [
+    {
+      title: "No",
+      key: "index",
+      render: (text, record, index) => (currentPage - 1) * pageSize + index + 1,
+    },
     {
       title: "Device Type",
       dataIndex: "deviceType",
@@ -92,7 +99,18 @@ const Acknowledge = () => {
   return (
     <div className="px-[3rem] py-[2rem]">
       <div className="pl-[6rem] pt-6 ">
-        <Table columns={column} dataSource={data?.data || []} />
+        <Table
+          columns={column}
+          dataSource={data?.data || []}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, pageSize) => {
+              setCurrentPage(page);
+              setPageSize(pageSize);
+            },
+          }}
+        />
         <Modal
           open={open}
           onCancel={() => setOpen(false)}
