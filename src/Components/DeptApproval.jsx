@@ -127,7 +127,7 @@ const DeptApproval = () => {
   const approveRequestMutation = useMutation({
     mutationFn: (recordId) => api.patch(`/dept/req/${recordId}/approve`),
     onSuccess: () => {
-      toast.success("Request approved!");
+      toast.success("Requisition approved!");
 
       queryClient.invalidateQueries(["requisition"]);
     },

@@ -239,7 +239,7 @@ const Requisition = () => {
           </Form.Item>
 
           <Form.Item name="roomNo" label="Room No">
-            <Input placeholder="Enter Room Number" />
+            <Input placeholder="Enter Room Number" disabled />
           </Form.Item>
 
           {/* Submit Button */}

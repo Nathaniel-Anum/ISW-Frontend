@@ -105,7 +105,7 @@ const Maintenance = () => {
     //   dataIndex: "priority",
     // },
     {
-      title: "Logged By",
+      title: "System Received By",
       dataIndex: "technicianReceivedName",
     },
     {
