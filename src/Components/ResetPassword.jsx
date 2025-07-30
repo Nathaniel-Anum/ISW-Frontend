@@ -39,7 +39,7 @@ const ResetPassword = () => {
         toast.success(
           "Password reset successfully. Redirecting to dashboard..."
         );
-        setTimeout(() => navigate("/dashboard"), 2000);
+        setTimeout(() => navigate("/"), 2000);
       }
     },
     onError: (err) => {

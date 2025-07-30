@@ -179,9 +179,15 @@ const Maintenance = () => {
       issueType: values.issueType,
     };
 
+    const payload = {
+      ...ticketData,
+      priority: "MEDIUM",
+    };
+    createTicket(payload);
+
     // console.log("Submitting ticket data:", ticketData);
 
-    createTicket(ticketData);
+    // createTicket(ticketData);
   };
 
   // Mutation to resolve a ticket
@@ -201,12 +207,13 @@ const Maintenance = () => {
   });
 
   const handleResolve = (values) => {
-    const payload = {
-      ...values,
-      dateResolved: values.dateResolved.toISOString(),
-    };
+    // const payload = {
+    //   ...values,
+    //   dateResolved: values.dateResolved.toISOString(),
+    // };
     // console.log(payload);
-    resolveTicket(payload);
+    resolveTicket(values);
+    console.log("Resolving ticket with data:", values);
   };
 
   return (
@@ -272,7 +279,7 @@ const Maintenance = () => {
         )}
         {selectedDevice && (
           <Form layout="vertical" onFinish={onFinish}>
-            <Form.Item label="Asset ID">
+            {/* <Form.Item label="Asset ID">
               <Input value={selectedDevice.inventoryId} disabled />
             </Form.Item>
             <Form.Item label="User ID">
@@ -283,7 +290,7 @@ const Maintenance = () => {
             </Form.Item>
             <Form.Item label="Unit ID">
               <Input value={selectedDevice.unitId} disabled />
-            </Form.Item>
+            </Form.Item> */}
 
             <Form.Item
               label="Issue Type"
@@ -296,13 +303,13 @@ const Maintenance = () => {
               </Select>
             </Form.Item>
 
-            <Form.Item label="Priority" name="priority" initialValue="MEDIUM">
+            {/* <Form.Item label="Priority" name="priority" initialValue="MEDIUM">
               <Select disabled>
                 <Select.Option value="HIGH">HIGH</Select.Option>
                 <Select.Option value="MEDIUM">MEDIUM</Select.Option>
                 <Select.Option value="LOW">LOW</Select.Option>
               </Select>
-            </Form.Item>
+            </Form.Item> */}
 
             {/* <Form.Item label="Remarks" name="remarks">
               <Input.TextArea rows={2} disabled/>
@@ -324,7 +331,13 @@ const Maintenance = () => {
               </Select>
             </Form.Item>
 
-            <Form.Item label="Description" name="description">
+            <Form.Item
+              label="Description"
+              name="description"
+              rules={[
+                { required: true, message: "Please enter a Description" },
+              ]}
+            >
               <Input.TextArea rows={3} />
             </Form.Item>
 
@@ -371,7 +384,7 @@ const Maintenance = () => {
             </Select>
           </Form.Item>
 
-          <Form.Item
+          {/* <Form.Item
             name="dateResolved"
             label="Date Resolved"
             rules={[
@@ -379,7 +392,7 @@ const Maintenance = () => {
             ]}
           >
             <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item name="remarks" label="Remarks">
             <Input.TextArea />
