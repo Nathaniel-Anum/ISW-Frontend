@@ -2,7 +2,13 @@ import "./App.css";
 import Dashboard from "./Components/Dashboard";
 
 import Login from "./Components/Login";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
 import Requisition from "./Components/Requisition";
 import ITDApproval from "./Components/ITDApproval";
 import DashboardLayout from "./Components/DashboardLayoutbo";
@@ -34,51 +40,101 @@ import StoresReport from "./Components/StoresReport";
 import TechReport from "./Components/TechReport";
 import InvOfficerReport from "./Components/InvOfficerReport";
 import TicketsResolved from "./Components/TicketsResolved";
+import ForgotPassword from "./Components/ForgotPassword";
+import LoginWithToken from "./Components/LoginWithToken";
+import ResetPassword from "./Components/ResetPassword";
+
 import Stock from "./Components/Stock";
 import AdminLogs from "./Components/AdminLogs";
+import { useEffect } from "react";
+
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pathname = location.pathname;
+
+  const publicPaths = [
+    "/",
+    "/login-with-token",
+    "/forgot-password",
+    "/reset-password",
+  ];
+
+  useEffect(() => {
+    const token = localStorage.getItem("access_token");
+    const mustResetPassword =
+      localStorage.getItem("mustResetPassword") === "true";
+
+    if (!token && !publicPaths.includes(pathname)) {
+      console.log(
+        `Auth: No token, accessing protected path (${pathname}). Redirecting to /`
+      );
+      navigate("/", { replace: true });
+    } else if (token && !mustResetPassword && publicPaths.includes(pathname)) {
+      console.log(
+        `Auth: Logged in, no reset needed, on public path (${pathname}). Redirecting to /dashboard`
+      );
+      navigate("/dashboard", { replace: true });
+    } else if (token && mustResetPassword && pathname !== "/reset-password") {
+      console.log(
+        `Auth: Logged in, reset required, not on reset page (${pathname}). Redirecting to /reset-password`
+      );
+      navigate("/reset-password", { replace: true });
+    } else {
+      // console.log(`Auth: No redirect needed for path (${pathname}). Token: ${!!token}, MustReset: ${mustResetPassword}`);
+    }
+  }, [pathname, navigate]);
+  return (
+    <Routes>
+      <Route path="/" element={<Login />} />
+      <Route path="/login-with-token" element={<LoginWithToken />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+
+      <Route path="/dashboard" element={<DashboardLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="requisition" element={<Requisition />} />
+        <Route path="dpt-approval" element={<DeptApproval />} />
+        <Route path="itd-approval" element={<ITDApproval />} />
+        <Route path="stores-officer" element={<StoresOfficer />} />
+        <Route path="inventory" element={<InvOfficer />} />
+        <Route path="stores" element={<StoresPage />} />
+        <Route path="maintenance" element={<Maintenance />} />
+        <Route path="maintenance-report" element={<MaintenanceReport />} />
+        <Route path="stores-report" element={<StoresReport />} />
+        <Route path="technician-report" element={<TechReport />} />
+        <Route path="inv-officer-report" element={<InvOfficerReport />} />
+        <Route path="inventory-report" element={<InventoryReport />} />
+        <Route path="total-ticket" element={<TotalTicket />} />
+        <Route path="resolved" element={<Resolved />} />
+        <Route path="unresolved" element={<Unresolved />} />
+        <Route path="total-asset" element={<TotalAssets />} />
+        <Route path="total-devices" element={<TotalDevices />} />
+        <Route path="acknowledge" element={<Acknowledge />} />
+        {/* <Route path="acknowledge" element={<Acknowledge />} /> */}
+        <Route path="status-table" element={<StatusTable />} />
+        <Route path="resolved-tickets" element={<TicketsResolved />} />
+        <Route path="stock" element={<Stock />} />
+        <Route path="admin-logs" element={<AdminLogs />} />
+      </Route>
+      <Route path="/backoffice/dashboard" element={<DLayout />}>
+        <Route index element={<Employees />} />
+        <Route path="department" element={<Department />} />
+        <Route path="unit" element={<Units />} />
+        <Route path="supplier" element={<Supplier />} />
+        <Route path="roles" element={<Roles />} />
+        <Route path="permissions" element={<Permissions />} />
+        <Route path="it-items" element={<ItItems />} />
+      </Route>
+    </Routes>
+  );
+}
 
 function App() {
   return (
     <div>
       <Router>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={<DashboardLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="requisition" element={<Requisition />} />
-            <Route path="dpt-approval" element={<DeptApproval />} />
-            <Route path="itd-approval" element={<ITDApproval />} />
-            <Route path="stores-officer" element={<StoresOfficer />} />
-            <Route path="inventory" element={<InvOfficer />} />
-            <Route path="stores" element={<StoresPage />} />
-            <Route path="maintenance" element={<Maintenance />} />
-            <Route path="maintenance-report" element={<MaintenanceReport />} />
-            <Route path="stores-report" element={<StoresReport />} />
-            <Route path="technician-report" element={<TechReport />} />
-            <Route path="inv-officer-report" element={<InvOfficerReport />} />
-            <Route path="inventory-report" element={<InventoryReport />} />
-            <Route path="total-ticket" element={<TotalTicket />} />
-            <Route path="resolved" element={<Resolved />} />
-            <Route path="unresolved" element={<Unresolved />} />
-            <Route path="total-asset" element={<TotalAssets />} />
-            <Route path="total-devices" element={<TotalDevices />} />
-            <Route path="acknowledge" element={<Acknowledge />} />
-            {/* <Route path="acknowledge" element={<Acknowledge />} /> */}
-            <Route path="status-table" element={<StatusTable />} />
-            <Route path="resolved-tickets" element={<TicketsResolved />} />
-            <Route path="stock" element={<Stock />} />
-            <Route path="admin-logs" element={<AdminLogs />} />
-          </Route>
-          <Route path="/backoffice/dashboard" element={<DLayout />}>
-            <Route index element={<Employees />} />
-            <Route path="department" element={<Department />} />
-            <Route path="unit" element={<Units />} />
-            <Route path="supplier" element={<Supplier />} />
-            <Route path="roles" element={<Roles />} />
-            <Route path="permissions" element={<Permissions />} />
-            <Route path="it-items" element={<ItItems />} />
-          </Route>
-        </Routes>
+        <AppContent />
       </Router>
     </div>
   );
