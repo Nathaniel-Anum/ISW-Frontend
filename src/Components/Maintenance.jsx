@@ -231,10 +231,10 @@ const Maintenance = () => {
           icon={<AiOutlinePlus />}
           onClick={() => setOpen(true)}
         >
-          Create New Ticket
+          Create New Job Card
         </Button>
         <Link to="/dashboard/resolved-tickets">
-          <Button type="primary">View Resolved Tickets</Button>
+          <Button type="primary">View Resolved Jobs</Button>
         </Link>
       </div>
       <div className="pl-[6rem] pt-6">
