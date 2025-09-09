@@ -1,4 +1,5 @@
 import React from "react";
+import { logo } from "/assets/undraw_term-sheet_70lo.svg";
 
 const AuthLayout = ({ children, title }) => {
   return (
@@ -8,7 +9,7 @@ const AuthLayout = ({ children, title }) => {
         <div>
           <img
             className="w-[620px] h-auto object-contain"
-            src="/src/assets/undraw_term-sheet_70lo.svg"
+            src={logo}
             alt="Illustration"
           />
         </div>
