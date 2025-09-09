@@ -1,5 +1,5 @@
 import React from "react";
-import { logo } from "/assets/undraw_term-sheet_70lo.svg";
+import logo from "/assets/undraw_term-sheet_70lo.svg";
 
 const AuthLayout = ({ children, title }) => {
   return (
