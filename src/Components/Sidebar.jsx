@@ -12,6 +12,7 @@ import { GrVmMaintenance } from "react-icons/gr";
 import { GiCheckMark } from "react-icons/gi";
 import { SiOpensourcehardware } from "react-icons/si";
 import { AiOutlineAudit, AiOutlineStock } from "react-icons/ai";
+import cocoa from "/assets/logo.9a18109e1c16584832d5.png";
 
 const Sidebar = () => {
   const { user } = useUser();
@@ -21,7 +22,7 @@ const Sidebar = () => {
       <div className="w-full h-full  bg-center">
         <div className="w-[140px] h-screen fixed top-0 left-0 px-[15px] py-[19px] bg-[#E3E5E6] overflow-x-hidden no-scrollbar ">
           <div>
-            <img src="/src/assets/logo.9a18109e1c16584832d5.png" alt="" />
+            <img src={cocoa} alt="logo" />
           </div>
           <ul className="list-none  px-[15px] py-[25px]  flex flex-col gap-[35px]  my-[20px] cursor-pointer ">
             <Link to="/dashboard">

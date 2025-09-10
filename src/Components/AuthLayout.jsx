@@ -1,5 +1,6 @@
 import React from "react";
 import logo from "/assets/undraw_term-sheet_70lo.svg";
+import cocoa from "/assets/logo.9a18109e1c16584832d5.png";
 
 const AuthLayout = ({ children, title }) => {
   return (
@@ -24,7 +25,7 @@ const AuthLayout = ({ children, title }) => {
           <div className="flex items-center">
             <img
               className="w-[70px] h-auto"
-              src="/src/assets/logo.9a18109e1c16584832d5.png"
+              src={cocoa}
               alt="Ghana Cocoa Board Logo"
             />
             <div className="h-[20px] w-[2px] bg-[#6C63FF] mr-2"></div>
