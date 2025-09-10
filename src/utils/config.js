@@ -1,13 +1,13 @@
-import axios from "axios";
+import axios from 'axios';
 
 const api = axios.create({
-  baseURL: "http://localhost:3000",
-  headers: { "Content-Type": "application/json" },
+  baseURL: import.meta.env.VITE_BASE_URL,
+  headers: { 'Content-Type': 'application/json' },
 });
 
 // Add token to requests
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("access_token");
+  const token = localStorage.getItem('access_token');
   if (token) {
     // console.log("Using token:", token); // Add this
     config.headers.Authorization = `Bearer ${token}`;
@@ -19,9 +19,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error("API Error:", error.response?.data, error.response?.status);
+    console.error('API Error:', error.response?.data, error.response?.status);
     if (error.response?.status === 401) {
-      localStorage.removeItem("access_token");
+      localStorage.removeItem('access_token');
     }
     return Promise.reject(error);
   }

@@ -268,7 +268,7 @@ const TotalAssets = () => {
     if (values.lpoReference) params.append("lpoReference", values.lpoReference);
     if (values.supplier) params.append("supplierId", values.supplier);
 
-    const url = `http://localhost:3000/reports/inventory/device-age?${params.toString()}`;
+    const url = `${import.meta.VITE_BASE_URL}/reports/inventory/device-age?${params.toString()}`;
     // console.log("Fetching from:", url);
 
     api

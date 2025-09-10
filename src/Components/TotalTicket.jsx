@@ -1,56 +1,56 @@
-import { useQuery } from "@tanstack/react-query";
-import React, { useState } from "react";
-import api from "../utils/config";
-import { Button, DatePicker, Form, Input, Modal, Select, Table } from "antd";
+import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
+import api from '../utils/config';
+import { Button, DatePicker, Form, Input, Modal, Select, Table } from 'antd';
 
 import {
   DownloadOutlined,
   FilterOutlined,
   SearchOutlined,
-} from "@ant-design/icons";
-import * as XLSX from "xlsx";
+} from '@ant-design/icons';
+import * as XLSX from 'xlsx';
 
 const TotalTicket = () => {
   const { Option } = Select;
   const [form] = Form.useForm();
-  const [searchText, setSearchText] = useState("");
+  const [searchText, setSearchText] = useState('');
   const [filteredTickets, setFilteredTickets] = useState(null);
   const [open, setOpen] = useState(false);
 
   const { data } = useQuery({
-    queryKey: ["totalTicket"],
+    queryKey: ['totalTicket'],
     queryFn: () => {
-      return api.get("reports/workshop");
+      return api.get('reports/workshop');
     },
   });
 
   const { data: department } = useQuery({
-    queryKey: ["department"],
+    queryKey: ['department'],
     queryFn: () => {
-      return api.get("admin/departments");
+      return api.get('admin/departments');
     },
   });
   const columns = [
     {
-      title: "No.",
-      key: "index",
+      title: 'No.',
+      key: 'index',
       render: (text, record, index) => index + 1,
     },
     {
-      title: "Ticket ID",
-      dataIndex: "ticketId",
+      title: 'Ticket ID',
+      dataIndex: 'ticketId',
     },
     {
-      title: "Brand",
-      dataIndex: "brand",
+      title: 'Brand',
+      dataIndex: 'brand',
     },
     {
-      title: "Model",
-      dataIndex: "model",
+      title: 'Model',
+      dataIndex: 'model',
     },
     {
-      title: "User Name",
-      dataIndex: "userName",
+      title: 'User Name',
+      dataIndex: 'userName',
       filteredValue: [searchText],
       onFilter: (value, record) => {
         return (
@@ -67,55 +67,55 @@ const TotalTicket = () => {
       },
     },
     {
-      title: "Issue Type",
-      dataIndex: "issueType",
+      title: 'Issue Type',
+      dataIndex: 'issueType',
     },
     {
-      title: "Received By",
-      dataIndex: "technicianReceivedName",
+      title: 'Received By',
+      dataIndex: 'technicianReceivedName',
     },
     {
-      title: "Returned By",
-      dataIndex: "technicianReturnedName",
+      title: 'Returned By',
+      dataIndex: 'technicianReturnedName',
     },
     {
-      title: "Action Taken",
-      dataIndex: "actionTaken",
-      render: (value) => (value ? value : "-"),
+      title: 'Action Taken',
+      dataIndex: 'actionTaken',
+      render: (value) => (value ? value : '-'),
     },
     {
-      title: "Remarks",
-      dataIndex: "remarks",
+      title: 'Remarks',
+      dataIndex: 'remarks',
     },
     {
-      title: "Date Logged",
-      dataIndex: "dateLogged",
-      key: "dateLogged",
+      title: 'Date Logged',
+      dataIndex: 'dateLogged',
+      key: 'dateLogged',
       render: (value) =>
         value
-          ? new Date(value).toLocaleString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
+          ? new Date(value).toLocaleString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
             })
-          : "-",
+          : '-',
     },
     {
-      title: "Date Resolved",
-      dataIndex: "dateResolved",
-      key: "dateResolved",
+      title: 'Date Resolved',
+      dataIndex: 'dateResolved',
+      key: 'dateResolved',
       render: (value) =>
         value
-          ? new Date(value).toLocaleString("en-US", {
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "numeric",
-              minute: "2-digit",
+          ? new Date(value).toLocaleString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
             })
-          : "-",
+          : '-',
     },
   ];
 
@@ -146,26 +146,26 @@ const TotalTicket = () => {
         Model: item.model,
         ReceivedBy: item.technicianReceivedName,
         ReturnedBy: item.technicianReturnedName,
-        ActionTaken: item.actionTaken || "-",
-        Remarks: item.remarks || "-",
+        ActionTaken: item.actionTaken || '-',
+        Remarks: item.remarks || '-',
         DateLogged: item.dateLogged
           ? new Date(item.dateLogged).toLocaleDateString()
-          : "-",
+          : '-',
         DateResolved: item.dateResolved
           ? new Date(item.dateResolved).toLocaleDateString()
-          : "-",
+          : '-',
       }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Tickets");
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tickets');
 
-    XLSX.writeFile(workbook, "AllTickets.xlsx");
+    XLSX.writeFile(workbook, 'AllTickets.xlsx');
   };
 
   const formatDate = (date) => {
     if (!date) return null;
-    return new Date(date.$d).toISOString().split("T")[0]; // 'YYYY-MM-DD'
+    return new Date(date.$d).toISOString().split('T')[0]; // 'YYYY-MM-DD'
   };
 
   const handleCancel = () => {
@@ -183,26 +183,28 @@ const TotalTicket = () => {
       issueType: values.issueType || null,
       department: values.department || null,
     };
-    console.log("Filtering with:", filters);
+    console.log('Filtering with:', filters);
 
     const params = new URLSearchParams();
 
-    if (filters.startDate) params.append("startDate", filters.startDate);
-    if (filters.endDate) params.append("endDate", filters.endDate);
-    if (filters.issueType) params.append("issueType", filters.issueType);
-    if (values.department) params.append("departmentId", values.department);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    if (filters.issueType) params.append('issueType', filters.issueType);
+    if (values.department) params.append('departmentId', values.department);
 
-    const url = `http://localhost:3000/reports/workshop?${params.toString()}`;
-    console.log("Fetching from:", url);
+    const url = `${
+      import.meta.VITE_BASE_URL
+    }/reports/workshop?${params.toString()}`;
+    console.log('Fetching from:', url);
 
     api
       .get(url)
       .then((res) => {
-        console.log("Filtered data:", res.data);
+        console.log('Filtered data:', res.data);
         setFilteredTickets(res.data.tickets);
       })
       .catch((err) => {
-        console.error("Error fetching filtered data:", err);
+        console.error('Error fetching filtered data:', err);
       });
 
     setOpen(false);
@@ -217,7 +219,7 @@ const TotalTicket = () => {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           prefix={<SearchOutlined />}
-          style={{ width: "200px" }}
+          style={{ width: '200px' }}
         />
         <Button icon={<FilterOutlined />} onClick={() => setOpen(true)} />
         <Button icon={<DownloadOutlined />} onClick={handleDownload} />
@@ -227,11 +229,11 @@ const TotalTicket = () => {
         <Modal title="Filter" open={open} onCancel={handleCancel} footer={null}>
           <Form form={form} layout="vertical" onFinish={handleFinish}>
             <Form.Item label="Start Date" name="startDate">
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker style={{ width: '100%' }} />
             </Form.Item>
 
             <Form.Item label="End Date" name="endDate">
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker style={{ width: '100%' }} />
             </Form.Item>
 
             <Form.Item label="Issue Type" name="issueType">
