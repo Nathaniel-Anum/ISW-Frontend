@@ -32,7 +32,7 @@ const StoresPage = () => {
   //useQuery for stores it-items
   const { data: itItems } = useQuery({
     queryKey: ["itItems"],
-    queryFn: () => api.get("/stores/it-items"),
+    queryFn: () => api.get("/admin/it-items"),
   });
   //   console.log(itItems?.data);
 
