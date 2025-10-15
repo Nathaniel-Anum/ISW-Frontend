@@ -34,7 +34,7 @@ const StoresPage = () => {
     queryKey: ["itItems"],
     queryFn: () => api.get("/admin/it-items"),
   });
-  //   console.log(itItems?.data);
+  console.log(itItems?.data);
 
   //useQuery for stores suppliers
   const { data: Suppliers } = useQuery({
