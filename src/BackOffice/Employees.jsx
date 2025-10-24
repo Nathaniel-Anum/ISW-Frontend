@@ -13,7 +13,8 @@ import {
 } from "antd";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { AiOutlinePlus } from "react-icons/ai";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const Employees = () => {
   const [open, setOpen] = useState(false);
@@ -193,7 +194,7 @@ const Employees = () => {
   return (
     <div className="px-[15rem] py-[2rem]">
       {/* <p>This is the Employees Page</p> */}
-      <div className=" flex justify-end py-4">
+      <div className=" py-4">
         <Button
           type="primary"
           icon={<AiOutlinePlus />}
@@ -356,6 +357,7 @@ const Employees = () => {
           </Form.Item>
         </Form>
       </Modal>
+         <ToastContainer />
     </div>
   );
 };

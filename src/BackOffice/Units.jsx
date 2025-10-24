@@ -89,8 +89,8 @@ const Units = () => {
   ];
   return (
     <div className="px-[19rem]">
-      unit page
-      <div className=" flex justify-end">
+      
+      <div className=" p-6">
         <Button
           type="primary"
           icon={<AiOutlinePlus />}

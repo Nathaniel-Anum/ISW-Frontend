@@ -13,7 +13,8 @@ import {
 } from "antd";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { AiOutlinePlus } from "react-icons/ai";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const ItItems = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -130,7 +131,7 @@ const ItItems = () => {
   const handleSubmit = (values) => {
     const payload = {
       ...values,
-      defaultWarranty: Number(values.defaultWarranty),
+      defaultWarranty: 12,
     };
     console.log(payload);
     mutate(payload);
@@ -138,8 +139,8 @@ const ItItems = () => {
 
   return (
     <div className="px-[19rem]">
-      It items
-      <div className=" flex justify-end">
+      
+      <div className=" p-6">
         <Button
           type="primary"
           icon={<AiOutlinePlus />}
@@ -189,13 +190,13 @@ const ItItems = () => {
             <Input />
           </Form.Item>
 
-          <Form.Item
+          {/* <Form.Item
             name="defaultWarranty"
             label="Default Warranty (months)"
             rules={[{ required: true }]}
           >
             <Input type="number" />
-          </Form.Item>
+          </Form.Item> */}
 
           <Form.Item
             name="supplierId"
@@ -249,6 +250,7 @@ const ItItems = () => {
           </Form.Item>
         </Form>
       </Modal>
+        <ToastContainer />
     </div>
   );
 };

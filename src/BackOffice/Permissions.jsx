@@ -57,7 +57,7 @@ const Permissions = () => {
   ];
   return (
     <div className="px-[19rem]">
-      Permission Page..
+    
       <div className=" flex justify-end"></div>
       <Table columns={columns} dataSource={dataSource || []} />
     </div>

@@ -101,8 +101,8 @@ const Roles = () => {
   }
   return (
     <div className="px-[19rem]">
-      Roles Page
-      <div className=" flex justify-end">
+
+      <div className=" p-6">
         <Button
           type="primary"
           icon={<AiOutlinePlus />}

@@ -91,8 +91,8 @@ const Department = () => {
   ];
   return (
     <div className="px-[19rem]">
-      Department Page!
-      <div className=" flex justify-end">
+  
+      <div className=" py-6 ">
         <Button
           type="primary"
           icon={<AiOutlinePlus />}

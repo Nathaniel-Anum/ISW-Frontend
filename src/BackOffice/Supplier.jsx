@@ -12,7 +12,8 @@ import {
 } from "antd";
 import { FiEdit, FiTrash2 } from "react-icons/fi";
 import { AiOutlinePlus } from "react-icons/ai";
-import { toast } from "react-toastify";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const Supplier = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -122,8 +123,8 @@ const Supplier = () => {
   };
   return (
     <div className="px-[19rem]">
-      Supplier page
-      <div className=" flex justify-end">
+
+      <div className=" p-6">
         <Button
           type="primary"
           icon={<AiOutlinePlus />}
@@ -196,6 +197,7 @@ const Supplier = () => {
           </Form.Item>
         </Form>
       </Modal>
+       <ToastContainer />
     </div>
   );
 };
