@@ -250,7 +250,7 @@ const Employees = () => {
               ))}
             </Select>
           </Form.Item>
-          <Form.Item name="unitId" label="Unit" rules={[{ required: true }]}>
+          <Form.Item name="unitId" label="Unit" >
             <Select placeholder="Select Unit" disabled={!selectedUnits.length}>
               {selectedUnits.map((unit) => (
                 <Select.Option key={unit.id} value={unit.id}>

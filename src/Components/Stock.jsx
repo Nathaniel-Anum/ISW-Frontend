@@ -142,7 +142,7 @@ const Stock = () => {
   return (
     <div className="px-[3rem] py-[2rem]">
       <div className="pl-[6rem] pt-6">
-        <div className="flex justify-end gap-3 mb-4">
+        <div className="pb-2 flex gap-2">
           <Input
             placeholder="Search..."
             value={searchText}

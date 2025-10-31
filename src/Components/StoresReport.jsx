@@ -499,7 +499,7 @@ const StoresReport = () => {
 
   return (
     <div className="px-[3rem] py-[2rem]">
-      <div className=" flex gap-2 justify-end">
+      <div className=" pb-2 flex gap-2 px-[7rem]">
         <Button
           // disabled={!reportData?.data?.length}
           icon={<FilterOutlined />}

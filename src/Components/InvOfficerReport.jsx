@@ -249,7 +249,7 @@ const InvOfficerReport = () => {
   };
   return (
     <div className="px-[3rem] py-[2rem]">
-      <div className=" flex gap-2 justify-end">
+      <div className=" px-[7rem] flex gap-2">
         <Button
           // disabled={!reportData?.data?.length}
           icon={<FilterOutlined />}

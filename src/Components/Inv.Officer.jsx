@@ -262,7 +262,7 @@ const InvOfficer = () => {
   }
   return (
     <div className="px-[3rem] py-[2rem]">
-      <div className="flex justify-end ">
+      <div className=" px-[7rem] pb-2 ">
         <Input
           placeholder="Search..."
           value={searchText}
