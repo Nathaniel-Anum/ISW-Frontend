@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useDeferredValue, useMemo, useState } from "react";
 import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
 import {
   Button,
@@ -14,17 +14,22 @@ import api from "../utils/config";
 import * as XLSX from "xlsx";
 import { useQuery } from "@tanstack/react-query";
 
+const { Option } = Select;
+const DEFAULT_REPORT_FILTERS = { reportType: "inventory" };
+
+const formatColumnTitle = (value) =>
+  String(value)
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (letter) => letter.toUpperCase());
+
 const InvOfficerReport = () => {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [selectedReport, setSelectedReport] = useState(null);
-  const [reportData, setReportData] = useState([]);
+  const [submittedFilters, setSubmittedFilters] = useState(DEFAULT_REPORT_FILTERS);
   const [form] = Form.useForm();
-  const [departments, setDepartments] = useState([]);
-  const [units, setUnits] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const deferredSearch = useDeferredValue(searchText.trim());
 
   const { data } = useQuery({
     queryKey: ["department"],
@@ -38,69 +43,83 @@ const InvOfficerReport = () => {
       return api.get("/inventory/users");
     },
   });
+  const { data: categoriesResponse } = useQuery({
+    queryKey: ["itItemCategories"],
+    queryFn: () => api.get("/admin/it-item-categories"),
+  });
 
-  useEffect(() => {
-    api.get("/admin/departments?includeUnits=true").then((res) => {
-      setDepartments(res.data);
+  const departments = data?.data || [];
+  const categories = categoriesResponse?.data || [];
+  const units = useMemo(
+    () =>
+      departments
+        .flatMap((dept) => dept.units || [])
+        .filter((unit, index, self) => index === self.findIndex((item) => item.id === unit.id)),
+    [departments]
+  );
 
-      // Flatten units across all departments
-      const allUnits = res.data
-        .flatMap((dept) => dept.units || []) // handle departments with no units
-        .filter(
-          (unit, index, self) =>
-            index === self.findIndex((u) => u.id === unit.id) // remove duplicates
-        );
+  const { data: reportResponse, isFetching: reportLoading } = useQuery({
+    queryKey: ["inventoryReport", submittedFilters, deferredSearch],
+    queryFn: () =>
+      api.get("/inventory/reports", {
+        params: {
+          ...submittedFilters,
+          ...(deferredSearch ? { search: deferredSearch } : {}),
+        },
+      }),
+  });
 
-      setUnits(allUnits);
+  const selectedReport = submittedFilters?.reportType || null;
+  const reportRows = reportResponse?.data?.data || [];
+  const attributeColumns = reportResponse?.data?.meta?.attributeColumns || [];
+
+  const openFilterModal = () => {
+    form.setFieldsValue({
+      reportType: submittedFilters?.reportType || DEFAULT_REPORT_FILTERS.reportType,
+      status: submittedFilters?.status,
+      deviceType: submittedFilters?.deviceType,
+      categoryId: submittedFilters?.categoryId,
+      warrantyPeriod: submittedFilters?.warrantyPeriod,
+      userId: submittedFilters?.userId,
+      departmentId: submittedFilters?.departmentId,
+      unitId: submittedFilters?.unitId,
     });
-  }, []);
+    setOpen(true);
+  };
 
   const formatDate = (date) => {
     if (!date) return null;
     return new Date(date.$d).toISOString().split("T")[0]; // 'YYYY-MM-DD'
   };
 
-  const onFinish = async (values) => {
+  const onFinish = (values) => {
     const {
       reportType,
       status,
       deviceType,
+      categoryId,
       warrantyPeriod,
       userId,
       unitId,
       departmentId,
     } = values;
-    const filters = {
-      startDate: values.startDate ? formatDate(values.startDate) : null,
-      endDate: values.endDate ? formatDate(values.endDate) : null,
-      warrantyPeriod: values.warrantyPeriod || null,
-    };
-    console.log("Filtering with:", filters);
-    console.log(typeof filters.warrantyPeriod);
-    const params = new URLSearchParams({ reportType });
-
-    if (status) params.append("status", status);
-    if (deviceType) params.append("deviceType", deviceType);
-    if (warrantyPeriod) params.append("warrantyPeriod", warrantyPeriod);
-    if (userId) params.append("userId", userId);
-    if (departmentId) params.append("departmentId", departmentId);
-    if (unitId) params.append("unitId", unitId);
-
-    if (filters.startDate) params.append("startDate", filters.startDate);
-    if (filters.endDate) params.append("endDate", filters.endDate);
-
-    try {
-      const response = await api.get(`/inventory/reports?${params.toString()}`);
-      setSelectedReport(reportType);
-      setReportData(response.data); //This will feed the table
-      setOpen(false);
-      form.resetFields();
-    } catch (err) {
-      console.error(err);
-      setOpen(false);
-      form.resetFields();
-    }
+    setSearchText("");
+    setSubmittedFilters({
+      reportType,
+      ...(status ? { status } : {}),
+      ...(deviceType ? { deviceType } : {}),
+      ...(categoryId ? { categoryId } : {}),
+      ...(warrantyPeriod ? { warrantyPeriod } : {}),
+      ...(userId ? { userId } : {}),
+      ...(departmentId ? { departmentId } : {}),
+      ...(unitId ? { unitId } : {}),
+      ...(values.startDate ? { startDate: formatDate(values.startDate) } : {}),
+      ...(values.endDate ? { endDate: formatDate(values.endDate) } : {}),
+    });
+    setCurrentPage(1);
+    setOpen(false);
   };
+
   const getColumns = () => {
     if (selectedReport === "inventory") {
       return [
@@ -113,36 +132,6 @@ const InvOfficerReport = () => {
           title: "User Name",
           dataIndex: "userName",
           key: "userName",
-          filteredValue: [searchText],
-          onFilter: (value, record) => {
-            return (
-              record.userName
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.userEmail
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.departmentName
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.unitName
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.deviceType
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
-              record.model.toLowerCase().includes(searchText.toLowerCase()) ||
-              record.serialNumber
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.status.toLowerCase().includes(searchText.toLowerCase()) ||
-              record.warrantyPeriod
-                .toString()
-                .toLowerCase()
-                .includes(searchText.toLowerCase())
-            );
-          },
         },
         {
           title: "User Email",
@@ -158,6 +147,16 @@ const InvOfficerReport = () => {
           title: "Unit Name",
           dataIndex: "unitName",
           key: "unitName",
+        },
+        {
+          title: "Asset ID",
+          dataIndex: "assetId",
+          key: "assetId",
+        },
+        {
+          title: "Category",
+          dataIndex: "categoryName",
+          key: "categoryName",
         },
         {
           title: "Device Type",
@@ -190,45 +189,29 @@ const InvOfficerReport = () => {
           key: "purchaseDate",
           render: (date) => new Date(date).toLocaleDateString(),
         },
+        ...attributeColumns.map((column) => ({
+          title: column.label,
+          key: `attr-${column.key}`,
+          render: (_, record) => record.dynamicAttributes?.[column.key] || "-",
+        })),
       ];
     }
   };
 
   const downloadExcel = () => {
-    if (!reportData?.data?.length) return;
+    if (!reportRows.length) return;
 
     let cleanData = [];
 
     if (selectedReport === "inventory") {
-      cleanData = reportData?.data
-        .filter(
-          (record) =>
-            record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.userEmail.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.departmentName
-              .toLowerCase()
-              .includes(searchText.toLowerCase()) ||
-            record.unitName.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.deviceType
-              .toLowerCase()
-              .includes(searchText.toLowerCase()) ||
-            record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.model.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.serialNumber
-              .toLowerCase()
-              .includes(searchText.toLowerCase()) ||
-            record.status.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.warrantyPeriod
-              .toString()
-              .toLowerCase()
-              .includes(searchText.toLowerCase())
-        )
-        .map((item, index) => ({
+      cleanData = reportRows.map((item, index) => ({
           No: index + 1,
+          AssetId: item?.assetId || "-",
           UserName: item?.userName || "-",
           Email: item?.userEmail || "-",
           Department: item?.departmentName || "-",
           UnitName: item?.unitName || "-",
+          Category: item?.categoryName || "-",
           DeviceType: item?.deviceType || "-",
           Brand: item?.brand || "-",
           Model: item?.model || "-",
@@ -238,6 +221,10 @@ const InvOfficerReport = () => {
           PurchaseDate: item?.purchaseDate
             ? new Date(item.purchaseDate).toLocaleDateString()
             : "-",
+          ...attributeColumns.reduce((result, column) => {
+            result[column.label] = item?.dynamicAttributes?.[column.key] || "-";
+            return result;
+          }, {}),
         }));
     }
 
@@ -251,14 +238,13 @@ const InvOfficerReport = () => {
     <div className="px-[3rem] py-[2rem]">
       <div className=" px-[7rem] flex gap-2">
         <Button
-          // disabled={!reportData?.data?.length}
           icon={<FilterOutlined />}
-          onClick={() => setOpen(true)}
+          onClick={openFilterModal}
         >
           Filter
         </Button>
         <Input
-          disabled={!reportData?.data?.length}
+          disabled={!selectedReport}
           placeholder="Search..."
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
@@ -269,20 +255,20 @@ const InvOfficerReport = () => {
         <Button
           type="primary"
           onClick={downloadExcel}
-          disabled={!reportData?.data?.length}
+          disabled={!reportRows.length}
         >
           Download
         </Button>
       </div>
       <div className="pl-[6rem] pt-6">
-        {loading ? (
+        {reportLoading ? (
           <div className="flex justify-center items-center h-[300px]">
             <Spin size="large" />
           </div>
         ) : (
           <Table
             columns={getColumns()}
-            dataSource={reportData?.data || []}
+            dataSource={reportRows}
             rowKey={(record) => record.id || record.key}
             pagination={{
               current: currentPage,
@@ -307,6 +293,7 @@ const InvOfficerReport = () => {
             <Form.Item
               name="reportType"
               label="Report Type"
+              initialValue={DEFAULT_REPORT_FILTERS.reportType}
               rules={[{ required: true, message: "Select report type" }]}
             >
               <Select placeholder="Filter by" style={{ width: "100%" }}>
@@ -350,6 +337,21 @@ const InvOfficerReport = () => {
                 <Select.Option value="OTHER">OTHER</Select.Option>
               </Select>
             </Form.Item>
+            <Form.Item label="Item Category" name="categoryId">
+              <Select
+                placeholder="Select category"
+                allowClear
+                showSearch
+                optionFilterProp="children"
+                style={{ width: "100%" }}
+              >
+                {categories.map((category) => (
+                  <Select.Option key={category.id} value={category.id}>
+                    {category.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
             <Form.Item label="User" name="userId">
               <Select
                 placeholder="Select User"
@@ -389,7 +391,7 @@ const InvOfficerReport = () => {
               <Button
                 type="primary"
                 htmlType="submit"
-                loading={loading}
+                loading={reportLoading}
                 className="w-full"
               >
                 Submit

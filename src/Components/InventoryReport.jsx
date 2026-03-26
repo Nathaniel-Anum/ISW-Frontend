@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import api from "../utils/config";
 import { Link } from "react-router-dom";
-import { Spin} from "antd";
+import { Button, Spin} from "antd";
+import * as XLSX from "xlsx";
 
 
 const InventoryReport = () => {
@@ -20,8 +21,27 @@ const InventoryReport = () => {
   });
   console.log(devices?.data?.summary?.totalAssets);
 
+  const exportSummary = () => {
+    const summaryRows = [
+      {
+        totalAssets: data?.data?.summary?.totalAssets || 0,
+        totalDevices: devices?.data?.summary?.totalAssets || 0,
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(summaryRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventory Summary");
+    XLSX.writeFile(workbook, "inventory-report-summary.xlsx");
+  };
+
   return (
     <div className="px-[13rem]  ">
+      <div className="flex justify-end px-6 pt-6">
+        <Button type="primary" onClick={exportSummary} disabled={isLoading || loading}>
+          Export Excel
+        </Button>
+      </div>
       <div className="  p-6 flex gap-6 cursor-pointer ">
         <Link to="/dashboard/total-asset">
           <div className="w-full   max-w-2xl">

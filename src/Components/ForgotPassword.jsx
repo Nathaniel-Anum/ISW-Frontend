@@ -12,15 +12,14 @@ const ForgotPassword = () => {
   const navigate = useNavigate();
 
   const forgotPasswordMutation = useMutation({
-    mutationFn: ({ email, securityAnswer }) =>
-      forgotPassword(email, securityAnswer),
+    mutationFn: ({ email }) => forgotPassword(email),
     onSuccess: () => {
-      toast.success("Check your email for reset instructions");
-      navigate("/");
+      toast.success("If that email exists, a reset link has been sent");
+      setTimeout(() => navigate("/"), 3000);
     },
     onError: (err) => {
       console.error("Forgot password failed:", err);
-      toast.error("Failed to send reset instructions. Please try again.");
+      toast.error(err.response?.data?.message || "Something went wrong. Please try again.");
     },
   });
 
@@ -29,41 +28,33 @@ const ForgotPassword = () => {
   };
 
   return (
-    <AuthLayout title="Reset Your Password">
-      <Form form={form} name="forgot-password" onFinish={onFinish}>
+    <AuthLayout title="Forgot Password" description="Enter your email and we'll send you a reset link.">
+      <Form form={form} name="forgot-password" layout="vertical" onFinish={onFinish}>
         <Form.Item
           name="email"
+          label="Email"
           rules={[
             { required: true, message: "Please input your email!" },
             { type: "email", message: "Invalid email format!" },
           ]}
         >
-          <Input placeholder="Email" allowClear />
-        </Form.Item>
-
-        <Form.Item
-          name="securityAnswer"
-          rules={[
-            { required: true, message: "Please input your security answer!" },
-          ]}
-        >
-          <Input placeholder="Security Answer (to your chosen question)" />
+          <Input size="large" placeholder="Enter your email" allowClear />
         </Form.Item>
 
         <Form.Item>
           <Button
-            className="w-full bg-[#9D4D01] hover:bg-[#7A3C01]"
+            className="h-13 w-full border-0 bg-[linear-gradient(135deg,#D32F2F,#B71C1C)] text-base font-bold shadow-[0_18px_34px_rgba(211,47,47,0.24)] hover:!bg-[linear-gradient(135deg,#B71C1C,#991B1B)]"
             type="primary"
             htmlType="submit"
             disabled={forgotPasswordMutation.isPending}
           >
-            {forgotPasswordMutation.isPending ? "Submitting..." : "Submit"}
+            {forgotPasswordMutation.isPending ? "Sending..." : "Send Reset Link"}
           </Button>
         </Form.Item>
       </Form>
 
-      <p className="text-center mt-4">
-        <a href="/" className="font-semibold text-[#6C63FF]">
+      <p className="text-center text-sm text-[#6B7280]">
+        <a href="/" className="font-bold text-[#B71C1C] transition-colors hover:text-[#D32F2F]">
           Back to Login
         </a>
       </p>

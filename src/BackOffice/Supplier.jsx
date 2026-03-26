@@ -1,204 +1,176 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useState } from "react";
+import { SearchOutlined } from "@ant-design/icons";
+import { Button, Form, Input, Modal, Popconfirm, Table } from "antd";
+import { useDeferredValue, useMemo, useState } from "react";
+import { LuPackageCheck, LuPhoneCall, LuPlus } from "react-icons/lu";
+import { toast } from "react-toastify";
+import { Delete } from "../Components/icons/icons.components";
+import PageShell from "../Components/ui/page-shell";
 import api from "../utils/config";
-import {
-  Button,
-  Input,
-  Table,
-  Form,
-  DatePicker,
-  Modal,
-  Popconfirm,
-} from "antd";
-import { FiEdit, FiTrash2 } from "react-icons/fi";
-import { AiOutlinePlus } from "react-icons/ai";
-import { toast, ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 
 const Supplier = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
-  //getting all suppliers
-  const { data: getSupplier } = useQuery({
-    queryKey: ["getSupplier"],
-    queryFn: () => api.get("/admin/suppliers"),
-  });
-  console.log(getSupplier?.data);
+  const deferredSearch = useDeferredValue(searchText.trim());
 
-  //mutation to add supplier
-  const { mutate } = useMutation({
+  const { data } = useQuery({
+    queryKey: ["getSupplier", deferredSearch],
+    queryFn: () =>
+      api.get("/admin/suppliers", {
+        params: deferredSearch ? { search: deferredSearch } : undefined,
+      }),
+  });
+
+  const suppliers = data?.data || [];
+
+  const stats = useMemo(() => {
+    const withRemarks = suppliers.filter((supplier) => supplier.remarks).length;
+    const withContacts = suppliers.filter((supplier) => supplier.contactDetails).length;
+
+    return [
+      { label: "Suppliers", value: suppliers.length, caption: "Approved vendor records" },
+      { label: "With contacts", value: withContacts, caption: "Suppliers ready for follow-up" },
+      { label: "With remarks", value: withRemarks, caption: "Records carrying procurement notes" },
+    ];
+  }, [suppliers]);
+
+  const createSupplier = useMutation({
     mutationKey: ["createSupplier"],
     mutationFn: (payload) => api.post("/admin/suppliers/create", payload),
     onSuccess: () => {
       toast.success("Supplier created successfully");
       form.resetFields();
       setIsModalOpen(false);
-      queryClient.invalidateQueries(["getSupplier"]);
+      queryClient.invalidateQueries({ queryKey: ["getSupplier"] });
     },
   });
-
-  const handleEdit = (record) => {
-    console.log("Editing record:", record);
-    // Open modal, set form fields, etc
-  };
 
   const handleDelete = (id) => {
     api
       .delete(`/admin/suppliers/${id}`)
       .then(() => {
-        toast.success("Department deleted successfully!");
-        queryClient.invalidateQueries(["getAllDepartments"]);
+        toast.success("Supplier deleted successfully");
+        queryClient.invalidateQueries({ queryKey: ["getSupplier"] });
       })
-      .catch((error) => {
-        console.error("Delete failed:", error);
-        toast.error("Failed to delete department.");
+      .catch(() => {
+        toast.error("Failed to delete supplier");
       });
   };
 
   const columns = [
     {
-      title: "Supplier Name",
+      title: "Supplier",
       dataIndex: "name",
       key: "name",
+      render: (value) => <span className="font-semibold text-[#212121]">{value}</span>,
     },
     {
       title: "Contact Details",
       dataIndex: "contactDetails",
       key: "contactDetails",
+      render: (value) => value || "Not provided",
     },
-    // {
-    //   title: "LPO Reference",
-    //   dataIndex: "lpoReference",
-    //   key: "lpoReference",
-    // },
-    // {
-    //   title: "LPO Date",
-    //   dataIndex: "lpoDate",
-    //   key: "lpoDate",
-    //   render: (text) => new Date(text).toLocaleDateString(), // Format the date nicely
-    // },
-    // {
-    //   title: "Voucher Number",
-    //   dataIndex: "voucherNumber",
-    //   key: "voucherNumber",
-    // },
     {
       title: "Remarks",
       dataIndex: "remarks",
       key: "remarks",
+      render: (value) => value || "No remarks",
     },
     {
       title: "Action",
       key: "action",
       render: (_, record) => (
-        <div className="flex items-center gap-3">
-          {/* <FiEdit
-            className="text-blue-500 cursor-pointer"
-            size={18}
-            onClick={() => handleEdit(record)}
-          /> */}
-          <div className="flex items-center gap-3">
-            <Popconfirm
-              title="Are you sure to delete this department?"
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <FiTrash2 className="text-red-500 cursor-pointer" size={18} />
-            </Popconfirm>
-          </div>
-        </div>
+        <Popconfirm
+          title="Delete supplier"
+          description="This action removes the supplier record."
+          onConfirm={() => handleDelete(record.id)}
+          okText="Delete"
+          cancelText="Cancel"
+        >
+          <button className="rounded-full p-1.5 transition hover:bg-[#FFEBEE]">
+            <Delete size={18} />
+          </button>
+        </Popconfirm>
       ),
     },
   ];
 
-  const handleSubmit = (values) => {
-    // const payload = {
-    //   ...values,
-    //   lpoDate: values.lpoDate.format("YYYY-MM-DD"),
-    // };
-    console.log(values);
-    mutate(values);
-  };
   return (
-    <div className="px-[19rem]">
-
-      <div className=" p-6">
-        <Button
-          type="primary"
-          icon={<AiOutlinePlus />}
-          onClick={() => setIsModalOpen(true)}
-        >
-          Create Supplier
-        </Button>
-      </div>
-      <Table
-        columns={columns}
-        dataSource={getSupplier?.data || []}
-        rowKey="id"
-        pagination={false}
-      />
-      <Modal
-        title="Create Supplier"
-        open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        footer={null}
-      >
-        <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <Form.Item
-            label="Supplier Name"
-            name="name"
-            rules={[{ required: true, message: "Please enter supplier name" }]}
+    <PageShell
+      eyebrow="Back Office"
+      title="Supplier Records"
+      description="Keep vendor information current so procurement, stock receiving, and warranty traceability remain consistent across the inventory workflow."
+      stats={stats}
+      actions={
+        <>
+          <Input
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            allowClear
+            prefix={<SearchOutlined />}
+            placeholder="Search supplier, contact, LPO, voucher, or remarks"
+            className="w-full sm:w-[340px]"
+          />
+          <Button
+            type="primary"
+            icon={<LuPlus size={16} />}
+            className="!h-11 !rounded-2xl !px-5"
+            onClick={() => setIsModalOpen(true)}
           >
-            <Input />
-          </Form.Item>
+            Create Supplier
+          </Button>
+        </>
+      }
+    >
+      <section className="responsive-data-card rounded-[28px] border border-[#E0E0E0] bg-white p-4 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-6">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-[#212121]">Vendor Directory</h3>
+            <p className="text-sm text-[#616161]">Track the suppliers that support item cataloging and stock replenishment.</p>
+          </div>
+          <div className="section-badge inline-flex items-center gap-2 rounded-full bg-[#F9FAFB] px-4 py-2 text-sm font-medium text-[#616161]">
+            <LuPackageCheck size={16} className="text-[#D32F2F]" />
+            {suppliers.length} active records
+          </div>
+        </div>
 
-          <Form.Item
-            label="Contact Details"
-            name="contactDetails"
-            rules={[
-              { required: true, message: "Please enter contact details" },
-            ]}
-          >
-            <Input />
-          </Form.Item>
+        <Table columns={columns} dataSource={suppliers} rowKey="id" pagination={false} size="middle" scroll={{ x: 820 }} />
+      </section>
 
-          {/* <Form.Item
-            label="LPO Reference"
-            name="lpoReference"
-            rules={[{ required: true, message: "Please enter LPO reference" }]}
-          >
-            <Input />
-          </Form.Item>
+      <Modal title="Create Supplier" open={isModalOpen} onCancel={() => setIsModalOpen(false)} footer={null} width={680} destroyOnClose>
+        <Form form={form} layout="vertical" onFinish={(values) => createSupplier.mutate(values)}>
+          <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+            <Form.Item
+              label="Supplier Name"
+              name="name"
+              rules={[{ required: true, message: "Please enter supplier name" }]}
+            >
+              <Input placeholder="Supplier name" />
+            </Form.Item>
 
-          <Form.Item
-            label="LPO Date"
-            name="lpoDate"
-            rules={[{ required: true, message: "Please select LPO date" }]}
-          >
-            <DatePicker style={{ width: "100%" }} />
-          </Form.Item>
+            <Form.Item
+              label="Contact Details"
+              name="contactDetails"
+              rules={[{ required: true, message: "Please enter contact details" }]}
+            >
+              <Input prefix={<LuPhoneCall size={16} className="text-[#616161]" />} placeholder="Phone, email, or representative" />
+            </Form.Item>
+          </div>
 
-          <Form.Item
-            label="Voucher Number"
-            name="voucherNumber"
-            rules={[{ required: true, message: "Please enter voucher number" }]}
-          >
-            <Input />
-          </Form.Item> */}
           <Form.Item label="Remarks" name="remarks">
-            <Input />
+            <Input.TextArea rows={4} placeholder="Optional procurement notes" />
           </Form.Item>
-          <Form.Item>
-            <Button type="primary" htmlType="submit">
+
+          <Form.Item className="mb-0">
+            <Button type="primary" htmlType="submit" block className="!h-11 !rounded-2xl">
               Submit
             </Button>
           </Form.Item>
         </Form>
       </Modal>
-       <ToastContainer />
-    </div>
+    </PageShell>
   );
 };
 

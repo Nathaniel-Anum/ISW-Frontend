@@ -3,10 +3,12 @@ import Layout from "./Layout";
 
 const DashboardLayoutbo = () => {
   return (
-    <>
+    <div className="min-h-screen bg-[#F7F7F7] text-[#212121]">
       <Layout />
-      <Outlet />
-    </>
+      <main className="min-h-screen pl-0 pt-[88px] md:pl-[280px]">
+        <Outlet />
+      </main>
+    </div>
   );
 };
 export default DashboardLayoutbo;

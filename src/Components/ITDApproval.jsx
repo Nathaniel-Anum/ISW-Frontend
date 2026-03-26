@@ -1,49 +1,93 @@
-import React, { useState } from "react";
+import React, { useDeferredValue, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Button,
-  Input,
-  Modal,
-  Popconfirm,
-  Popover,
-  Space,
-  Table,
-  Tag,
-} from "antd";
-import api from "../utils/config";
-import { AiOutlineCheck, AiOutlineClose } from "react-icons/ai";
+import { Button, Input, Modal, Popconfirm, Space, Table, Tag } from "antd";
+import { SearchOutlined } from "@ant-design/icons";
+import { LuCheck, LuX } from "react-icons/lu";
 import { toast } from "react-toastify";
+import api from "../utils/config";
+import { formatCapitalizedLabel } from "../utils/formatText";
+import PageShell from "./ui/page-shell";
+import { REQUISITION_STATUS_STYLES as STATUS_STYLES } from "../utils/statusColors";
 
 const ITDApproval = () => {
   const queryClient = useQueryClient();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
   const [selectedRecord, setSelectedRecord] = useState(null);
-  const { data: approval } = useQuery({
-    queryKey: ["approval"],
-    queryFn: () => {
-      return api.get("/itd/requisitions");
+  const [searchText, setSearchText] = useState("");
+  const deferredSearch = useDeferredValue(searchText.trim());
+
+  const { data: approvalResponse, isLoading } = useQuery({
+    queryKey: ["approval", deferredSearch],
+    queryFn: () =>
+      api.get("/itd/requisitions", {
+        params: deferredSearch ? { search: deferredSearch } : undefined,
+      }),
+  });
+
+  const approvals = approvalResponse?.data || [];
+
+  const stats = useMemo(
+    () => [
+      {
+        label: "ITD Reviews",
+        value: approvals.length,
+        caption: "Requests in technical queue",
+      },
+      {
+        label: "Requested Units",
+        value: approvals.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+        caption: "Total quantity under review",
+      },
+      {
+        label: "Departments",
+        value: new Set(approvals.map((item) => item.department?.name).filter(Boolean)).size,
+        caption: "Represented in queue",
+      },
+    ],
+    [approvals]
+  );
+
+  const approveRequestMutation = useMutation({
+    mutationFn: (recordId) => api.patch(`/itd/req/${recordId}/approve`),
+    onSuccess: () => {
+      toast.success("Requisition approved");
+      queryClient.invalidateQueries(["approval"]);
+    },
+    onError: () => {
+      toast.error("Failed to approve request.");
     },
   });
 
-  console.log(approval);
+  const declineRequestMutation = useMutation({
+    mutationFn: ({ id, reason }) => api.patch(`/itd/req/${id}/decline`, { reason }),
+    onSuccess: () => {
+      toast.success("Requisition declined");
+      queryClient.invalidateQueries(["approval"]);
+      setIsModalVisible(false);
+      setDeclineReason("");
+      setSelectedRecord(null);
+    },
+    onError: () => {
+      toast.error("Failed to decline requisition.");
+    },
+  });
+
+  const handleDecline = () => {
+    if (!declineReason.trim()) {
+      toast.error("Please provide a reason for declining");
+      return;
+    }
+
+    declineRequestMutation.mutate({ id: selectedRecord?.id, reason: declineReason });
+  };
 
   const columns = [
-    // {
-    //   title: "Requisition ID",
-    //   dataIndex: "requisitionID",
-    //   key: "requisitionID"
-    // },
     {
       title: "Staff Name",
       dataIndex: ["staff", "name"],
       key: "staffName",
     },
-    // {
-    //   title: "Staff Email",
-    //   dataIndex: ["staff", "email"],
-    //   key: "staffEmail"
-    // },
     {
       title: "Item Description",
       dataIndex: "itemDescription",
@@ -53,11 +97,13 @@ const ITDApproval = () => {
       title: "Quantity",
       dataIndex: "quantity",
       key: "quantity",
+      render: (value) => <span className="font-semibold text-[#212121]">{value}</span>,
     },
     {
       title: "Urgency",
       dataIndex: "urgency",
       key: "urgency",
+      render: (urgency) => urgency || "-",
     },
     {
       title: "Purpose",
@@ -79,7 +125,13 @@ const ITDApproval = () => {
       dataIndex: "status",
       key: "status",
       render: (status) => (
-        <Tag color={"blue"}>{status.replaceAll("_", " ")}</Tag>
+        <Tag
+          className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${
+            STATUS_STYLES[status] || "bg-[#F3F4F6] text-[#374151]"
+          }`}
+        >
+          {formatCapitalizedLabel(status)}
+        </Tag>
       ),
     },
     {
@@ -93,105 +145,82 @@ const ITDApproval = () => {
       key: "action",
       render: (_, record) => (
         <Space size="middle">
-          {/* Approve Popconfirm */}
           <Popconfirm
-            title="Are you sure?"
-            onConfirm={() => handleApprove(record)}
-            onCancel={() => handleCancel("approve")}
-            okText="Yes"
-            cancelText="No"
+            title="Approve this requisition?"
+            onConfirm={() => approveRequestMutation.mutate(record?.id)}
+            okText="Approve"
+            cancelText="Cancel"
           >
-            <Popover content="Approve">
-              <AiOutlineCheck style={{ color: "green", cursor: "pointer" }} />
-            </Popover>
+            <button
+              type="button"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ECFDF3] text-[#166534] transition-colors duration-200 hover:bg-[#DCFCE7]"
+            >
+              <LuCheck />
+            </button>
           </Popconfirm>
 
-          {/* Decline Popconfirm */}
-          <Popover content="Decline">
-            <AiOutlineClose
-              style={{ color: "red", cursor: "pointer" }}
-              onClick={() => showDeclineModal(record)}
-            />
-          </Popover>
+          <button
+            type="button"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFEBEE] text-[#B71C1C] transition-colors duration-200 hover:bg-[#FDE2E2]"
+            onClick={() => {
+              setSelectedRecord(record);
+              setIsModalVisible(true);
+            }}
+          >
+            <LuX />
+          </button>
         </Space>
       ),
     },
   ];
 
-  //Mutation function to approve requisition
-  const approveRequestMutation = useMutation({
-    mutationFn: (recordId) => api.patch(`/itd/req/${recordId}/approve`),
-    onSuccess: () => {
-      toast.success("Requisition approved!");
-
-      queryClient.invalidateQueries(["requisition"]);
-    },
-    onError: () => {
-      toast.error("Failed to approve request.");
-    },
-  });
-
-  const handleApprove = (record) => {
-    approveRequestMutation.mutate(record?.id);
-  };
-
-  //Mutation to deline request
-  const declineRequestMutation = useMutation({
-    mutationFn: ({ id, reason }) =>
-      api.patch(`/itd/req/${id}/decline`, { reason }),
-
-    onSuccess: () => {
-      toast.success("Requisition declined!");
-      queryClient.invalidateQueries(["requisition"]);
-      setIsModalVisible(false);
-      setDeclineReason("");
-      setSelectedRecord(null);
-    },
-
-    onError: () => {
-      toast.error("Failed to decline requisition.");
-    },
-  });
-
-  const handleDecline = () => {
-    if (!declineReason.trim()) {
-      toast.error("Please provide a reason for declining");
-      return;
-    }
-
-    declineRequestMutation.mutate({
-      id: selectedRecord?.id,
-      reason: declineReason,
-    });
-  };
-
-  // Function to open modal instead of direct confirmation
-  const showDeclineModal = (record) => {
-    console.log(record);
-    setSelectedRecord(record);
-    setIsModalVisible(true);
-  };
-
-  const handleCancel = () => {
-    setIsModalVisible(false);
-    setDeclineReason("");
-    setSelectedRecord(null);
-  };
   return (
-    <div className="px-[3rem] py-[2rem]">
-      <div className="pl-[6rem] pt-6">
-        <Table
-          dataSource={approval?.data || []}
-          columns={columns}
-          rowKey="id"
+    <PageShell
+      eyebrow="Approval Workflow"
+      title="ITD Approval"
+      description="Process technically reviewed requisitions with clearer approval controls and a cleaner data layout."
+      stats={stats}
+      actions={
+        <Input
+          placeholder="Search ITD queue"
+          value={searchText}
+          onChange={(event) => setSearchText(event.target.value)}
+          prefix={<SearchOutlined />}
+          className="w-full md:w-[280px]"
         />
-      </div>
+      }
+    >
+      <section className="responsive-data-card rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#616161]">Technical Queue</p>
+            <h3 className="text-xl font-bold text-[#212121]">ITD approval requests</h3>
+          </div>
+          <span className="rounded-full bg-[#FFEBEE] px-3 py-1 text-xs font-semibold text-[#D32F2F]">
+            Action required
+          </span>
+        </div>
+
+        <Table columns={columns} dataSource={approvals} rowKey="id" loading={isLoading} scroll={{ x: 1150 }} />
+      </section>
+
       <Modal
         title="Decline Request"
         open={isModalVisible}
-        onCancel={handleCancel}
+        onCancel={() => {
+          setIsModalVisible(false);
+          setDeclineReason("");
+          setSelectedRecord(null);
+        }}
         footer={[
-          <Button key="cancel" onClick={handleCancel}>
+          <Button
+            key="cancel"
+            onClick={() => {
+              setIsModalVisible(false);
+              setDeclineReason("");
+              setSelectedRecord(null);
+            }}
+          >
             Cancel
           </Button>,
           <Button key="decline" type="primary" danger onClick={handleDecline}>
@@ -199,15 +228,15 @@ const ITDApproval = () => {
           </Button>,
         ]}
       >
-        <p>Please provide a reason for declining this request:</p>
+        <p className="mb-3 text-sm text-[#616161]">Please provide a reason for declining this request.</p>
         <Input.TextArea
           rows={4}
           value={declineReason}
-          onChange={(e) => setDeclineReason(e.target.value)}
-          placeholder="Enter decline reason..."
+          onChange={(event) => setDeclineReason(event.target.value)}
+          placeholder="Enter decline reason"
         />
       </Modal>
-    </div>
+    </PageShell>
   );
 };
 

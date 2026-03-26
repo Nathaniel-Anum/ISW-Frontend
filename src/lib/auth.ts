@@ -3,6 +3,7 @@ import api from "../utils/config";
 export const login = async (staffId: string, password: string) => {
   const response = await api.post("/auth/login", { staffId, password });
   localStorage.setItem("access_token", response.data.access_token);
+  localStorage.setItem("refresh_token", response.data.refresh_token);
   localStorage.setItem(
     "mustResetPassword",
     response.data.mustResetPassword.toString()
@@ -13,6 +14,7 @@ export const login = async (staffId: string, password: string) => {
 export const loginWithToken = async (token: string) => {
   const response = await api.post("/auth/login-with-token", { token });
   localStorage.setItem("access_token", response.data.access_token);
+  localStorage.setItem("refresh_token", response.data.refresh_token);
   localStorage.setItem(
     "mustResetPassword",
     response.data.mustResetPassword.toString()
@@ -20,24 +22,13 @@ export const loginWithToken = async (token: string) => {
   return response.data;
 };
 
-export const resetPassword = async (
-  newPassword: string,
-  securityQuestion?: string,
-  securityAnswer?: string
-) => {
-  const response = await api.patch("/auth/reset-password", {
-    newPassword,
-    securityQuestion,
-    securityAnswer,
-  });
+export const resetPassword = async (newPassword: string) => {
+  const response = await api.patch("/auth/reset-password", { newPassword });
   return response.data;
 };
 
-export const forgotPassword = async (email: string, securityAnswer: string) => {
-  const response = await api.post("/auth/forgot-password", {
-    email,
-    securityAnswer,
-  });
+export const forgotPassword = async (email: string) => {
+  const response = await api.post("/auth/forgot-password", { email });
   return response.data;
 };
 
@@ -53,9 +44,20 @@ export const resetPasswordWithToken = async (
 };
 
 export const logout = async () => {
-  await api.post("/auth/logout");
+  const refresh_token = localStorage.getItem("refresh_token") ?? undefined;
+  await api.post("/auth/logout", { refresh_token }).catch(() => {});
   localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
   localStorage.removeItem("mustResetPassword");
+};
+
+export const refreshToken = async (): Promise<string> => {
+  const refresh_token = localStorage.getItem("refresh_token");
+  if (!refresh_token) throw new Error("No refresh token");
+  const response = await api.post("/auth/refresh", { refresh_token });
+  localStorage.setItem("access_token", response.data.access_token);
+  localStorage.setItem("refresh_token", response.data.refresh_token);
+  return response.data.access_token;
 };
 
 export const getSecurityQuestions = async () => {

@@ -1,94 +1,113 @@
-import { DownOutlined } from "@ant-design/icons";
-import { Dropdown, Space } from "antd";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Dropdown } from "antd";
+import { LuChevronDown, LuLayoutDashboard, LuMenu, LuPlus } from "react-icons/lu";
+import { useNavigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useUser } from "../utils/userContext";
+import NotificationBell from "./ui/NotificationBell";
 
-const Navbar = () => {
+const Navbar = ({ onOpenMenu = () => {} }) => {
   const { user, setUser } = useUser();
   const currentDate = new Date();
-  // console.log(currentDate);
-
   const navigate = useNavigate();
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
     setUser(null);
     navigate("/");
-    localStorage.removeItem("user");
   };
 
   const isAdmin = user?.roles?.includes("admin");
+  const formattedDate = currentDate.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const initials =
+    user?.name
+      ?.split(" ")
+      .filter(Boolean)
+      .map((name) => name[0])
+      .join("") || "IS";
+  const roleLabel = user?.roles?.join(", ") || "User";
 
-  // Assuming `user` is accessible globally in your app
   const items = [
-    // If user is admin, add this item first
     ...(isAdmin
       ? [
           {
-            label: <a href="/backoffice/dashboard"> Go to Backoffice</a>,
+            label: (
+              <button
+                type="button"
+                onClick={() => navigate("/backoffice/dashboard")}
+                className="flex items-center gap-2 font-semibold"
+              >
+                <LuLayoutDashboard className="text-base" />
+                Backoffice
+              </button>
+            ),
             key: "1",
           },
         ]
       : []),
-
-    // Logout is always present
     {
-      label: <a onClick={handleLogout}>Logout</a>,
+      label: <span className="font-semibold">Logout</span>,
       key: "0",
+      onClick: handleLogout,
     },
   ];
 
   return (
-    <div>
-      <div className="flex justify-between items-center pt-[20px]">
-        <div className="pl-[200px]">
-          {/* <p className="font-semibold text-[23px]">Dashboard</p> */}
+    <div className="app-shell-topbar fixed left-0 right-0 top-0 z-20 border-b border-[#E0E0E0] bg-white px-4 py-3 md:left-[280px] md:px-6 lg:px-10">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#E0E0E0] bg-white text-[#616161] transition-colors duration-150 hover:border-[#D32F2F]/40 hover:bg-[#FFEBEE] hover:text-[#D32F2F] md:hidden"
+          >
+            <LuMenu className="text-lg" />
+          </button>
 
-          <p className="font-semibold ">{currentDate.toDateString()}</p>
-          {/* <p>{currentDate.toLocaleTimeString()}</p> */}
+          <div className="min-w-0">
+            <p className="truncate text-xs font-semibold uppercase tracking-widest text-[#9E9E9E] sm:text-[11px]">
+              IT HUB
+            </p>
+            <p className="text-sm font-semibold text-[#212121]">{formattedDate}</p>
+          </div>
         </div>
 
-        <div>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth="1.5"
-            stroke="currentColor"
-            className="svgs1"
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3 lg:gap-4">
+          <button
+            type="button"
+            onClick={() =>
+              navigate("/dashboard/requisition", {
+                state: { openCreateModal: true },
+              })
+            }
+            className="hidden items-center gap-2 rounded-lg bg-[#D32F2F] px-4 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-[#B71C1C] md:flex"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
-            />
-          </svg>
-        </div>
+            <LuPlus className="text-base" />
+            New Request
+          </button>
 
-        <div className="pr-[51px] flex gap-2 items-center">
-          <p className=" border  px-3 py-2 font-semibold rounded-md text-[18px]">
-            {user?.name
-              ?.split(" ")
-              .map((n) => n[0])
-              .join(".")}
-          </p>
-          <Dropdown
-            menu={{
-              items,
-            }}
-            trigger={["click"]}
-          >
-            <a
-              className="font-semibold  cursor-pointer"
-              onClick={(e) => e.preventDefault()}
+          <NotificationBell />
+
+          <Dropdown menu={{ items }} trigger={["click"]}>
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded-xl border border-[#E0E0E0] bg-white px-2 py-1.5 text-left transition-colors duration-150 hover:border-[#D32F2F]/30 hover:bg-[#FFF5F5] sm:gap-3 sm:px-3"
             >
-              <Space>
-                {user?.name}
-                <DownOutlined />
-              </Space>
-            </a>
+              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1E1E1E] text-sm font-semibold text-white">
+                {initials}
+              </span>
+              <div className="hidden text-left sm:block">
+                <p className="max-w-[180px] truncate text-sm font-bold text-[#212121]">{user?.name}</p>
+                <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#616161]">{roleLabel}</p>
+              </div>
+              <LuChevronDown className="text-[#616161]" />
+            </button>
           </Dropdown>
         </div>
       </div>

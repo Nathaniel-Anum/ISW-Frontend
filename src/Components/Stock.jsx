@@ -9,6 +9,7 @@ const Stock = () => {
   const [meta, setMeta] = useState({});
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pagination, setPagination] = useState({ page: 1, limit: 20 });
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form] = Form.useForm();
@@ -20,7 +21,9 @@ const Stock = () => {
   const fetchStock = async () => {
     setLoading(true);
     try {
-      const response = await api.get("/stores/stock", { params: filters });
+      const response = await api.get("/stores/stock", {
+        params: { ...filters, page: pagination.page, limit: pagination.limit },
+      });
       const stockData = response.data.data || [];
       const metaData = response.data.meta || {};
 
@@ -55,7 +58,7 @@ const Stock = () => {
 
   useEffect(() => {
     fetchStock();
-  }, [filters]);
+  }, [filters, pagination]);
 
   const handleFilterSubmit = () => {
     form
@@ -65,6 +68,7 @@ const Stock = () => {
           brand: values.brand || null,
           deviceType: values.deviceType || null,
         });
+        setPagination((prev) => ({ ...prev, page: 1 }));
         setIsModalOpen(false);
       })
       .catch((info) => {
@@ -75,6 +79,7 @@ const Stock = () => {
   const handleReset = () => {
     form.resetFields();
     setFilters({ brand: null, deviceType: null });
+    setPagination((prev) => ({ ...prev, page: 1 }));
     setIsModalOpen(false);
   };
 
@@ -166,12 +171,17 @@ const Stock = () => {
             columns={columns}
             dataSource={data}
             pagination={{
+              current: pagination.page,
+              pageSize: pagination.limit,
               total: meta?.total || 0,
-              pageSize: 10,
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "20", "50"],
               showTotal: (total) =>
                 `Total ${total} items | Total Stock: ${
                   meta?.totalStockQuantity ?? 0
                 }`,
+              onChange: (page, pageSize) =>
+                setPagination({ page, limit: pageSize }),
             }}
             rowClassName={(record) =>
               record.quantityInStock <= 1

@@ -1,269 +1,206 @@
-import { Button, DatePicker, Input, Select, Table, Form, Modal } from 'antd';
-import React, { useState } from 'react';
 import {
-  DownloadOutlined,
-  FilterOutlined,
-  SearchOutlined,
-} from '@ant-design/icons';
-import * as XLSX from 'xlsx';
+  Button,
+  Col,
+  DatePicker,
+  Form,
+  Input,
+  Row,
+  Space,
+  Table,
+  Typography,
+  message,
+} from 'antd';
+import dayjs from 'dayjs';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { DownloadOutlined, SearchOutlined } from '@ant-design/icons';
+import * as XLSX from 'xlsx';
 import api from '../utils/config';
 
-const Resolved = () => {
-  const [searchText, setSearchText] = useState('');
+const { Title, Text } = Typography;
+const DATE_FORMAT = 'YYYY-MM-DD';
+
+const columns = [
+  {
+    title: 'Ticket No.',
+    dataIndex: 'ticketId',
+    key: 'ticketId',
+  },
+  {
+    title: 'Requester',
+    dataIndex: 'requestedBy',
+    key: 'requestedBy',
+    render: (value) => value || 'N/A',
+  },
+  {
+    title: 'Department',
+    dataIndex: 'department',
+    key: 'department',
+    render: (value) => value || 'N/A',
+  },
+  {
+    title: 'Unit',
+    dataIndex: 'unitName',
+    key: 'unitName',
+    render: (value) => value || 'N/A',
+  },
+  {
+    title: 'Category',
+    dataIndex: 'itemCategory',
+    key: 'itemCategory',
+    render: (value) => value || 'N/A',
+  },
+  {
+    title: 'Issue',
+    dataIndex: 'description',
+    key: 'description',
+    render: (value) => value || 'N/A',
+  },
+  {
+    title: 'Assigned To',
+    dataIndex: 'assignedTo',
+    key: 'assignedTo',
+    render: (value) => value || 'Unassigned',
+  },
+  {
+    title: 'Reported',
+    dataIndex: 'createdAt',
+    key: 'createdAt',
+    render: (value) => (value ? dayjs(value).format('DD MMM YYYY') : 'N/A'),
+  },
+  {
+    title: 'Resolved',
+    dataIndex: 'resolvedAt',
+    key: 'resolvedAt',
+    render: (value) => (value ? dayjs(value).format('DD MMM YYYY') : 'N/A'),
+  },
+];
+
+const buildExportRows = (rows) =>
+  rows.map((row) => ({
+    'Ticket No.': row.ticketId,
+    Requester: row.requestedBy || 'N/A',
+    Department: row.department || 'N/A',
+    Unit: row.unitName || 'N/A',
+    Category: row.itemCategory || 'N/A',
+    Issue: row.description || 'N/A',
+    'Assigned To': row.assignedTo || 'Unassigned',
+    Reported: row.createdAt ? dayjs(row.createdAt).format('YYYY-MM-DD') : 'N/A',
+    Resolved: row.resolvedAt ? dayjs(row.resolvedAt).format('YYYY-MM-DD') : 'N/A',
+  }));
+
+export default function Resolved() {
   const [form] = Form.useForm();
-  const [open, setOpen] = useState(false);
-  const [filteredTickets, setFilteredTickets] = useState(null);
-  const { data } = useQuery({
-    queryKey: ['totalTicket'],
-    queryFn: () => {
-      return api.get('reports/workshop');
+  const [messageApi, contextHolder] = message.useMessage();
+  const [searchText, setSearchText] = useState('');
+  const [submittedFilters, setSubmittedFilters] = useState(null);
+  const deferredSearch = useDeferredValue(searchText.trim());
+
+  const reportQuery = useQuery({
+    queryKey: ['workshop-report', 'resolved', submittedFilters, deferredSearch],
+    enabled: Boolean(submittedFilters),
+    queryFn: async () => {
+      const params = {
+        startDate: submittedFilters.startDate,
+        endDate: submittedFilters.endDate,
+        status: 'RESOLVED',
+      };
+
+      if (deferredSearch) {
+        params.search = deferredSearch;
+      }
+
+      const response = await api.get('/reports/workshop', { params });
+
+      return response.data;
     },
   });
 
-  const { data: department } = useQuery({
-    queryKey: ['department'],
-    queryFn: () => {
-      return api.get('admin/departments');
-    },
-  });
+  const rows = useMemo(() => reportQuery.data?.data ?? [], [reportQuery.data]);
 
-  const TableData = data?.data?.tickets.filter((ticket) => ticket.dateResolved);
-  console.log('Resolved tickets are: ', TableData);
-
-  const tickets = filteredTickets || TableData || [];
-
-  const formatDate = (date) => {
-    if (!date) return null;
-    return new Date(date.$d).toISOString().split('T')[0]; // 'YYYY-MM-DD'
+  const handleGenerate = (values) => {
+    setSubmittedFilters({
+      startDate: values.dateRange?.[0]?.format(DATE_FORMAT),
+      endDate: values.dateRange?.[1]?.format(DATE_FORMAT),
+    });
   };
 
-  const handleFinish = (values) => {
-    //This is formatting the date to YYYY-MM-DD
-    const filters = {
-      startDate: values.startDate ? formatDate(values.startDate) : null,
-      endDate: values.endDate ? formatDate(values.endDate) : null,
-      issueType: values.issueType || null,
-      department: values.department || null,
-    };
-    console.log('Filtering with:', filters);
+  const handleExport = () => {
+    if (!rows.length) {
+      messageApi.warning('There is no resolved ticket data to export.');
+      return;
+    }
 
-    const params = new URLSearchParams();
-
-    if (filters.startDate) params.append('startDate', filters.startDate);
-    if (filters.endDate) params.append('endDate', filters.endDate);
-    if (filters.issueType) params.append('issueType', filters.issueType);
-    if (values.department) params.append('departmentId', values.department);
-
-    const url = `${
-      import.meta.VITE_BASE_URL
-    }/reports/workshop?${params.toString()}`;
-    console.log('Fetching from:', url);
-
-    api
-      .get(url)
-      .then((res) => {
-        console.log('Filtered data:', res.data);
-        setFilteredTickets(res.data.tickets);
-      })
-      .catch((err) => {
-        console.error('Error fetching filtered data:', err);
-      });
-
-    setOpen(false);
-    form.resetFields();
-  };
-
-  const handleCancel = () => {
-    setOpen(false);
-    form.resetFields();
-  };
-  const handleDownload = () => {
-    const tickets = data?.data?.tickets;
-
-    const cleanData = tickets
-      .filter(
-        (record) =>
-          record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
-          record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
-          record.model.toLowerCase().includes(searchText.toLowerCase()) ||
-          record.technicianReceivedName
-            .toLowerCase()
-            .includes(searchText.toLowerCase()) ||
-          record.technicianReturnedName
-            .toLowerCase()
-            .includes(searchText.toLowerCase()) ||
-          record.remarks.toLowerCase().includes(searchText.toLowerCase())
-      )
-
-      .map((item, index) => ({
-        No: index + 1,
-        TicketID: item.ticketId,
-        User: item.userName,
-        Priority: item.priority,
-        IssueType: item.issueType,
-        Brand: item.brand,
-        Model: item.model,
-        ReceivedBy: item.technicianReceivedName,
-        ReturnedBy: item.technicianReturnedName,
-        ActionTaken: item.actionTaken || '-',
-        Remarks: item.remarks || '-',
-        DateLogged: item.dateLogged
-          ? new Date(item.dateLogged).toLocaleDateString()
-          : '-',
-        DateResolved: item.dateResolved
-          ? new Date(item.dateResolved).toLocaleDateString()
-          : '-',
-      }));
-
-    const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tickets');
-
-    XLSX.writeFile(workbook, 'AllTickets.xlsx');
+    const worksheet = XLSX.utils.json_to_sheet(buildExportRows(rows));
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Resolved Tickets');
+    XLSX.writeFile(workbook, 'resolved-maintenance-tickets.xlsx');
   };
-
-  const columns = [
-    {
-      title: 'No.',
-      key: 'index',
-      render: (text, record, index) => index + 1,
-    },
-    {
-      title: 'Ticket ID',
-      dataIndex: 'ticketId',
-    },
-    {
-      title: 'Brand',
-      dataIndex: 'brand',
-    },
-    {
-      title: 'Model',
-      dataIndex: 'model',
-    },
-    {
-      title: 'User Name',
-      dataIndex: 'userName',
-      filteredValue: [searchText],
-      onFilter: (value, record) => {
-        return (
-          record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
-          record.brand.toLowerCase().includes(searchText.toLowerCase()) ||
-          record.model.toLowerCase().includes(searchText.toLowerCase()) ||
-          record.technicianReceivedName
-            .toLowerCase()
-            .includes(searchText.toLowerCase()) ||
-          record.technicianReturnedName
-            .toLowerCase()
-            .includes(searchText.toLowerCase()) ||
-          record.remarks.toLowerCase().includes(searchText.toLowerCase())
-        );
-      },
-    },
-    {
-      title: 'Issue Type',
-      dataIndex: 'issueType',
-    },
-    {
-      title: 'Received By',
-      dataIndex: 'technicianReceivedName',
-    },
-    {
-      title: 'Returned By',
-      dataIndex: 'technicianReturnedName',
-    },
-    {
-      title: 'Action Taken',
-      dataIndex: 'actionTaken',
-      render: (value) => (value ? value : '-'),
-    },
-    {
-      title: 'Remarks',
-      dataIndex: 'remarks',
-    },
-    {
-      title: 'Date Logged',
-      dataIndex: 'dateLogged',
-      key: 'dateLogged',
-      render: (value) =>
-        value
-          ? new Date(value).toLocaleString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })
-          : '-',
-    },
-    {
-      title: 'Date Resolved',
-      dataIndex: 'dateResolved',
-      key: 'dateResolved',
-      render: (value) =>
-        value
-          ? new Date(value).toLocaleString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-            })
-          : '-',
-    },
-  ];
 
   return (
-    <div className=" px-[3rem] py-[2rem]">
-      <div className="flex gap-2 justify-end">
-        <Input
-          placeholder="Search..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          prefix={<SearchOutlined />}
-          style={{ width: '200px' }}
-        />
-        <Button icon={<FilterOutlined />} onClick={() => setOpen(true)} />
-        <Button icon={<DownloadOutlined />} onClick={handleDownload} />
+    <div className="page-wrapper report-page">
+      {contextHolder}
+      <div className="page-header-card">
+        <div>
+          <Text className="section-tag">Workshop Report</Text>
+          <Title level={2}>Resolved Maintenance Tickets</Title>
+          <Text type="secondary">
+            Generate date-bound reports and search across the returned resolved tickets.
+          </Text>
+        </div>
       </div>
-      <div className="pl-[6rem] pt-6">
-        <Table dataSource={tickets} columns={columns} />
-        <Modal title="Filter" open={open} onCancel={handleCancel} footer={null}>
-          <Form form={form} layout="vertical" onFinish={handleFinish}>
-            <Form.Item label="Start Date" name="startDate">
-              <DatePicker style={{ width: '100%' }} />
-            </Form.Item>
 
-            <Form.Item label="End Date" name="endDate">
-              <DatePicker style={{ width: '100%' }} />
-            </Form.Item>
+      <div className="table-card">
+        <Form form={form} layout="vertical" onFinish={handleGenerate}>
+          <Row gutter={[16, 16]} align="bottom">
+            <Col xs={24} md={12} lg={10}>
+              <Form.Item
+                label="Date range"
+                name="dateRange"
+                rules={[{ required: true, message: 'Select a date range.' }]}
+              >
+                <DatePicker.RangePicker style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12} lg={14}>
+              <Space wrap>
+                <Button type="primary" htmlType="submit" loading={reportQuery.isFetching && !reportQuery.data}>
+                  Generate report
+                </Button>
+                <Button
+                  icon={<DownloadOutlined />}
+                  onClick={handleExport}
+                  disabled={!rows.length}
+                >
+                  Export
+                </Button>
+              </Space>
+            </Col>
+          </Row>
+        </Form>
 
-            <Form.Item label="Issue Type" name="issueType">
-              <Select placeholder="Select issue type">
-                <Option value="HARDWARE">HARDWARE</Option>
-                <Option value="SOFTWARE">SOFTWARE</Option>
-              </Select>
-            </Form.Item>
-            <Form.Item name="department" label="Select Department">
-              <Select placeholder="Choose a department">
-                {department?.data.map((dept) => (
-                  <Option key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </Option>
-                ))}
-              </Select>
-            </Form.Item>
+        <div className="toolbar-row" style={{ marginTop: 24 }}>
+          <Input
+            allowClear
+            prefix={<SearchOutlined />}
+            placeholder="Search ticket number, requester, department, unit, category, issue, or technician"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            disabled={!submittedFilters}
+            style={{ maxWidth: 420 }}
+          />
+        </div>
 
-            <Form.Item>
-              <Button type="primary" htmlType="submit" className="w-full">
-                Submit
-              </Button>
-            </Form.Item>
-          </Form>
-        </Modal>
+        <Table
+          rowKey={(record) => record.ticketId}
+          columns={columns}
+          dataSource={rows}
+          loading={reportQuery.isFetching}
+          pagination={{ pageSize: 10, showSizeChanger: false }}
+          scroll={{ x: 1100 }}
+          style={{ marginTop: 20 }}
+        />
       </div>
     </div>
   );
-};
-
-export default Resolved;
+}

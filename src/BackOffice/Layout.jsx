@@ -1,14 +1,16 @@
-import React from 'react';
-import Sidebar from './Sidebar';
-import Navbar from './Navbar';
+import { useState } from "react";
+import Navbar from "./Navbar";
+import Sidebar from "./Sidebar";
 
 const Layout = () => {
-    return (
-        <div>
-            <Sidebar/>
-            <Navbar/>
-        </div>
-    );
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  return (
+    <>
+      <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
+      <Navbar onOpenMenu={() => setMobileNavOpen(true)} />
+    </>
+  );
 };
 
 export default Layout;

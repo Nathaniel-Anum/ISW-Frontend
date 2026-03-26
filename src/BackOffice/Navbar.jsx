@@ -1,95 +1,88 @@
-import React from "react";
+import { Button, Dropdown, Space } from "antd";
 import { DownOutlined } from "@ant-design/icons";
-import { Dropdown, Space } from "antd";
-import { Navigate, useNavigate } from "react-router-dom";
-import { ToastContainer } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
+import { LuArrowRightLeft, LuMenu } from "react-icons/lu";
+import { useNavigate } from "react-router-dom";
 import { useUser } from "../utils/userContext";
 
-const Navbar = () => {
+const Navbar = ({ onOpenMenu = () => {} }) => {
   const { user, setUser } = useUser();
-  const currentDate = new Date();
-  // console.log(currentDate);
-
   const navigate = useNavigate();
 
   const handleLogout = () => {
     localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
     setUser(null);
     navigate("/");
-    localStorage.removeItem("user");
   };
 
-  const isAdmin = user?.roles?.includes("admin");
-
-  // Assuming `user` is accessible globally in your app
   const items = [
-    // If user is admin, add this item first
-    ...(isAdmin
-      ? [
-          {
-            label: <a href="/dashboard">Go to Dashboard</a>,
-            key: "1",
-          },
-        ]
-      : []),
-
-    // Logout is always present
     {
-      label: <a onClick={handleLogout}>Logout</a>,
-      key: "0",
+      key: "workspace",
+      label: <button onClick={() => navigate("/dashboard")}>Open workspace</button>,
+    },
+    {
+      key: "logout",
+      label: <button onClick={handleLogout}>Logout</button>,
     },
   ];
+
   return (
-    <div>
-      <div className="flex justify-between items-center pt-[20px]">
-        <div className="pl-[15rem]">
-          {/* <p className="font-semibold text-[23px]">Dashboard</p> */}
-
-          <p className="font-semibold ">{currentDate.toDateString()}</p>
-          {/* <p>{currentDate.toLocaleTimeString()}</p> */}
-        </div>
-
-        <div>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth="1.5"
-            stroke="currentColor"
-            className="svgs1"
+    <header className="fixed left-0 right-0 top-0 z-30 h-[72px] border-b border-[#E0E0E0] bg-white md:left-[280px]">
+      <div className="flex h-full items-center justify-between gap-4 px-4 md:px-8 xl:px-10">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#E0E0E0] bg-white text-[#212121] transition-colors duration-200 hover:border-[#D32F2F]/40 hover:bg-[#FFEBEE] hover:text-[#D32F2F] md:hidden"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"
-            />
-          </svg>
-        </div>
+            <LuMenu className="text-lg" />
+          </button>
 
-        <div className="pr-[51px] flex gap-2 items-center">
-          <p className=" border  px-3 py-2 font-semibold rounded-md text-[18px]">
-            IS
+          <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#9E9E9E]">
+            Back Office
           </p>
-          <Dropdown
-            menu={{
-              items,
-            }}
-            trigger={["click"]}
+          <h1 className="mt-1 text-lg font-bold text-[#212121] md:text-xl">Administration</h1>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button
+            type="default"
+            icon={<LuArrowRightLeft size={16} />}
+            className="hidden !h-9 !rounded-lg !border-[#E0E0E0] !px-4 !text-[#212121] md:inline-flex"
+            onClick={() => navigate("/dashboard")}
           >
-            <a
-              className="font-semibold  cursor-pointer"
-              onClick={(e) => e.preventDefault()}
-            >
-              <Space>
-                {user?.name}
-                <DownOutlined />
-              </Space>
-            </a>
-          </Dropdown>
+            Main dashboard
+          </Button>
+
+          <div className="hidden rounded-lg border border-[#E0E0E0] px-3 py-2 md:block">
+            <p className="text-xs font-semibold uppercase tracking-widest text-[#9E9E9E]">
+              Signed In
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[#212121]">{user?.email || user?.name}</p>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-xl border border-[#E0E0E0] bg-white px-2 py-1.5 sm:gap-3 sm:px-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#1E1E1E] text-sm font-semibold text-white">
+              {(user?.name || "IS")
+                .split(" ")
+                .slice(0, 2)
+                .map((value) => value.charAt(0).toUpperCase())
+                .join("")}
+            </div>
+            <Dropdown menu={{ items }} trigger={["click"]}>
+              <button className="text-left text-sm font-semibold text-[#212121]">
+                <Space>
+                  <span className="hidden sm:inline">{user?.name || "Inventory Admin"}</span>
+                  <DownOutlined />
+                </Space>
+              </button>
+            </Dropdown>
+          </div>
         </div>
       </div>
-    </div>
+    </header>
   );
 };
 

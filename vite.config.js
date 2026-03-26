@@ -8,4 +8,17 @@ export default defineConfig({
     port: 3001, 
   },
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-antd': ['antd'],
+          'vendor-charts': ['recharts'],
+          'vendor-xlsx': ['xlsx', 'file-saver'],
+          'vendor-query': ['@tanstack/react-query'],
+        },
+      },
+    },
+  },
 })

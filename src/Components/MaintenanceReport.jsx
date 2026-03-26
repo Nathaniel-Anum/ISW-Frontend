@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { IoLocationOutline } from "react-icons/io5";
 import { LuSearch } from "react-icons/lu";
 import { Link } from "react-router-dom";
-import { Spin } from "antd"; 
+import { Button, Spin } from "antd"; 
+import * as XLSX from "xlsx";
 import api from "../utils/config";
 
 const MaintenanceReport = () => {
@@ -23,9 +24,30 @@ const MaintenanceReport = () => {
     (ticket) => !ticket.dateResolved
   );
   console.log("Unresolved tickets are: ", unresolved);
+
+  const exportSummary = () => {
+    const summaryRows = [
+      {
+        totalTickets: data?.data?.summary?.totalTickets || 0,
+        resolved: data?.data?.summary?.resolved || 0,
+        unresolved: data?.data?.summary?.unresolved || 0,
+      },
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(summaryRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Maintenance Summary");
+    XLSX.writeFile(workbook, "maintenance-report-summary.xlsx");
+  };
+
   return (
     <div className="px-[13rem]  ">
       {/* <p>Maintenance Page</p> */}
+      <div className="flex justify-end px-6 pt-6">
+        <Button type="primary" onClick={exportSummary} disabled={isLoading || !data?.data?.summary}>
+          Export Excel
+        </Button>
+      </div>
       <div className="max-h-[90%] py-[4rem] grid grid-cols-2 overflow-scroll no-scrollbar h-screen">
         <div className="  p-6 flex gap-6 cursor-pointer ">
           <Link to="/dashboard/total-ticket">

@@ -1,346 +1,171 @@
-import React, { useState } from "react";
-import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
-import {
-  Button,
-  DatePicker,
-  Form,
-  Input,
-  Modal,
-  Select,
-  Spin,
-  Table,
-} from "antd";
-import api from "../utils/config";
-import * as XLSX from "xlsx";
+import React, { useDeferredValue, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Department } from "./icons/icons.components";
+import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, DatePicker, Form, Input, Modal, Select, Spin, Table } from "antd";
+import * as XLSX from "xlsx";
+import api from "../utils/config";
+
+const { Option } = Select;
 
 const TechReport = () => {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [selectedReport, setSelectedReport] = useState(null);
-  const [reportData, setReportData] = useState([]);
+  const [submittedFilters, setSubmittedFilters] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm();
+  const deferredSearch = useDeferredValue(searchText.trim());
 
-  const { data } = useQuery({
+  const { data: departmentsResponse } = useQuery({
     queryKey: ["department"],
-    queryFn: () => {
-      return api.get("/admin/departments?includeUnits=true");
-    },
+    queryFn: () => api.get("/admin/departments?includeUnits=true"),
   });
+
+  const { data: reportResponse, isFetching: reportLoading } = useQuery({
+    queryKey: ["techReport", submittedFilters, deferredSearch],
+    enabled: !!submittedFilters?.reportType,
+    queryFn: () =>
+      api.get("/hardware/reports", {
+        params: {
+          ...submittedFilters,
+          ...(deferredSearch ? { search: deferredSearch } : {}),
+        },
+      }),
+  });
+
+  const reportRows = reportResponse?.data?.data || [];
+  const hasReport = Boolean(submittedFilters?.reportType);
 
   const formatDate = (date) => {
     if (!date) return null;
-    return new Date(date.$d).toISOString().split("T")[0]; // 'YYYY-MM-DD'
+    return new Date(date.$d).toISOString().split("T")[0];
   };
 
-  const onFinish = async (values) => {
-    const { reportType, status, deviceType, issueType, departmentId } = values;
-    const filters = {
-      startDate: values.startDate ? formatDate(values.startDate) : null,
-      endDate: values.endDate ? formatDate(values.endDate) : null,
-    };
-    console.log("Filtering with:", filters);
-    const params = new URLSearchParams({ reportType });
-
-    if (status) params.append("status", status);
-    if (deviceType) params.append("deviceType", deviceType);
-    if (issueType) params.append("issueType", issueType);
-    if (departmentId) params.append("departmentId", departmentId);
-
-    if (filters.startDate) params.append("startDate", filters.startDate);
-    if (filters.endDate) params.append("endDate", filters.endDate);
-
-    try {
-      const response = await api.get(`/hardware/reports?${params.toString()}`);
-      setSelectedReport(reportType);
-      setReportData(response.data); //This will feed the table
-      setOpen(false);
-      form.resetFields();
-    } catch (err) {
-      console.error(err);
-      setOpen(false);
-      form.resetFields();
-    }
-  };
-  const getColumns = () => {
-    if (selectedReport === "maintenance_tickets") {
-      return [
-        {
-          title: "No",
-          key: "index",
-          render: (_text, _record, index) => index + 1,
-        },
-        {
-          title: "User Name",
-          dataIndex: "userName",
-          key: "userName",
-          filteredValue: [searchText],
-          onFilter: (value, record) => {
-            return (
-              record.userName
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record?.actionTaken
-                ?.toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.departmentName
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.unitName
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.deviceType
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.issueType
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.brand?.toLowerCase().includes(searchText.toLowerCase()) ||
-              record.model?.toLowerCase().includes(searchText.toLowerCase()) ||
-              record.remarks
-                ?.toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.technicianReceivedName
-                .toLowerCase()
-                .includes(searchText.toLowerCase()) ||
-              record.technicianReturnedName
-                .toString()
-                .toLowerCase()
-                .includes(searchText.toLowerCase())
-            );
-          },
-        },
-        {
-          title: "Unit Name",
-          dataIndex: "unitName",
-          key: "unitName",
-        },
-        {
-          title: "Department",
-          dataIndex: "departmentName",
-          key: "departmentName",
-        },
-        {
-          title: "Action Taken",
-          dataIndex: "actionTaken",
-          key: "actionTaken",
-          render: (text) => (text ? text : "-"),
-        },
-
-        // {
-        //   title: "Description",
-        //   dataIndex: "description",
-        //   key: "description",
-        // },
-        {
-          title: "Issue Type",
-          dataIndex: "issueType",
-          key: "issueType",
-        },
-        {
-          title: "Device Type",
-          dataIndex: "deviceType",
-          key: "deviceType",
-        },
-        { title: "Brand", dataIndex: "brand", key: "brand" },
-        { title: "Model", dataIndex: "model", key: "model" },
-        // {
-        //   title: "Priority",
-        //   dataIndex: "priority",
-        //   key: "priority",
-        // },
-        {
-          title: "Remarks",
-          dataIndex: "remarks",
-          key: "remarks",
-        },
-        {
-          title: "Received By",
-          dataIndex: "technicianReceivedName",
-          key: "technicianReceivedName",
-        },
-        {
-          title: "Sent By",
-          dataIndex: "technicianReturnedName",
-          key: "technicianReturnedName",
-        },
-
-        {
-          title: "Date Logged",
-          dataIndex: "dateLogged",
-          key: "dateLogged",
-          render: (date) => new Date(date).toLocaleDateString(),
-        },
-        {
-          title: "Date Resolved",
-          dataIndex: "dateResolved",
-          key: "dateResolved",
-          render: (date) => (date ? new Date(date).toLocaleDateString() : "-"),
-        },
-      ];
-    }
+  const handleSubmit = (values) => {
+    setSearchText("");
+    setSubmittedFilters({
+      reportType: values.reportType,
+      ...(values.status ? { status: values.status } : {}),
+      ...(values.deviceType ? { deviceType: values.deviceType } : {}),
+      ...(values.issueType ? { issueType: values.issueType } : {}),
+      ...(values.departmentId ? { departmentId: values.departmentId } : {}),
+      ...(values.startDate ? { startDate: formatDate(values.startDate) } : {}),
+      ...(values.endDate ? { endDate: formatDate(values.endDate) } : {}),
+    });
+    setOpen(false);
+    form.resetFields();
   };
 
-  const downloadExcel = () => {
-    if (!reportData?.data?.length) return;
+  const handleDownload = () => {
+    if (!reportRows.length) return;
 
-    let cleanData = [];
-
-    if (selectedReport === "maintenance_tickets") {
-      cleanData = reportData?.data
-        .filter(
-          (record) =>
-            record.userName.toLowerCase().includes(searchText.toLowerCase()) ||
-            record?.actionTaken
-              ?.toLowerCase()
-              .includes(searchText.toLowerCase()) ||
-            record.departmentName
-              .toLowerCase()
-              .includes(searchText.toLowerCase()) ||
-            record.unitName.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.deviceType
-              .toLowerCase()
-              .includes(searchText.toLowerCase()) ||
-            record.issueType.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.brand?.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.model?.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.remarks?.toLowerCase().includes(searchText.toLowerCase()) ||
-            record.technicianReceivedName
-              .toLowerCase()
-              .includes(searchText.toLowerCase()) ||
-            record.technicianReturnedName
-              .toString()
-              .toLowerCase()
-              .includes(searchText.toLowerCase())
-        )
-
-        .map((item, index) => ({
-          No: index + 1,
-          UserName: item?.name || "-",
-          UnitName: item?.unitName || "-",
-          Department: item?.departmentName || "-",
-          ActionTaken: item?.actionTaken || "-",
-          IssueType: item?.issueType || "-",
-          DeviceType: item?.deviceType || "-",
-          Brand: item?.brand || "-",
-          Model: item?.model || "-",
-          Remarks: item?.remarks || "-",
-          ReceivedBy: item?.technicianReceivedName || "-",
-          SentBy: item?.technicianReturnedName || "-",
-          DateLogged: item?.dateLogged
-            ? new Date(item.dateLogged).toLocaleDateString()
-            : "-",
-          DateResolved: item?.dateResolved
-            ? new Date(item.dateResolved).toLocaleDateString()
-            : "-",
-        }));
-    }
+    const cleanData = reportRows.map((item, index) => ({
+      No: index + 1,
+      UserName: item?.userName || "-",
+      UnitName: item?.unitName || "-",
+      Department: item?.departmentName || "-",
+      ActionTaken: item?.actionTaken || "-",
+      IssueType: item?.issueType || "-",
+      DeviceType: item?.deviceType || "-",
+      Brand: item?.brand || "-",
+      Model: item?.model || "-",
+      Remarks: item?.remarks || "-",
+      ReceivedBy: item?.technicianReceivedName || "-",
+      SentBy: item?.technicianReturnedName || "-",
+      DateLogged: item?.dateLogged ? new Date(item.dateLogged).toLocaleDateString() : "-",
+      DateResolved: item?.dateResolved ? new Date(item.dateResolved).toLocaleDateString() : "-",
+    }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-
-    XLSX.writeFile(workbook, `${selectedReport || "report"}.xlsx`);
+    XLSX.writeFile(workbook, "maintenance_tickets.xlsx");
   };
+
+  const columns = [
+    { title: "No", key: "index", render: (_text, _record, index) => (currentPage - 1) * pageSize + index + 1 },
+    { title: "User Name", dataIndex: "userName", key: "userName" },
+    { title: "Unit Name", dataIndex: "unitName", key: "unitName" },
+    { title: "Department", dataIndex: "departmentName", key: "departmentName" },
+    { title: "Action Taken", dataIndex: "actionTaken", key: "actionTaken", render: (text) => text || "-" },
+    { title: "Issue Type", dataIndex: "issueType", key: "issueType" },
+    { title: "Device Type", dataIndex: "deviceType", key: "deviceType" },
+    { title: "Brand", dataIndex: "brand", key: "brand" },
+    { title: "Model", dataIndex: "model", key: "model" },
+    { title: "Remarks", dataIndex: "remarks", key: "remarks" },
+    { title: "Received By", dataIndex: "technicianReceivedName", key: "technicianReceivedName" },
+    { title: "Sent By", dataIndex: "technicianReturnedName", key: "technicianReturnedName" },
+    { title: "Date Logged", dataIndex: "dateLogged", key: "dateLogged", render: (date) => new Date(date).toLocaleDateString() },
+    { title: "Date Resolved", dataIndex: "dateResolved", key: "dateResolved", render: (date) => (date ? new Date(date).toLocaleDateString() : "-") },
+  ];
+
   return (
     <div className="px-[3rem] py-[2rem]">
-      <div className=" px-[7rem] flex gap-2">
-        <Button
-          // disabled={!reportData?.data?.length}
-          icon={<FilterOutlined />}
-          onClick={() => setOpen(true)}
-        >
+      <div className="px-[7rem] flex gap-2">
+        <Button icon={<FilterOutlined />} onClick={() => setOpen(true)}>
           Filter
         </Button>
         <Input
-          disabled={!reportData?.data?.length}
+          disabled={!hasReport}
           placeholder="Search..."
           value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
+          onChange={(event) => setSearchText(event.target.value)}
           prefix={<SearchOutlined />}
           style={{ width: "200px" }}
         />
-        <Button
-          type="primary"
-          onClick={downloadExcel}
-          disabled={!reportData?.data?.length}
-        >
+        <Button type="primary" onClick={handleDownload} disabled={!reportRows.length}>
           Download
         </Button>
       </div>
       <div className="pl-[6rem] pt-6">
-        {loading ? (
+        {reportLoading ? (
           <div className="flex justify-center items-center h-[300px]">
             <Spin size="large" />
           </div>
         ) : (
           <Table
-            columns={getColumns()}
-            dataSource={reportData?.data || []}
-            rowKey={(record) => record.id || record.key}
+            columns={hasReport ? columns : []}
+            dataSource={reportRows}
+            rowKey={(record) => record.id || record.ticketId}
             pagination={{
               current: currentPage,
-              pageSize: pageSize,
-              onChange: (page, pageSize) => {
+              pageSize,
+              onChange: (page, nextPageSize) => {
                 setCurrentPage(page);
-                setPageSize(pageSize);
+                setPageSize(nextPageSize);
               },
             }}
           />
         )}
       </div>
-      <Modal
-        title="Filter"
-        open={open}
-        onCancel={() => setOpen(false)}
-        footer={null}
-      >
+      <Modal title="Filter" open={open} onCancel={() => setOpen(false)} footer={null}>
         <div className="max-h-[39rem] overflow-y-auto pr-2 no-scrollbar">
-          <Form form={form} onFinish={onFinish} layout="vertical">
-            <Form.Item
-              name="reportType"
-              label="Report Type"
-              rules={[{ required: true, message: "Select report type" }]}
-            >
+          <Form form={form} onFinish={handleSubmit} layout="vertical">
+            <Form.Item name="reportType" label="Report Type" rules={[{ required: true, message: "Select report type" }]}>
               <Select placeholder="Filter by" style={{ width: "100%" }}>
                 <Option value="maintenance_tickets">Maintenance Ticket</Option>
               </Select>
             </Form.Item>
-
             <Form.Item label="Start Date" name="startDate">
               <DatePicker style={{ width: "100%" }} />
             </Form.Item>
-
             <Form.Item label="End Date" name="endDate">
               <DatePicker style={{ width: "100%" }} />
             </Form.Item>
             <Form.Item label="Status" name="status">
               <Select placeholder="Status" allowClear style={{ width: "100%" }}>
                 <Select.Option value="OPEN">OPEN</Select.Option>
-                <Select.Option value="CLOSED">CLOSED</Select.Option>
+                <Select.Option value="RESOLVED">RESOLVED</Select.Option>
               </Select>
             </Form.Item>
             <Form.Item label="Issue Type" name="issueType">
-              <Select
-                placeholder="Issue Type"
-                allowClear
-                style={{ width: "100%" }}
-              >
+              <Select placeholder="Issue Type" allowClear style={{ width: "100%" }}>
                 <Select.Option value="HARDWARE">HARDWARE</Select.Option>
                 <Select.Option value="SOFTWARE">SOFTWARE</Select.Option>
               </Select>
             </Form.Item>
-
             <Form.Item label="Device Type" name="deviceType">
-              <Select
-                placeholder="Device Type"
-                allowClear
-                style={{ width: "100%" }}
-              >
+              <Select placeholder="Device Type" allowClear style={{ width: "100%" }}>
                 <Select.Option value="LAPTOP">LAPTOP</Select.Option>
                 <Select.Option value="DESKTOP">DESKTOP</Select.Option>
                 <Select.Option value="PRINTER">PRINTER</Select.Option>
@@ -348,24 +173,10 @@ const TechReport = () => {
               </Select>
             </Form.Item>
             <Form.Item label="Department" name="departmentId">
-              <Select
-                placeholder="Select Department"
-                allowClear
-                style={{ width: "100%" }}
-                options={data?.data.map((dept) => ({
-                  label: dept.name,
-                  value: dept.id,
-                }))}
-              />
+              <Select placeholder="Select Department" allowClear style={{ width: "100%" }} options={departmentsResponse?.data?.map((dept) => ({ label: dept.name, value: dept.id }))} />
             </Form.Item>
-
             <Form.Item>
-              <Button
-                type="primary"
-                htmlType="submit"
-                loading={loading}
-                className="w-full"
-              >
+              <Button type="primary" htmlType="submit" loading={reportLoading} className="w-full">
                 Submit
               </Button>
             </Form.Item>

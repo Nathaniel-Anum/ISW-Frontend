@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "banner-design",
+      "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "installedAt": "2026-03-25T06:14:28.946Z",
+      "files": [
+        "c:\\Users\\LENOVO\\Documents\\workspace\\ISW-Frontend\\.github\\skills\\banner-design\\SKILL.md"
+      ]
+    },
+    {
+      "name": "brand",
+      "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "installedAt": "2026-03-25T06:14:29.107Z",
+      "files": [
+        "c:\\Users\\LENOVO\\Documents\\workspace\\ISW-Frontend\\.github\\skills\\brand\\SKILL.md"
+      ]
+    },
+    {
+      "name": "design-system",
+      "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "installedAt": "2026-03-25T06:14:29.279Z",
+      "files": [
+        "c:\\Users\\LENOVO\\Documents\\workspace\\ISW-Frontend\\.github\\skills\\design-system\\SKILL.md"
+      ]
+    },
+    {
+      "name": "design",
+      "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "installedAt": "2026-03-25T06:14:29.458Z",
+      "files": [
+        "c:\\Users\\LENOVO\\Documents\\workspace\\ISW-Frontend\\.github\\skills\\design\\SKILL.md"
+      ]
+    },
+    {
+      "name": "slides",
+      "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "installedAt": "2026-03-25T06:14:29.624Z",
+      "files": [
+        "c:\\Users\\LENOVO\\Documents\\workspace\\ISW-Frontend\\.github\\skills\\slides\\SKILL.md"
+      ]
+    },
+    {
+      "name": "ui-styling",
+      "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "installedAt": "2026-03-25T06:14:29.798Z",
+      "files": [
+        "c:\\Users\\LENOVO\\Documents\\workspace\\ISW-Frontend\\.github\\skills\\ui-styling\\SKILL.md"
+      ]
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "repo": "https://github.com/nextlevelbuilder/ui-ux-pro-max-skill",
+      "installedAt": "2026-03-25T06:14:29.973Z",
+      "files": [
+        "c:\\Users\\LENOVO\\Documents\\workspace\\ISW-Frontend\\.github\\skills\\ui-ux-pro-max\\SKILL.md"
+      ]
+    }
+  ]
+}
