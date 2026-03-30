@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Dropdown, Form, Input, Modal, Select, Table, Tag } from "antd";
 import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
 import React, { useDeferredValue, useMemo, useState } from "react";
-import { LuArrowUpRight, LuMessageSquarePlus, LuPlay, LuRefreshCcw, LuUserRoundPlus, LuWrench } from "react-icons/lu";
+import { LuArrowUpRight, LuMessageSquarePlus, LuPlay, LuPlus, LuRefreshCcw, LuUserRoundPlus, LuWrench } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../utils/config";
@@ -67,6 +67,7 @@ const ServiceDeskQueue = () => {
   const { user } = useUser();
   const isHardwareTech = user?.roles?.includes("hardware_technician");
   const isWorkshopSupervisor = user?.roles?.includes("workshop_supervisor");
+  const isManager = user?.roles?.some((role) => MANAGER_ROLES.includes(role));
   const queryClient = useQueryClient();
   const [searchText, setSearchText] = useState("");
   const [scope, setScope] = useState("all");
@@ -78,9 +79,11 @@ const ServiceDeskQueue = () => {
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [bulkAssignForm] = Form.useForm();
   const [assignForm] = Form.useForm();
+  const [createForm] = Form.useForm();
   const [statusForm] = Form.useForm();
   const [commentForm] = Form.useForm();
   const [escalateForm] = Form.useForm();
@@ -103,6 +106,19 @@ const ServiceDeskQueue = () => {
     queryFn: () => api.get("/service-desk/support-staff"),
   });
 
+  const { data: allUsersResponse } = useQuery({
+    queryKey: ["allUsersForProxy"],
+    queryFn: () => api.get("/admin/users"),
+    enabled: !!isManager,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: categoriesResponse } = useQuery({
+    queryKey: ["serviceDeskCategories"],
+    queryFn: () => api.get("/service-desk/categories"),
+    enabled: !!isManager,
+  });
+
   const tickets = ticketsResponse?.data || [];
   const displayedTickets = useMemo(
     () => (isWorkshopSupervisor ? tickets.filter((t) => t.maintenanceTicket != null) : tickets),
@@ -120,7 +136,6 @@ const ServiceDeskQueue = () => {
     user?.roles?.includes("supervisor") ||
     user?.roles?.includes("admin");
   const isSupportStaff = canUpdateTickets;
-  const isManager = user?.roles?.some((role) => MANAGER_ROLES.includes(role));
 
   const getAllowedStatuses = (ticket) => {
     if (!ticket) return [];
@@ -228,6 +243,17 @@ const ServiceDeskQueue = () => {
     },
   });
 
+  const createTicketOnBehalf = useMutation({
+    mutationFn: (values) => api.post("/service-desk/tickets", values),
+    onSuccess: () => {
+      toast.success("Ticket created successfully");
+      refreshQueries();
+      setCreateOpen(false);
+      createForm.resetFields();
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to create ticket"),
+  });
+
   const bulkAction = useMutation({
     mutationFn: (payload) => api.post("/service-desk/tickets/bulk", payload),
     onSuccess: (res) => {
@@ -280,7 +306,24 @@ const ServiceDeskQueue = () => {
   const columns = [
     { title: "Ticket", dataIndex: "ticketNo", key: "ticketNo", render: (value) => <span className="font-semibold">{value}</span> },
     { title: "Subject", dataIndex: "subject", key: "subject" },
-    { title: "Reporter", dataIndex: ["reporter", "name"], key: "reporter", render: (value) => value || "Unknown" },
+    {
+      title: "Reporter",
+      key: "reporter",
+      render: (_, record) => {
+        const dept = record.reporter?.department?.name;
+        const room = record.reporter?.roomNo;
+        return (
+          <div>
+            <p className="font-medium text-[#212121]">{record.reporter?.name || "Unknown"}</p>
+            {(dept || room) && (
+              <p className="text-xs text-[#757575]">
+                {[dept, room ? `Rm ${room}` : null].filter(Boolean).join(" · ")}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
     { title: "Category", dataIndex: ["category", "name"], key: "category", render: (value) => value || "General" },
     { title: "Priority", dataIndex: "priority", key: "priority" },
     {
@@ -389,6 +432,16 @@ const ServiceDeskQueue = () => {
       stats={stats}
       actions={
         <>
+          {isManager && (
+            <Button
+              type="primary"
+              icon={<LuPlus />}
+              onClick={() => setCreateOpen(true)}
+              style={{ backgroundColor: "#D32F2F", borderColor: "#D32F2F" }}
+            >
+              New Ticket
+            </Button>
+          )}
           {!isHardwareTech && !isWorkshopSupervisor && (
             <Select value={scope} onChange={setScope} className="w-full md:w-[190px]">
               <Select.Option value="all">All Tickets</Select.Option>
@@ -607,6 +660,88 @@ const ServiceDeskQueue = () => {
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" block loading={createMaintenance.isPending}>
               Create Maintenance Job
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Create Ticket on Behalf of User"
+        open={createOpen}
+        onCancel={() => { setCreateOpen(false); createForm.resetFields(); }}
+        footer={null}
+        width={640}
+        destroyOnClose
+      >
+        <Form
+          form={createForm}
+          layout="vertical"
+          initialValues={{ priority: "MEDIUM" }}
+          onFinish={(values) => createTicketOnBehalf.mutate(values)}
+        >
+          <Form.Item
+            name="onBehalfOfUserId"
+            label="Reporter (creating on behalf of)"
+            rules={[{ required: true, message: "Please select the user reporting this issue" }]}
+          >
+            <Select
+              showSearch
+              placeholder="Search by name, email, or staff ID"
+              filterOption={(input, option) =>
+                (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              options={(allUsersResponse?.data || []).map((u) => ({
+                value: u.id,
+                label: `${u.name || u.email}${u.department?.name ? ` · ${u.department.name}` : ""}${u.staffId ? ` (${u.staffId})` : ""}`,
+              }))}
+            />
+          </Form.Item>
+          <Form.Item
+            name="subject"
+            label="Subject"
+            rules={[{ required: true, message: "Please enter a subject" }]}
+          >
+            <Input placeholder="Brief description of the issue" />
+          </Form.Item>
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="categoryId" label="Category">
+              <Select allowClear placeholder="Select category">
+                {(categoriesResponse?.data || []).map((cat) => (
+                  <Select.Option key={cat.id} value={cat.id}>{cat.name}</Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item name="priority" label="Priority">
+              <Select>
+                <Select.Option value="LOW">Low</Select.Option>
+                <Select.Option value="MEDIUM">Medium</Select.Option>
+                <Select.Option value="HIGH">High</Select.Option>
+                <Select.Option value="CRITICAL">Critical</Select.Option>
+              </Select>
+            </Form.Item>
+          </div>
+          <Form.Item name="issueType" label="Issue Type">
+            <Select allowClear placeholder="Select issue type">
+              <Select.Option value="HARDWARE">Hardware</Select.Option>
+              <Select.Option value="SOFTWARE">Software</Select.Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="description"
+            label="Description"
+            rules={[{ required: true, message: "Please describe the issue" }]}
+          >
+            <Input.TextArea rows={4} placeholder="Provide details about the problem, error messages, or steps to reproduce" />
+          </Form.Item>
+          <Form.Item className="mb-0">
+            <Button
+              type="primary"
+              htmlType="submit"
+              block
+              loading={createTicketOnBehalf.isPending}
+              style={{ backgroundColor: "#D32F2F", borderColor: "#D32F2F" }}
+            >
+              Create Ticket
             </Button>
           </Form.Item>
         </Form>

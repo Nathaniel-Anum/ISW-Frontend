@@ -105,7 +105,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user, setUser } = useUser();
 
-  const hasRole = (role) => user?.roles?.includes(role);
+  const hasRole = (role) => !!user?.roles?.includes(role);
   const isAdmin = hasRole("admin");
   const isSupervisor = hasRole("supervisor");
   const isStoresOfficer = hasRole("stores_officer");

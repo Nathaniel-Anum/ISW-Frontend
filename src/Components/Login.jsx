@@ -16,9 +16,7 @@ const Login = () => {
   const loginMutation = useMutation({
     mutationFn: ({ staffId, password }) => login(staffId, password),
     onSuccess: () => {
-      const mustResetPassword =
-        localStorage.getItem("mustResetPassword") === "true";
-      navigate(mustResetPassword ? "/reset-password" : "/dashboard");
+      navigate("/dashboard");
     },
     onError: (err) => {
       console.error("Login failed:", err);

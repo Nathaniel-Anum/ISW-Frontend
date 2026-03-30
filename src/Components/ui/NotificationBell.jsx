@@ -4,8 +4,7 @@ import { LuBell, LuCheck, LuX } from "react-icons/lu";
 import { io } from "socket.io-client";
 import api from "../../utils/config";
 
-const BACKEND_URL =
-  import.meta.env.VITE_API_URL?.replace("/api", "") || "http://localhost:3000";
+const BACKEND_URL = import.meta.env.VITE_BASE_URL || "http://localhost:9000";
 
 const MAX_NOTIFICATIONS = 50;
 
@@ -70,7 +69,11 @@ export default function NotificationBell() {
 
     const socket = io(BACKEND_URL, {
       auth: { token },
-      transports: ["websocket"],
+      transports: ["polling", "websocket"],
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 30000,
     });
     socketRef.current = socket;
 

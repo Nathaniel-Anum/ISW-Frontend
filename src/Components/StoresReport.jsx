@@ -331,7 +331,7 @@ const StoresReport = () => {
         ) : !reportRows.length ? (
           <div className="rounded-3xl border border-dashed border-[#E0E0E0] bg-[#F9FAFB] px-6 py-12">
             <Empty
-              description="Run a filter to generate a stores report."
+              description="No records found for the selected filters."
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           </div>

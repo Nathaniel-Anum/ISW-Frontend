@@ -24,7 +24,6 @@ const ResetPassword = () => {
       if (token) {
         toast.success("Password reset successfully. Redirecting to login...");
       } else {
-        localStorage.setItem("mustResetPassword", "false");
         toast.success("Password set successfully. Redirecting to dashboard...");
       }
       setTimeout(() => navigate("/"), 2000);

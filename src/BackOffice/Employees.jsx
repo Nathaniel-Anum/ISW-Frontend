@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SearchOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Popconfirm, Select, Table, message } from "antd";
+import { Button, Form, Input, Modal, Popconfirm, Select, Table, Tooltip, message } from "antd";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { LuBriefcaseBusiness, LuMail, LuPlus, LuUsersRound } from "react-icons/lu";
+import { LuBriefcaseBusiness, LuCheck, LuCopy, LuKeyRound, LuMail, LuPlus, LuUsersRound } from "react-icons/lu";
 import { toast } from "react-toastify";
 import { Delete, Edit } from "../Components/icons/icons.components";
 import PageShell from "../Components/ui/page-shell";
@@ -14,6 +14,9 @@ const Employees = () => {
   const [editingRecord, setEditingRecord] = useState(null);
   const [selectedUnits, setSelectedUnits] = useState([]);
   const [searchText, setSearchText] = useState("");
+  const [tempPassRecord, setTempPassRecord] = useState(null);
+  const [tempPassword, setTempPassword] = useState("");
+  const [copied, setCopied] = useState(false);
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const deferredSearch = useDeferredValue(searchText.trim());
@@ -120,6 +123,15 @@ const Employees = () => {
     },
   });
 
+  const generateTempPassword = useMutation({
+    mutationFn: (staffId) => api.post(`/admin/user/${staffId}/reset-password`),
+    onSuccess: (res, staffId) => {
+      setTempPassword(res.data.tempPassword);
+      setCopied(false);
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to generate temporary password"),
+  });
+
   const handleDepartmentChange = (departmentId) => {
     const department = departments.find((item) => item.id === departmentId);
     setSelectedUnits(department?.units || []);
@@ -190,6 +202,14 @@ const Employees = () => {
           <button className="rounded-full p-1.5 transition hover:bg-[#FFEBEE]" onClick={() => openEditModal(record)}>
             <Edit size={18} />
           </button>
+          <Tooltip title="Generate temporary password">
+            <button
+              className="rounded-full p-1.5 transition hover:bg-[#FFF8E1]"
+              onClick={() => { setTempPassRecord(record); setTempPassword(""); generateTempPassword.mutate(record.staffId); }}
+            >
+              <LuKeyRound size={18} className="text-[#F59E0B]" />
+            </button>
+          </Tooltip>
           <Popconfirm
             title="Delete staff"
             description="This action permanently removes the user record."
@@ -314,6 +334,77 @@ const Employees = () => {
             </Button>
           </Form.Item>
         </Form>
+      </Modal>
+
+      <Modal
+        open={!!tempPassRecord}
+        onCancel={() => { setTempPassRecord(null); setTempPassword(""); }}
+        footer={null}
+        title={null}
+        width={440}
+        destroyOnClose
+        centered
+      >
+        <div className="px-2 py-4">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFF8E1]">
+              <LuKeyRound size={20} className="text-[#F59E0B]" />
+            </div>
+            <div>
+              <p className="text-base font-bold text-[#212121]">Temporary Password</p>
+              <p className="text-sm text-[#757575]">{tempPassRecord?.name} · {tempPassRecord?.staffId}</p>
+            </div>
+          </div>
+
+          <p className="mb-3 text-sm text-[#616161]">
+            A temporary password has been generated. Share it securely with the employee — they can use it to log in directly.
+          </p>
+
+          <div className="flex items-center gap-3 rounded-2xl border border-[#E0E0E0] bg-[#F9FAFB] px-4 py-3">
+            {generateTempPassword.isPending ? (
+              <span className="flex-1 animate-pulse text-sm text-[#9E9E9E]">Generating…</span>
+            ) : (
+              <span className="flex-1 font-mono text-lg font-semibold tracking-widest text-[#212121]">
+                {tempPassword || "—"}
+              </span>
+            )}
+            <Tooltip title={copied ? "Copied!" : "Copy to clipboard"}>
+              <button
+                disabled={!tempPassword}
+                className="rounded-full p-2 transition hover:bg-[#FFEBEE] disabled:opacity-40"
+                onClick={() => {
+                  navigator.clipboard.writeText(tempPassword);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2500);
+                }}
+              >
+                {copied ? <LuCheck size={18} className="text-[#4CAF50]" /> : <LuCopy size={18} className="text-[#616161]" />}
+              </button>
+            </Tooltip>
+          </div>
+
+          <p className="mt-3 text-xs text-[#9E9E9E]">
+            An email with this password has also been sent to {tempPassRecord?.email}.
+          </p>
+
+          <div className="mt-5 flex gap-3">
+            <Button
+              block
+              onClick={() => { generateTempPassword.mutate(tempPassRecord?.staffId); }}
+              loading={generateTempPassword.isPending}
+              icon={<LuKeyRound size={15} />}
+            >
+              Regenerate
+            </Button>
+            <Button
+              type="primary"
+              block
+              onClick={() => { setTempPassRecord(null); setTempPassword(""); }}
+            >
+              Done
+            </Button>
+          </div>
+        </div>
       </Modal>
     </PageShell>
   );

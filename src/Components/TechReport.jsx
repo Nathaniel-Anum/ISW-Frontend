@@ -10,11 +10,15 @@ const { Option } = Select;
 const TechReport = () => {
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [submittedFilters, setSubmittedFilters] = useState(null);
+  const [submittedFilters, setSubmittedFilters] = useState({ reportType: "maintenance_tickets" });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [form] = Form.useForm();
   const deferredSearch = useDeferredValue(searchText.trim());
+
+  React.useEffect(() => {
+    form.setFieldsValue({ reportType: "maintenance_tickets" });
+  }, [form]);
 
   const { data: departmentsResponse } = useQuery({
     queryKey: ["department"],
@@ -23,7 +27,6 @@ const TechReport = () => {
 
   const { data: reportResponse, isFetching: reportLoading } = useQuery({
     queryKey: ["techReport", submittedFilters, deferredSearch],
-    enabled: !!submittedFilters?.reportType,
     queryFn: () =>
       api.get("/hardware/reports", {
         params: {
@@ -34,7 +37,7 @@ const TechReport = () => {
   });
 
   const reportRows = reportResponse?.data?.data || [];
-  const hasReport = Boolean(submittedFilters?.reportType);
+  const hasReport = true;
 
   const formatDate = (date) => {
     if (!date) return null;

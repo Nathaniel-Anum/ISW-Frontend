@@ -8,9 +8,11 @@ import {
   Select,
   Table,
   Tag,
+  Tooltip,
 } from "antd";
 import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
 import { useDeferredValue, useMemo, useState } from "react";
+import { LuStar } from "react-icons/lu";
 import * as XLSX from "xlsx";
 import PageShell from "./ui/page-shell";
 import api from "../utils/config";
@@ -300,7 +302,7 @@ const ServiceDeskReport = () => {
       </Modal>
 
       {satisfaction && (
-        <section className="rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
+        <section className="mt-6 rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
           <div className="mb-5 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-[#616161]">Satisfaction Analytics</p>
@@ -313,7 +315,16 @@ const ServiceDeskReport = () => {
 
           <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
             {[
-              { label: "Overall Avg", value: satisfaction.overallAvg != null ? `${satisfaction.overallAvg}/5` : "N/A", caption: "Mean satisfaction score" },
+              {
+                label: "Overall Avg",
+                value: satisfaction.overallAvg != null ? (
+                  <span className="flex items-center gap-1">
+                    <LuStar className="text-[#F59E0B]" />
+                    <span>{satisfaction.overallAvg} / 5</span>
+                  </span>
+                ) : "N/A",
+                caption: "Mean satisfaction score",
+              },
               { label: "Total Responses", value: satisfaction.totalResponses ?? 0, caption: "Ratings submitted" },
               { label: "By Technicians", value: satisfaction.byTechnician?.length ?? 0, caption: "Technicians rated" },
               { label: "By Categories", value: satisfaction.byCategory?.length ?? 0, caption: "Categories rated" },
@@ -336,9 +347,15 @@ const ServiceDeskReport = () => {
                 dataSource={satisfaction.byTechnician}
                 columns={[
                   { title: "Technician", dataIndex: "name", key: "name", render: (v) => <span className="font-semibold">{v}</span> },
-                  { title: "Avg Score", dataIndex: "avgScore", key: "avgScore", render: (v) => (
-                    <span className={`font-bold ${v >= 4 ? "text-[#166534]" : v >= 3 ? "text-[#B45309]" : "text-[#B71C1C]"}`}>{v} / 5</span>
-                  )},
+                  {
+                    title: "Avg Score", dataIndex: "avgRating", key: "avgRating",
+                    render: (v) => (
+                      <span className={`flex items-center gap-1 font-bold ${v >= 4 ? "text-[#166534]" : v >= 3 ? "text-[#B45309]" : "text-[#B71C1C]"}`}>
+                        {"★".repeat(Math.round(v ?? 0))}{"☆".repeat(5 - Math.round(v ?? 0))}
+                        <span className="ml-1">{v} / 5</span>
+                      </span>
+                    ),
+                  },
                   { title: "Responses", dataIndex: "responseCount", key: "responseCount" },
                 ]}
               />
@@ -346,19 +363,77 @@ const ServiceDeskReport = () => {
           )}
 
           {satisfaction.byCategory?.length > 0 && (
-            <div>
+            <div className="mb-6">
               <p className="mb-3 text-sm font-bold text-[#424242]">By Category</p>
               <Table
-                rowKey="categoryId"
+                rowKey="name"
                 size="small"
                 pagination={false}
                 dataSource={satisfaction.byCategory}
                 columns={[
-                  { title: "Category", dataIndex: "categoryName", key: "categoryName" },
-                  { title: "Avg Score", dataIndex: "avgScore", key: "avgScore", render: (v) => (
-                    <span className={`font-bold ${v >= 4 ? "text-[#166534]" : v >= 3 ? "text-[#B45309]" : "text-[#B71C1C]"}`}>{v} / 5</span>
-                  )},
+                  { title: "Category", dataIndex: "name", key: "name" },
+                  {
+                    title: "Avg Score", dataIndex: "avgRating", key: "avgRating",
+                    render: (v) => (
+                      <span className={`flex items-center gap-1 font-bold ${v >= 4 ? "text-[#166534]" : v >= 3 ? "text-[#B45309]" : "text-[#B71C1C]"}`}>
+                        {"★".repeat(Math.round(v ?? 0))}{"☆".repeat(5 - Math.round(v ?? 0))}
+                        <span className="ml-1">{v} / 5</span>
+                      </span>
+                    ),
+                  },
                   { title: "Responses", dataIndex: "responseCount", key: "responseCount" },
+                ]}
+              />
+            </div>
+          )}
+
+          {satisfaction.byReporter?.length > 0 && (
+            <div>
+              <p className="mb-3 text-sm font-bold text-[#424242]">By User (Reporter)</p>
+              <Table
+                rowKey="reporterId"
+                size="small"
+                pagination={{ pageSize: 8 }}
+                dataSource={satisfaction.byReporter}
+                expandable={{
+                  expandedRowRender: (record) => (
+                    <div className="pl-4 py-2 space-y-2">
+                      {record.ratings?.map((r, i) => (
+                        <div key={i} className="flex flex-wrap items-start gap-x-3 gap-y-1 text-sm">
+                          <span className="font-semibold text-[#212121] shrink-0">{r.ticketNo}</span>
+                          <span className="text-[#616161] flex-1">{r.subject}</span>
+                          <span className={`font-bold shrink-0 ${r.rating >= 4 ? "text-[#166534]" : r.rating >= 3 ? "text-[#B45309]" : "text-[#B71C1C]"}`}>
+                            {"★".repeat(r.rating)}{"☆".repeat(5 - r.rating)} {r.rating}/5
+                          </span>
+                          {r.feedback && (
+                            <span className="italic text-[#757575] w-full pl-0">"{r.feedback}"</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ),
+                }}
+                columns={[
+                  {
+                    title: "User",
+                    key: "name",
+                    render: (_, r) => (
+                      <div>
+                        <p className="font-semibold text-[#212121]">{r.name}</p>
+                        {r.staffId && <p className="text-xs text-[#9E9E9E]">{r.staffId}</p>}
+                      </div>
+                    ),
+                  },
+                  {
+                    title: "Avg Rating", dataIndex: "avgRating", key: "avgRating",
+                    render: (v) => (
+                      <span className={`flex items-center gap-1 font-bold ${v >= 4 ? "text-[#166534]" : v >= 3 ? "text-[#B45309]" : "text-[#B71C1C]"}`}>
+                        {"★".repeat(Math.round(v ?? 0))}{"☆".repeat(5 - Math.round(v ?? 0))}
+                        <span className="ml-1">{v} / 5</span>
+                      </span>
+                    ),
+                  },
+                  { title: "Submissions", dataIndex: "responseCount", key: "responseCount" },
                 ]}
               />
             </div>
