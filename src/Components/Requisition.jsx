@@ -117,6 +117,7 @@ const Requisition = () => {
     const payload = {
       itemDescription: values.itemDescription,
       quantity: Number(values.quantity),
+      purpose: values.purpose,
       unitId: user.unit.id,
       departmentId: user.department.id,
       roomNo: user.roomNo,
@@ -333,6 +334,14 @@ const Requisition = () => {
             rules={[{ required: true, message: "Please enter the quantity" }]}
           >
             <Input type="number" min={1} placeholder="Enter quantity" />
+          </Form.Item>
+
+          <Form.Item
+            name="purpose"
+            label="Purpose / Justification"
+            rules={[{ required: true, message: "Please enter the purpose" }]}
+          >
+            <Input.TextArea rows={3} placeholder="e.g. For use in the server room" />
           </Form.Item>
 
           <Form.Item className="mb-0">
