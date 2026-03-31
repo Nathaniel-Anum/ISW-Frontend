@@ -1,6 +1,6 @@
 import React, { useDeferredValue, useEffect, useState } from "react";
 import { SearchOutlined } from "@ant-design/icons";
-import { Modal, Form, Input, Button, Table, Tag, Select, Popconfirm } from "antd";
+import { Modal, Form, Input, Button, Table, Tag, Popconfirm } from "antd";
 import { LuPlus } from "react-icons/lu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -29,12 +29,7 @@ const Requisition = () => {
 
   useEffect(() => {
     if (user && isModalOpen) {
-      form.setFieldsValue({
-        staffId: user.staffId,
-        roomNo: user.roomNo,
-        unitId: user.unit.name,
-        departmentId: user.department.name,
-      });
+      // no prefill needed — only itemDescription and quantity are shown
     }
   }, [user, form, isModalOpen]);
 
@@ -120,10 +115,12 @@ const Requisition = () => {
 
   const handleSubmit = (values) => {
     const payload = {
-      ...values,
+      itemDescription: values.itemDescription,
       quantity: Number(values.quantity),
       unitId: user.unit.id,
       departmentId: user.department.id,
+      roomNo: user.roomNo,
+      staffId: user.staffId,
     };
 
     createRequisition(payload);
@@ -137,13 +134,7 @@ const Requisition = () => {
       }),
   });
 
-  const { data: categoriesResponse } = useQuery({
-    queryKey: ["requisitionCategories"],
-    queryFn: () => api.get("/user/requisition-categories"),
-  });
-
   const requisitions = requisitionResponse?.data || [];
-  const categories = categoriesResponse?.data || [];
   const pendingCount = requisitions.filter((item) =>
     ["PENDING_DEPT_APPROVAL", "PENDING_ITD_APPROVAL", "PENDING_STOCK_ISSUANCE"].includes(item.status)
   ).length;
@@ -324,59 +315,25 @@ const Requisition = () => {
           form.resetFields();
         }}
         footer={null}
-        width={720}
+        width={480}
         destroyOnClose
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-            <Form.Item name="staffId" label="Staff ID" rules={[{ required: true }]}>
-              <Input disabled />
-            </Form.Item>
-
-            <Form.Item name="quantity" label="Quantity" rules={[{ required: true }]}>
-              <Input type="number" min={0} placeholder="Enter Quantity" />
-            </Form.Item>
-          </div>
-
-          <Form.Item
-            name="categoryId"
-            label="Item Category"
-            rules={[{ required: true, message: "Please select item category" }]}
-          >
-            <Select placeholder="Select item category" showSearch optionFilterProp="children">
-              {categories.map((category) => (
-                <Select.Option key={category.id} value={category.id}>
-                  {category.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
           <Form.Item
             name="itemDescription"
-            label="Item Description"
-            rules={[{ required: true }]}
+            label="Item Required"
+            rules={[{ required: true, message: "Please enter the item required" }]}
           >
-            <Input placeholder="Enter Item Description" />
+            <Input placeholder="e.g. Dell Latitude Laptop, USB-C Hub" />
           </Form.Item>
 
-          <Form.Item name="purpose" label="Purpose" rules={[{ required: true }]}>
-            <Input.TextArea placeholder="Enter Purpose" rows={4} />
+          <Form.Item
+            name="quantity"
+            label="Quantity"
+            rules={[{ required: true, message: "Please enter the quantity" }]}
+          >
+            <Input type="number" min={1} placeholder="Enter quantity" />
           </Form.Item>
-
-          <div className="grid grid-cols-1 gap-x-4 md:grid-cols-3">
-            <Form.Item name="unitId" label="Unit">
-              <Input disabled />
-            </Form.Item>
-
-            <Form.Item name="departmentId" label="Department" rules={[{ required: true }]}>
-              <Input disabled />
-            </Form.Item>
-
-            <Form.Item name="roomNo" label="Room No">
-              <Input placeholder="Enter Room Number" disabled />
-            </Form.Item>
-          </div>
 
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" loading={isPending} block>

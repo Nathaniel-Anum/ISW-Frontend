@@ -119,6 +119,14 @@ const ServiceDeskQueue = () => {
     enabled: !!isManager,
   });
 
+  const { data: reporterAssetsResponse } = useQuery({
+    queryKey: ["reporterAssets", selectedTicket?.reporter?.id],
+    queryFn: () => api.get(`/service-desk/user-assets/${selectedTicket.reporter.id}`),
+    enabled: !!isManager && !!selectedTicket?.reporter?.id && statusOpen,
+    staleTime: 2 * 60 * 1000,
+  });
+  const reporterAssets = reporterAssetsResponse?.data || [];
+
   const tickets = ticketsResponse?.data || [];
   const displayedTickets = useMemo(
     () => (isWorkshopSupervisor ? tickets.filter((t) => t.maintenanceTicket != null) : tickets),
@@ -279,6 +287,9 @@ const ServiceDeskQueue = () => {
     statusForm.setFieldsValue({
       status: ticket.status,
       resolutionNotes: ticket.resolutionNotes,
+      categoryId: ticket.category?.id ?? undefined,
+      issueType: ticket.issueType ?? undefined,
+      inventoryId: ticket.inventoryId ?? undefined,
     });
     setStatusOpen(true);
   };
@@ -537,6 +548,46 @@ const ServiceDeskQueue = () => {
               ))}
             </Select>
           </Form.Item>
+          {isManager && (
+            <div className="grid grid-cols-2 gap-4">
+              <Form.Item name="categoryId" label="Category">
+                <Select allowClear placeholder="Select category">
+                  {(categoriesResponse?.data || []).map((cat) => (
+                    <Select.Option key={cat.id} value={cat.id}>{cat.name}</Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+              <Form.Item name="issueType" label="Issue Type">
+                <Select allowClear placeholder="Select issue type">
+                  <Select.Option value="HARDWARE">Hardware</Select.Option>
+                  <Select.Option value="SOFTWARE">Software</Select.Option>
+                </Select>
+              </Form.Item>
+            </div>
+          )}
+          {isManager && (
+            <Form.Item
+              noStyle
+              shouldUpdate={(prev, curr) => prev.issueType !== curr.issueType}
+            >
+              {({ getFieldValue }) =>
+                getFieldValue("issueType") === "HARDWARE" ? (
+                  <Form.Item name="inventoryId" label="Affected Asset">
+                    <Select
+                      allowClear
+                      placeholder={reporterAssets.length ? "Select the affected device" : "No assigned assets found"}
+                      optionFilterProp="label"
+                      options={reporterAssets.map((asset) => ({
+                        value: asset.id,
+                        label: `${asset.assetId} - ${asset.brand} ${asset.model} (${asset.deviceType})`,
+                      }))}
+                      notFoundContent="No assigned hardware assets available"
+                    />
+                  </Form.Item>
+                ) : null
+              }
+            </Form.Item>
+          )}
           <Form.Item
             noStyle
             shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}

@@ -39,7 +39,7 @@ const ROLE_GUIDES = {
     bg: "#EFF6FF",
     icon: LuHouse,
     intro:
-      "As a staff member, you can submit requisition requests for IT items, track their approval status, raise support tickets, and confirm receipt of issued items.",
+      "As a staff member, you can submit requisition requests for IT items, track their approval status, raise support tickets, and confirm receipt of issued items. The system keeps forms simple — you only fill in what you know, and the stores and support teams handle the rest.",
     sections: [
       {
         title: "Submitting a Requisition",
@@ -47,10 +47,10 @@ const ROLE_GUIDES = {
         permissions: ["create:requisitions"],
         steps: [
           'Click "Requisitions" in the sidebar.',
-          'Press the "+ New Requisition" button.',
-          "Select the IT item you need from the dropdown, specify the quantity, and choose the urgency level.",
-          'Add any supporting notes and click "Submit".',
-          "Your request is immediately sent to your department approver for review.",
+          'Press the "+ Create Requisition" button.',
+          "Enter the name or description of the item you need (e.g. \"Dell Latitude Laptop\", \"USB-C Hub\") and the quantity required.",
+          'Click "Submit".',
+          "Your request is sent immediately to your department approver for review. The stores team will record the item category and asset type when they fulfil the request.",
         ],
       },
       {
@@ -70,10 +70,10 @@ const ROLE_GUIDES = {
         steps: [
           'Go to "Service Desk" in the sidebar.',
           'Click "Report Issue".',
-          'In the "Report an Issue" form, enter the Subject, Category, Priority, Issue Type, and Description.',
+          'In the "Report an Issue" form, enter a Subject, select a Priority (defaults to Medium), and describe the problem.',
           "As you type the subject, the system automatically searches the Knowledge Base and shows related articles below the form — check these first as they may resolve your issue without raising a ticket.",
           'Click "Submit Ticket" to create the request.',
-          "Your ticket is reviewed by the support team and assigned to a technician when needed.",
+          "The service desk attendant will assign the correct category, issue type, and affected asset when they review your ticket.",
           'Use "View" to open ticket details, reply in comments when the team needs more information, and use "Confirm Fixed" when a resolved issue has been verified.',
           'After closure, use "Rate" and "Submit Feedback" if you want to score the support experience.',
         ],
@@ -213,8 +213,9 @@ const ROLE_GUIDES = {
         steps: [
           'Go to "Issue Items" in the sidebar.',
           "You will see both ITD-approved standard requisitions and technician-raised maintenance requisitions that are ready for issuance.",
-          "Find the request and select the correct stock batch to issue from.",
+          "Find the request, then select the IT item and the stock batch to issue from. Items matching the requested category appear first; alternatives are listed below.",
           'Click "Issue" to complete the transaction.',
+          "The category and asset type (Fixed Asset / Consumable) are automatically recorded on the requisition from the issued IT item — no manual classification needed.",
           "The requesting staff member will be prompted to confirm receipt.",
         ],
       },
@@ -405,6 +406,7 @@ const ROLE_GUIDES = {
           'Use the options icon on a row and choose "Assign" to open the "Assign Ticket" modal, then pick a technician and click "Save Assignment".',
           'From the same row menu, you can also choose "Update status", "Escalate", or "Add comment" as needed.',
           'The manager role does not use the "Accept" or "Start Work" actions for direct ticket handling.',
+          "When updating a ticket status, you can also set the Category and Issue Type — fields that the user does not fill in on submission. If the issue type is HARDWARE, an Affected Asset dropdown appears so you can link the specific device belonging to the reporter.",
           "Monitor ticket statuses and escalations to ensure issues do not remain unresolved for too long.",
         ],
       },
@@ -776,7 +778,7 @@ const APP_FEATURES = [
       {
         icon: LuClipboardList,
         title: "Requisition Submission",
-        desc: "Staff submit IT item requests with urgency level, quantity, and supporting notes.",
+        desc: "Staff submit IT item requests with only the item description and quantity. Category and asset type are automatically set by the stores team at the point of issuance.",
       },
       {
         icon: LuShieldCheck,
@@ -906,7 +908,7 @@ const APP_FEATURES = [
       {
         icon: LuHeadset,
         title: "Ticket Submission",
-        desc: "Staff report issues with subject, category, priority, issue type, and a full description.",
+        desc: "Staff report issues with a subject, priority, and description only. The service desk manager assigns the category, issue type, and affected asset when reviewing the ticket.",
       },
       {
         icon: LuBookOpen,

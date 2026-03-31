@@ -101,6 +101,18 @@ export default function NotificationBell() {
     setOpen(flag);
   };
 
+  const markOneRead = async (id) => {
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      );
+      setUnread((count) => Math.max(0, count - 1));
+    } catch {
+      /* silent */
+    }
+  };
+
   const markAllRead = async (e) => {
     e.stopPropagation();
     try {
@@ -181,6 +193,7 @@ export default function NotificationBell() {
             label: (
               <div
                 className={`flex flex-col gap-0.5 py-1 ${!n.read ? "opacity-100" : "opacity-60"}`}
+                onClick={() => { if (!n.read) markOneRead(n.id); }}
               >
                 <div className="flex items-center justify-between gap-2">
                   <Tag

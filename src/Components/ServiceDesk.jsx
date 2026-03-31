@@ -351,33 +351,18 @@ const ServiceDesk = () => {
         />
       </section>
 
-      <Modal title="Report an Issue" open={isCreateOpen} onCancel={() => { setIsCreateOpen(false); setSubjectInput(""); setCategoryInput(null); }} footer={null} width={720} destroyOnClose>
+      <Modal title="Report an Issue" open={isCreateOpen} onCancel={() => { setIsCreateOpen(false); setSubjectInput(""); setCategoryInput(null); }} footer={null} width={600} destroyOnClose>
         <Form
           form={createForm}
           layout="vertical"
           onValuesChange={(changedValues) => {
-            if (changedValues.issueType && changedValues.issueType !== "HARDWARE") {
-              createForm.setFieldValue("inventoryId", undefined);
-            }
             if (changedValues.subject !== undefined) setSubjectInput(changedValues.subject);
-            if (changedValues.categoryId !== undefined) setCategoryInput(changedValues.categoryId ?? null);
           }}
           onFinish={(values) => { createTicket.mutate(values); setSubjectInput(""); setCategoryInput(null); }}
         >
-          <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-            <Form.Item name="subject" label="Subject" rules={[{ required: true, message: "Please enter a subject" }]}>
-              <Input placeholder="Short issue summary" />
-            </Form.Item>
-            <Form.Item name="categoryId" label="Category">
-              <Select placeholder="Choose a category" allowClear>
-                {categories.map((category) => (
-                  <Select.Option key={category.id} value={category.id}>
-                    {category.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
-          </div>
+          <Form.Item name="subject" label="Subject" rules={[{ required: true, message: "Please enter a subject" }]}>
+            <Input placeholder="Short issue summary" />
+          </Form.Item>
 
           {kbSuggestions.length > 0 && (
             <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
@@ -406,46 +391,13 @@ const ServiceDesk = () => {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-            <Form.Item name="priority" label="Priority" initialValue="MEDIUM">
-              <Select>
-                <Select.Option value="LOW">Low</Select.Option>
-                <Select.Option value="MEDIUM">Medium</Select.Option>
-                <Select.Option value="HIGH">High</Select.Option>
-                <Select.Option value="CRITICAL">Critical</Select.Option>
-              </Select>
-            </Form.Item>
-            <Form.Item name="issueType" label="Issue Type">
-              <Select placeholder="Hardware or software" allowClear>
-                <Select.Option value="HARDWARE">Hardware</Select.Option>
-                <Select.Option value="SOFTWARE">Software</Select.Option>
-              </Select>
-            </Form.Item>
-          </div>
-
-          <Form.Item noStyle shouldUpdate={(previousValues, currentValues) => previousValues.issueType !== currentValues.issueType}>
-            {({ getFieldValue }) => {
-              const issueType = getFieldValue("issueType");
-
-              if (issueType !== "HARDWARE") {
-                return null;
-              }
-
-              return (
-                <Form.Item name="inventoryId" label="Affected Asset">
-                  <Select
-                    placeholder={assets.length ? "Select the affected device" : "No assigned assets found"}
-                    allowClear
-                    optionFilterProp="label"
-                    options={assets.map((asset) => ({
-                      value: asset.id,
-                      label: `${asset.assetId} - ${asset.brand} ${asset.model} (${asset.deviceType})`,
-                    }))}
-                    notFoundContent="No assigned hardware assets available"
-                  />
-                </Form.Item>
-              );
-            }}
+          <Form.Item name="priority" label="Priority" initialValue="MEDIUM">
+            <Select>
+              <Select.Option value="LOW">Low</Select.Option>
+              <Select.Option value="MEDIUM">Medium</Select.Option>
+              <Select.Option value="HIGH">High</Select.Option>
+              <Select.Option value="CRITICAL">Critical</Select.Option>
+            </Select>
           </Form.Item>
 
           <Form.Item name="description" label="Description" rules={[{ required: true, message: "Please describe the issue" }]}>
