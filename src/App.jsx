@@ -57,6 +57,7 @@ const Units = lazy(() => import("./BackOffice/Units"));
 const Supplier = lazy(() => import("./BackOffice/Supplier"));
 const Roles = lazy(() => import("./BackOffice/Roles"));
 const ItItems = lazy(() => import("./BackOffice/ItItems"));
+const ItItemCategories = lazy(() => import("./BackOffice/ItItemCategories"));
 const Permissions = lazy(() => import("./BackOffice/Permissions"));
 const ServiceDeskCategories = lazy(() => import("./BackOffice/ServiceDeskCategories"));
 const SupportProfiles = lazy(() => import("./BackOffice/SupportProfiles"));
@@ -155,6 +156,7 @@ function AppContent() {
           <Route path="roles" element={<Suspense fallback={<PageLoader />}><Roles /></Suspense>} />
           <Route path="permissions" element={<Suspense fallback={<PageLoader />}><Permissions /></Suspense>} />
           <Route path="it-items" element={<Suspense fallback={<PageLoader />}><ItItems /></Suspense>} />
+          <Route path="it-item-categories" element={<Suspense fallback={<PageLoader />}><ItItemCategories /></Suspense>} />
         </Route>
       </Routes>
     </ErrorBoundary>

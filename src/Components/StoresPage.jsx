@@ -92,14 +92,14 @@ const StoresPage = () => {
       }),
   });
 
-  const { data: itItems } = useQuery({
-    queryKey: ["itItems"],
-    queryFn: () => api.get("/admin/it-items"),
+  const { data: itItems, isLoading: itItemsLoading } = useQuery({
+    queryKey: ["itItems", "all"],
+    queryFn: () => api.get("/stores/it-items", { params: { includeZeroStock: "true" } }),
   });
 
   const { data: categoriesResponse } = useQuery({
     queryKey: ["stockReceiveCategories"],
-    queryFn: () => api.get("/admin/it-item-categories"),
+    queryFn: () => api.get("/stores/categories"),
   });
 
   const { data: suppliersResponse } = useQuery({
@@ -118,12 +118,13 @@ const StoresPage = () => {
     : itItemsList;
   const selectedCategory = categories.find((category) => category.id === selectedCategoryId) || null;
   const selectedItem = itItemsList.find((item) => item.id === selectedItemId) || null;
-  const deviceDetailDefinitions = (selectedItem?.validationRules?.length
-    ? (selectedItem.category?.attributeDefinitions || []).filter(
-        (definition) =>
-          selectedItem.validationRules.includes(definition.key) && ["TEMPLATE", "BOTH"].includes(definition.scope)
-      )
-    : (selectedCategory?.attributeDefinitions || []).filter((definition) => ["TEMPLATE", "BOTH"].includes(definition.scope))) || [];
+  const isFixedAsset = selectedItem?.itemClass === "FIXED_ASSET";
+  const categoryDefinitions = (selectedCategory?.attributeDefinitions || []).filter(
+    (definition) => ["TEMPLATE", "BOTH"].includes(definition.scope)
+  );
+  const deviceDetailDefinitions = Array.isArray(selectedItem?.validationRules) && selectedItem.validationRules.length
+    ? categoryDefinitions.filter((def) => selectedItem.validationRules.includes(def.key))
+    : categoryDefinitions;
   const totalQuantityReceived = stockRows.reduce(
     (sum, row) => sum + Number(row.quantityReceived || 0),
     0
@@ -305,7 +306,7 @@ const StoresPage = () => {
 
                     <Form.Item name="itItemId" label="Item" rules={[{ required: true }]}> 
                       <Select
-                        placeholder={selectedCategoryId ? "Select item" : "Select category first"}
+                        placeholder={selectedCategoryId ? "Select item" : "Select a category first"}
                         disabled={!selectedCategoryId}
                         showSearch
                         optionFilterProp="children"
@@ -338,6 +339,12 @@ const StoresPage = () => {
                           </Select.Option>
                         ))}
                       </Select>
+                      {selectedCategoryId && !itItemsLoading && filteredItItems.length === 0 && (
+                        <div className="mt-2 rounded-xl bg-[#FFF7ED] px-3 py-2 text-xs text-[#92400E]">
+                          <p className="font-semibold">No items registered under this category.</p>
+                          <p className="mt-0.5">An administrator must add the IT item in <strong>Back Office → IT Items</strong>, selecting this category, before stock can be received.</p>
+                        </div>
+                      )}
                     </Form.Item>
 
                     <Form.Item name="quantityReceived" label="Quantity Received" rules={[{ required: true }]}> 
@@ -389,27 +396,37 @@ const StoresPage = () => {
               {
                 key: "device",
                 label: "Device Details",
-                children: deviceDetailDefinitions.length ? (
+                children: !selectedCategoryId ? (
+                  <div className="rounded-2xl border border-dashed border-[#E0E0E0] bg-[#F9FAFB] px-4 py-8 text-center text-sm text-[#616161]">
+                    Select an item category on the Main tab to load its device detail fields.
+                  </div>
+                ) : deviceDetailDefinitions.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-[#E0E0E0] bg-[#F9FAFB] px-4 py-8 text-center text-sm text-[#616161]">
+                    No structured device detail fields are defined for the selected category.
+                  </div>
+                ) : (
                   <>
-                    <div className="mb-4 rounded-2xl bg-[#F9FAFB] p-4 text-sm text-[#616161]">
-                      Capture the category-specific template details for the selected item. These values will be saved to the IT item specifications for future issuance and inventory use.
+                    <div className={`mb-4 rounded-2xl p-4 text-sm ${
+                      isFixedAsset
+                        ? "bg-[#FFF3E0] text-[#E65100]"
+                        : "bg-[#F9FAFB] text-[#616161]"
+                    }`}>
+                      {isFixedAsset
+                        ? "This is a Fixed Asset — required fields must be completed before receiving stock, as they will be saved to the inventory record."
+                        : "These category fields are optional for consumable items. Fill in any known attributes — they will be stored with the stock entry."}
                     </div>
                     {deviceDetailDefinitions.map((definition) => (
                       <Form.Item
                         key={definition.id}
                         name={["deviceDetails", definition.key]}
                         label={definition.label}
-                        rules={definition.isRequired ? [{ required: true, message: `${definition.label} is required` }] : undefined}
+                        rules={isFixedAsset && definition.isRequired ? [{ required: true, message: `${definition.label} is required` }] : undefined}
                         valuePropName={getDefinitionInputType(definition) === "switch" ? "checked" : "value"}
                       >
                         {renderCategoryFieldInput(definition)}
                       </Form.Item>
                     ))}
                   </>
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-[#E0E0E0] bg-[#F9FAFB] px-4 py-8 text-center text-sm text-[#616161]">
-                    Select an item category and IT item on the Main tab to load device details for that category.
-                  </div>
                 ),
               },
             ]} />
