@@ -100,17 +100,24 @@ const Employees = () => {
       setOpen(false);
       queryClient.invalidateQueries({ queryKey: ["getAllUsers"] });
     },
+    onError: (error) => {
+      const msg = error.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg[0] : msg || "Failed to create staff");
+    },
   });
 
   const editStaff = useMutation({
     mutationFn: (values) => api.patch(`/admin/user/${editingRecord.staffId}`, values),
     onSuccess: () => {
       toast.success("Staff updated successfully");
-      message.success("Staff updated successfully");
       form.resetFields();
       setOpen(false);
       setEditingRecord(null);
       queryClient.invalidateQueries({ queryKey: ["getAllUsers"] });
+    },
+    onError: (error) => {
+      const msg = error.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg[0] : msg || "Failed to update staff");
     },
   });
 
@@ -140,7 +147,8 @@ const Employees = () => {
 
   const handleSubmit = (values) => {
     if (editingRecord) {
-      editStaff.mutate(values);
+      const { staffId: _staffId, ...updateValues } = values;
+      editStaff.mutate(updateValues);
       return;
     }
 

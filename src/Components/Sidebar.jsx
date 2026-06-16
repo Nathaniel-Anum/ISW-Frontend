@@ -10,6 +10,7 @@ import {
   LuClipboardList,
   LuHeadset,
   LuHardDrive,
+  LuHeartPulse,
   LuHouse,
   LuLibrary,
   LuPackageCheck,
@@ -48,6 +49,11 @@ const Sidebar = ({ mobileOpen = false, onClose = () => {} }) => {
       icon: LuShieldCheck,
     },
     user?.roles?.includes("stores_officer") && {
+      to: "/dashboard/stores",
+      label: "Receive Stock",
+      icon: LuPackagePlus,
+    },
+    user?.roles?.includes("stores_officer") && {
       to: "/dashboard/stores-officer",
       label: "Issue Items",
       icon: LuArrowRightLeft,
@@ -57,10 +63,13 @@ const Sidebar = ({ mobileOpen = false, onClose = () => {} }) => {
       label: "Inventory",
       icon: LuBoxes,
     },
-    user?.roles?.includes("stores_officer") && {
-      to: "/dashboard/stores",
-      label: "Receive Stock",
-      icon: LuPackagePlus,
+    (user?.roles?.includes("inventory_officer") ||
+      user?.roles?.includes("service_desk_manager") ||
+      user?.roles?.includes("supervisor") ||
+      user?.roles?.includes("admin")) && {
+      to: "/dashboard/asset-health",
+      label: "Asset Health",
+      icon: LuHeartPulse,
     },
     user?.roles?.includes("stores_officer") && {
       to: "/dashboard/stock",

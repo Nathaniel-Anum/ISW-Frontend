@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Dropdown, Form, Input, Modal, Select, Table, Tag } from "antd";
 import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
 import React, { useDeferredValue, useMemo, useState } from "react";
-import { LuArrowUpRight, LuMessageSquarePlus, LuPlay, LuPlus, LuRefreshCcw, LuUserRoundPlus, LuWrench } from "react-icons/lu";
+import { LuArrowUpRight, LuCheckCheck, LuHistory, LuMessageSquarePlus, LuPlay, LuPlus, LuRefreshCcw, LuTriangleAlert, LuUserRoundPlus, LuWrench } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../utils/config";
@@ -60,7 +60,7 @@ const STATUS_LABELS = {
   ESCALATED: "Escalated",
   CANCELLED: "Cancelled",
 };
-const ESCALATION_SOURCE_STATUSES = ["ASSIGNED", "IN_PROGRESS", "WAITING_FOR_USER", "REOPENED"];
+const ESCALATION_SOURCE_STATUSES = ["IN_PROGRESS", "WAITING_FOR_USER", "REOPENED"];
 
 const ServiceDeskQueue = () => {
   const navigate = useNavigate();
@@ -80,6 +80,7 @@ const ServiceDeskQueue = () => {
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createBehalfUserId, setCreateBehalfUserId] = useState(null);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [bulkAssignForm] = Form.useForm();
   const [assignForm] = Form.useForm();
@@ -88,6 +89,11 @@ const ServiceDeskQueue = () => {
   const [commentForm] = Form.useForm();
   const [escalateForm] = Form.useForm();
   const [maintenanceForm] = Form.useForm();
+  const [reporterHistoryOpen, setReporterHistoryOpen] = useState(false);
+  const [historyReporterId, setHistoryReporterId] = useState(null);
+  const [closeTicketOpen, setCloseTicketOpen] = useState(false);
+  const [closeTicketRecord, setCloseTicketRecord] = useState(null);
+  const [cardFilter, setCardFilter] = useState(null);
   const deferredSearch = useDeferredValue(searchText.trim());
 
   const { data: ticketsResponse, isLoading } = useQuery({
@@ -119,6 +125,14 @@ const ServiceDeskQueue = () => {
     enabled: !!isManager,
   });
 
+  const { data: reporterHistoryResponse, isLoading: historyLoading } = useQuery({
+    queryKey: ["reporterHistory", historyReporterId],
+    queryFn: () => api.get(`/service-desk/reporter/${historyReporterId}/history`),
+    enabled: !!historyReporterId && reporterHistoryOpen,
+    staleTime: 2 * 60 * 1000,
+  });
+  const reporterHistory = reporterHistoryResponse?.data;
+
   const { data: reporterAssetsResponse } = useQuery({
     queryKey: ["reporterAssets", selectedTicket?.reporter?.id],
     queryFn: () => api.get(`/service-desk/user-assets/${selectedTicket.reporter.id}`),
@@ -126,6 +140,14 @@ const ServiceDeskQueue = () => {
     staleTime: 2 * 60 * 1000,
   });
   const reporterAssets = reporterAssetsResponse?.data || [];
+
+  const { data: createBehalfAssetsResponse } = useQuery({
+    queryKey: ["createBehalfAssets", createBehalfUserId],
+    queryFn: () => api.get(`/service-desk/user-assets/${createBehalfUserId}`),
+    enabled: !!isManager && !!createBehalfUserId,
+    staleTime: 2 * 60 * 1000,
+  });
+  const createBehalfAssets = createBehalfAssetsResponse?.data || [];
 
   const tickets = ticketsResponse?.data || [];
   const displayedTickets = useMemo(
@@ -175,21 +197,38 @@ const ServiceDeskQueue = () => {
   const getAcceptLabel = (ticket) => (ticket.assignedToId === user?.id ? "Start Work" : "Accept");
 
   const stats = useMemo(() => {
-    const queueLabel = isHardwareTech ? "My Assigned" : isWorkshopSupervisor ? "Maintenance Jobs" : "Queue Size";
+    const totalLabel = isHardwareTech ? "My Assigned" : isWorkshopSupervisor ? "Maintenance Jobs" : "Total";
+    const toggleFilter = (key) => setCardFilter((prev) => (prev === key ? null : key));
     return [
-      { label: queueLabel, value: displayedTickets.length, caption: "Tickets in current view" },
+      {
+        label: totalLabel,
+        value: displayedTickets.length,
+        caption: "Tickets in current view",
+        active: cardFilter === null,
+        onClick: () => setCardFilter(null),
+      },
       {
         label: "Unassigned",
         value: displayedTickets.filter((ticket) => !ticket.assignedToId).length,
         caption: "Need ownership",
+        active: cardFilter === "unassigned",
+        onClick: () => toggleFilter("unassigned"),
       },
       {
         label: "Waiting On User",
         value: displayedTickets.filter((ticket) => ticket.status === "WAITING_FOR_USER").length,
         caption: "Reporter response needed",
+        active: cardFilter === "waiting",
+        onClick: () => toggleFilter("waiting"),
       },
     ];
-  }, [displayedTickets, isHardwareTech, isWorkshopSupervisor]);
+  }, [displayedTickets, isHardwareTech, isWorkshopSupervisor, cardFilter]);
+
+  const tableData = useMemo(() => {
+    if (cardFilter === "unassigned") return displayedTickets.filter((t) => !t.assignedToId);
+    if (cardFilter === "waiting") return displayedTickets.filter((t) => t.status === "WAITING_FOR_USER");
+    return displayedTickets;
+  }, [displayedTickets, cardFilter]);
 
   const refreshQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["serviceDeskQueue"] });
@@ -219,6 +258,17 @@ const ServiceDeskQueue = () => {
       setStatusOpen(false);
       statusForm.resetFields();
     },
+  });
+
+  const closeTicketMutation = useMutation({
+    mutationFn: (ticketId) => api.post(`/service-desk/tickets/${ticketId}/close`),
+    onSuccess: () => {
+      toast.success("Ticket closed");
+      refreshQueries();
+      setCloseTicketOpen(false);
+      setCloseTicketRecord(null);
+    },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to close ticket"),
   });
 
   const addComment = useMutation({
@@ -335,7 +385,7 @@ const ServiceDeskQueue = () => {
         );
       },
     },
-    { title: "Category", dataIndex: ["category", "name"], key: "category", render: (value) => value || "General" },
+    { title: "Work Type", dataIndex: ["category", "name"], key: "category", render: (value) => value || "-" },
     { title: "Priority", dataIndex: "priority", key: "priority" },
     {
       title: "SLA",
@@ -383,33 +433,52 @@ const ServiceDeskQueue = () => {
       title: "Actions",
       key: "actions",
       render: (_, record) => {
+        const isTerminal = ["RESOLVED", "CLOSED", "CANCELLED"].includes(record.status);
         const items = [
           {
             key: "view",
             label: "View ticket",
             onClick: () => navigate(`/dashboard/service-desk/tickets/${record.id}`),
           },
-          ...(canAcceptTicket(record)
+          ...(!isTerminal && canAcceptTicket(record)
             ? [{ key: "accept", label: getAcceptLabel(record), icon: <LuPlay size={14} />, onClick: () => acceptTicket.mutate(record.id) }]
             : []),
-          ...(canAssignTickets
+          ...(!isTerminal && canAssignTickets
             ? [{ key: "assign", label: "Assign", icon: <LuUserRoundPlus size={14} />, onClick: () => openAssignModal(record) }]
             : []),
-          ...(canUpdateTicket(record)
+          ...(!isTerminal && canUpdateTicket(record)
             ? [{ key: "update", label: "Update status", icon: <LuRefreshCcw size={14} />, onClick: () => openStatusModal(record) }]
             : []),
-          ...(canEscalateTicket(record)
+          ...(!isTerminal && canEscalateTicket(record)
             ? [{ key: "escalate", label: "Escalate", icon: <LuArrowUpRight size={14} />, onClick: () => openEscalationModal(record) }]
             : []),
-          ...(canCreateMaintenanceTicket(record)
+          ...(!isTerminal && canCreateMaintenanceTicket(record)
             ? [{ key: "maintenance", label: "Open maintenance job", icon: <LuWrench size={14} />, onClick: () => openMaintenanceModal(record) }]
             : []),
-          {
-            key: "comment",
-            label: "Add comment",
-            icon: <LuMessageSquarePlus size={14} />,
-            onClick: () => openCommentModal(record),
-          },
+          ...(!isTerminal
+            ? [{
+                key: "comment",
+                label: "Add comment",
+                icon: <LuMessageSquarePlus size={14} />,
+                onClick: () => openCommentModal(record),
+              }]
+            : []),
+          ...(isManager && record.status === "RESOLVED"
+            ? [{
+                key: "close",
+                label: "Close ticket",
+                icon: <LuCheckCheck size={14} />,
+                onClick: () => { setCloseTicketRecord(record); setCloseTicketOpen(true); },
+              }]
+            : []),
+          ...(isSupportStaff && record.reporter?.id
+            ? [{
+                key: "reporterHistory",
+                label: "Reporter history",
+                icon: <LuHistory size={14} />,
+                onClick: () => { setHistoryReporterId(record.reporter.id); setReporterHistoryOpen(true); },
+              }]
+            : []),
         ];
 
         return (
@@ -501,7 +570,7 @@ const ServiceDeskQueue = () => {
           </div>
         )}
 
-        <Table columns={columns} dataSource={displayedTickets} rowKey="id" loading={isLoading} scroll={{ x: 1200 }}
+        <Table columns={columns} dataSource={tableData} rowKey="id" loading={isLoading} scroll={{ x: 1200 }}
           onRow={(record) => ({ style: getQueueRowStyle(record) })}
           rowSelection={canAssignTickets ? {
             selectedRowKeys,
@@ -641,7 +710,10 @@ const ServiceDeskQueue = () => {
         <Form
           form={escalateForm}
           layout="vertical"
-          onFinish={(values) => escalateTicket.mutate({ ticketId: selectedTicket.id, values })}
+          onFinish={(values) => {
+            const { priorityJustification, ...payload } = values;
+            escalateTicket.mutate({ ticketId: selectedTicket.id, values: payload });
+          }}
         >
           <Form.Item name="reason" label="Escalation Reason" rules={[{ required: true, message: "Please explain why this ticket is being escalated" }]}>
             <Input.TextArea rows={4} placeholder="Describe the blocker, specialist skill needed, or why this needs higher-level attention" />
@@ -664,6 +736,35 @@ const ServiceDeskQueue = () => {
               <Select.Option value="HIGH">High</Select.Option>
               <Select.Option value="CRITICAL">Critical</Select.Option>
             </Select>
+          </Form.Item>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.priority !== currentValues.priority}
+          >
+            {({ getFieldValue }) => {
+              const selectedPriority = getFieldValue("priority");
+              const needsJustification = ["HIGH", "CRITICAL"].includes(selectedPriority);
+              return (
+                <Form.Item
+                  name="priorityJustification"
+                  label="Priority Justification"
+                  rules={
+                    needsJustification
+                      ? [{ required: true, message: "Justification is required for HIGH or CRITICAL priority" }]
+                      : []
+                  }
+                >
+                  <Input.TextArea
+                    rows={3}
+                    placeholder={
+                      needsJustification
+                        ? "Explain why this needs elevated urgency"
+                        : "Optional note"
+                    }
+                  />
+                </Form.Item>
+              );
+            }}
           </Form.Item>
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" block loading={escalateTicket.isPending}>
@@ -719,7 +820,7 @@ const ServiceDeskQueue = () => {
       <Modal
         title="Create Ticket on Behalf of User"
         open={createOpen}
-        onCancel={() => { setCreateOpen(false); createForm.resetFields(); }}
+        onCancel={() => { setCreateOpen(false); createForm.resetFields(); setCreateBehalfUserId(null); }}
         footer={null}
         width={640}
         destroyOnClose
@@ -741,6 +842,7 @@ const ServiceDeskQueue = () => {
               filterOption={(input, option) =>
                 (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
+              onChange={(val) => { setCreateBehalfUserId(val || null); createForm.setFieldValue("inventoryId", undefined); }}
               options={(allUsersResponse?.data || []).map((u) => ({
                 value: u.id,
                 label: `${u.name || u.email}${u.department?.name ? ` · ${u.department.name}` : ""}${u.staffId ? ` (${u.staffId})` : ""}`,
@@ -754,6 +856,18 @@ const ServiceDeskQueue = () => {
           >
             <Input placeholder="Brief description of the issue" />
           </Form.Item>
+          <Form.Item
+            name="priority"
+            label="Priority"
+            rules={[{ required: true, message: "Please select a priority" }]}
+          >
+            <Select placeholder="Select priority">
+              <Select.Option value="LOW">Low</Select.Option>
+              <Select.Option value="MEDIUM">Medium</Select.Option>
+              <Select.Option value="HIGH">High</Select.Option>
+              <Select.Option value="CRITICAL">Critical</Select.Option>
+            </Select>
+          </Form.Item>
           <div className="grid grid-cols-2 gap-4">
             <Form.Item name="categoryId" label="Category">
               <Select allowClear placeholder="Select category">
@@ -762,21 +876,26 @@ const ServiceDeskQueue = () => {
                 ))}
               </Select>
             </Form.Item>
-            <Form.Item name="priority" label="Priority">
-              <Select>
-                <Select.Option value="LOW">Low</Select.Option>
-                <Select.Option value="MEDIUM">Medium</Select.Option>
-                <Select.Option value="HIGH">High</Select.Option>
-                <Select.Option value="CRITICAL">Critical</Select.Option>
+            <Form.Item name="issueType" label="Issue Type">
+              <Select allowClear placeholder="Select issue type">
+                <Select.Option value="HARDWARE">Hardware</Select.Option>
+                <Select.Option value="SOFTWARE">Software</Select.Option>
               </Select>
             </Form.Item>
           </div>
-          <Form.Item name="issueType" label="Issue Type">
-            <Select allowClear placeholder="Select issue type">
-              <Select.Option value="HARDWARE">Hardware</Select.Option>
-              <Select.Option value="SOFTWARE">Software</Select.Option>
-            </Select>
-          </Form.Item>
+          {createBehalfUserId && (
+            <Form.Item name="inventoryId" label="Affected Asset (optional)">
+              <Select
+                allowClear
+                placeholder={createBehalfAssets.length ? "Select reporter's device (if applicable)" : "No assets found for this user"}
+                disabled={!createBehalfAssets.length}
+                options={createBehalfAssets.map((a) => ({
+                  value: a.id,
+                  label: `${a.assetId} — ${a.itItem?.brand ?? ""} ${a.itItem?.model ?? ""}`.trim(),
+                }))}
+              />
+            </Form.Item>
+          )}
           <Form.Item
             name="description"
             label="Description"
@@ -820,6 +939,99 @@ const ServiceDeskQueue = () => {
             </Button>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* ── Close Ticket Confirmation Modal ── */}
+      <Modal
+        title="Close this ticket?"
+        open={closeTicketOpen}
+        onCancel={() => { setCloseTicketOpen(false); setCloseTicketRecord(null); }}
+        onOk={() => closeTicketMutation.mutate(closeTicketRecord.id)}
+        okText="Yes, close it"
+        cancelText="Cancel"
+        confirmLoading={closeTicketMutation.isPending}
+        destroyOnClose
+      >
+        <p className="text-sm text-[#616161]">
+          This confirms the issue is fully resolved. The ticket status will change to <strong>Closed</strong> and cannot be reopened.
+        </p>
+      </Modal>
+
+      {/* ── Reporter History Modal ── */}
+      <Modal
+        title={reporterHistory ? `Issue History — ${reporterHistory.reporter?.name}` : "Reporter History"}
+        open={reporterHistoryOpen}
+        onCancel={() => { setReporterHistoryOpen(false); setHistoryReporterId(null); }}
+        footer={null}
+        width={820}
+        destroyOnClose
+      >
+        {historyLoading ? (
+          <div className="py-10 text-center text-sm text-[#9E9E9E]">Loading history…</div>
+        ) : reporterHistory ? (
+          <div className="space-y-5">
+            {/* Summary row */}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Total Tickets", value: reporterHistory.totalTickets },
+                { label: "Still Open", value: reporterHistory.openTickets },
+                { label: "Recurring Issues", value: reporterHistory.recurringSubjects.length + reporterHistory.recurringCategories.length },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-3 text-center">
+                  <p className="text-xl font-bold text-[#212121]">{value}</p>
+                  <p className="text-xs text-[#9E9E9E]">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Recurring patterns */}
+            {(reporterHistory.recurringSubjects.length > 0 || reporterHistory.recurringCategories.length > 0) && (
+              <div className="rounded-xl border border-[#FEE2E2] bg-[#FFF7F7] p-4">
+                <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-[#B91C1C]">
+                  <LuTriangleAlert size={14} /> Recurring Issues Detected
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {reporterHistory.recurringSubjects.map(({ subject, count }) => (
+                    <span key={subject} className="rounded-full bg-[#FEE2E2] px-3 py-1 text-xs font-medium text-[#B91C1C]">
+                      "{subject}" — {count}×
+                    </span>
+                  ))}
+                  {reporterHistory.recurringCategories.map(({ category, count }) => (
+                    <span key={category} className="rounded-full bg-[#FEF3C7] px-3 py-1 text-xs font-medium text-[#92400E]">
+                      {category} — {count}×
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ticket list */}
+            <Table
+              size="small"
+              dataSource={reporterHistory.tickets}
+              rowKey="id"
+              pagination={{ pageSize: 8, size: "small" }}
+              scroll={{ x: 640 }}
+              columns={[
+                { title: "Ticket", dataIndex: "ticketNo", key: "ticketNo", render: (v) => <span className="font-semibold">{v}</span> },
+                { title: "Subject", dataIndex: "subject", key: "subject" },
+                { title: "Work Type", dataIndex: ["category", "name"], key: "category", render: (v) => v || "-" },
+                { title: "Priority", dataIndex: "priority", key: "priority" },
+                {
+                  title: "Status",
+                  dataIndex: "status",
+                  key: "status",
+                  render: (status) => (
+                    <Tag style={STATUS_STYLES[status] || DEFAULT_STATUS_STYLE} bordered={false}>
+                      {STATUS_LABELS[status] || status.replaceAll("_", " ")}
+                    </Tag>
+                  ),
+                },
+                { title: "Date", dataIndex: "createdAt", key: "createdAt", render: (v) => new Date(v).toLocaleDateString() },
+              ]}
+            />
+          </div>
+        ) : null}
       </Modal>
     </PageShell>
   );

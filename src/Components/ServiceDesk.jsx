@@ -220,7 +220,7 @@ const ServiceDesk = () => {
   const columns = [
     { title: "Ticket", dataIndex: "ticketNo", key: "ticketNo", render: (value) => <span className="font-semibold">{value}</span> },
     { title: "Subject", dataIndex: "subject", key: "subject" },
-    { title: "Category", dataIndex: ["category", "name"], key: "category", render: (value) => value || "General" },
+    { title: "Work Type", dataIndex: ["category", "name"], key: "category", render: (value) => value || "-" },
     { title: "Priority", dataIndex: "priority", key: "priority" },
     {
       title: "Status",
@@ -355,6 +355,7 @@ const ServiceDesk = () => {
         <Form
           form={createForm}
           layout="vertical"
+          initialValues={{ priority: "MEDIUM" }}
           onValuesChange={(changedValues) => {
             if (changedValues.subject !== undefined) setSubjectInput(changedValues.subject);
           }}
@@ -391,13 +392,16 @@ const ServiceDesk = () => {
             </div>
           )}
 
-          <Form.Item name="priority" label="Priority" initialValue="MEDIUM">
-            <Select>
-              <Select.Option value="LOW">Low</Select.Option>
-              <Select.Option value="MEDIUM">Medium</Select.Option>
-              <Select.Option value="HIGH">High</Select.Option>
-              <Select.Option value="CRITICAL">Critical</Select.Option>
-            </Select>
+          <Form.Item name="inventoryId" label="Affected Asset (optional)">
+            <Select
+              allowClear
+              placeholder={assets.length ? "Select the device this issue relates to" : "No assets assigned to you"}
+              disabled={!assets.length}
+              options={assets.map((a) => ({
+                value: a.id,
+                label: `${a.assetId} — ${a.itItem?.brand ?? ""} ${a.itItem?.model ?? ""}`.trim(),
+              }))}
+            />
           </Form.Item>
 
           <Form.Item name="description" label="Description" rules={[{ required: true, message: "Please describe the issue" }]}>

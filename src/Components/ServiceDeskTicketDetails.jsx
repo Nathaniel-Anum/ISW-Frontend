@@ -144,6 +144,35 @@ const AssetContextCard = ({ ticket }) => {
           </p>
           <p className="text-xs text-[#757575]">{formatLabel(ticket.inventory.itItem?.deviceType)}</p>
         </div>
+        <div className="rounded-2xl bg-[#FAFAFA] px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#9E9E9E]">Asset Status</p>
+          <p className="mt-1 font-medium text-[#212121]">{formatLabel(ticket.inventory.status) || "—"}</p>
+        </div>
+        <div className="rounded-2xl bg-[#FAFAFA] px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#9E9E9E]">Purchase Date</p>
+          <p className="mt-1 font-medium text-[#212121]">
+            {ticket.inventory.purchaseDate
+              ? new Date(ticket.inventory.purchaseDate).toLocaleDateString()
+              : "—"}
+          </p>
+        </div>
+        <div className="col-span-full rounded-2xl bg-[#FAFAFA] px-4 py-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#9E9E9E]">Warranty</p>
+          {ticket.inventory.warrantyPeriod && ticket.inventory.purchaseDate ? (() => {
+            const expiry = new Date(ticket.inventory.purchaseDate);
+            expiry.setMonth(expiry.getMonth() + ticket.inventory.warrantyPeriod);
+            const now = new Date();
+            const msLeft = expiry - now;
+            const daysLeft = Math.floor(msLeft / 86400000);
+            if (daysLeft < 0) {
+              return <p className="mt-1 font-medium text-[#D32F2F]">Expired ({Math.abs(daysLeft)} days ago · {expiry.toLocaleDateString()})</p>;
+            } else if (daysLeft <= 30) {
+              return <p className="mt-1 font-medium text-[#F57C00]">Expiring soon — {daysLeft} days left ({expiry.toLocaleDateString()})</p>;
+            } else {
+              return <p className="mt-1 font-medium text-[#388E3C]">Valid — {daysLeft} days left ({expiry.toLocaleDateString()})</p>;
+            }
+          })() : <p className="mt-1 font-medium text-[#212121]">{ticket.inventory.warrantyPeriod ? `${ticket.inventory.warrantyPeriod} months` : "—"}</p>}
+        </div>
       </div>
     </section>
   );
@@ -739,6 +768,15 @@ const SupportView = ({ ticket, ticketId, isLoading, refreshQueries, user }) => {
               <p className="mt-2 text-sm font-semibold text-[#212121]">{ticket?.reporter?.name || "-"}</p>
               <p className="text-sm text-[#616161]">{ticket?.reporter?.email || "-"}</p>
               <p className="mt-1 text-xs text-[#757575]">Staff ID: {ticket?.reporter?.staffId || "-"}</p>
+              {ticket?.reporter?.department?.name && (
+                <p className="mt-1 text-xs text-[#757575]">Dept: {ticket.reporter.department.name}</p>
+              )}
+              {ticket?.unit?.name && (
+                <p className="text-xs text-[#757575]">Unit: {ticket.unit.name}</p>
+              )}
+              {ticket?.reporter?.roomNo && (
+                <p className="text-xs text-[#757575]">Room: {ticket.reporter.roomNo}</p>
+              )}
             </div>
             <div className="rounded-2xl bg-[#FAFAFA] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9E9E9E]">Category</p>

@@ -9,6 +9,57 @@ import PageShell from "../Components/ui/page-shell";
 import api from "../utils/config";
 import { formatCapitalizedLabel } from "../utils/formatText";
 
+const ITEM_CATEGORY_LABEL = "Computer and accessories";
+
+const FORM_FACTOR_OPTIONS_BY_CATEGORY = {
+  Computer: ["Laptop", "Desktop", "Mini PC", "All-in-One", "Workstation"],
+  Printer: ["Laser", "Inkjet", "Thermal", "Dot Matrix"],
+  Network: ["Router", "Switch", "Firewall", "Access Point", "Load Balancer", "Modem", "Gateway", "Repeater"],
+  "CCTV Equipment": ["IP Camera", "NVR", "DVR", "Access Control Panel", "Alarm System", "Intercom Panel"],
+  CCTV: ["IP Camera", "NVR", "DVR", "Access Control Panel", "Alarm System", "Intercom Panel"],
+  Consumables: ["Accessories"],
+  Consumable: ["Accessories"],
+};
+
+const getFormFactorOptionsForCategory = (categoryName) => {
+  const normalized = String(categoryName || "").toLowerCase();
+  if (normalized.includes("comput")) return FORM_FACTOR_OPTIONS_BY_CATEGORY.Computer;
+  if (normalized.includes("print")) return FORM_FACTOR_OPTIONS_BY_CATEGORY.Printer;
+  if (normalized.includes("network")) return FORM_FACTOR_OPTIONS_BY_CATEGORY.Network;
+  if (normalized.includes("cctv") || normalized.includes("security")) return FORM_FACTOR_OPTIONS_BY_CATEGORY["CCTV Equipment"];
+  if (normalized.includes("consumable")) return FORM_FACTOR_OPTIONS_BY_CATEGORY.Consumables;
+  return FORM_FACTOR_OPTIONS_BY_CATEGORY[categoryName] || [];
+};
+
+const isClassificationLikeDefinition = (definition) => {
+  const key = String(definition?.key || "").toLowerCase();
+  const label = String(definition?.label || "").toLowerCase();
+  return (
+    key === "formfactor" ||
+    key === "form_factor" ||
+    key === "printtechnology" ||
+    key === "print_technology" ||
+    key.includes("device_type") ||
+    key.includes("devicetype") ||
+    key.includes("item_category") ||
+    key.includes("itemcategory") ||
+    label.includes("form factor") ||
+    label.includes("device type") ||
+    label.includes("item category") ||
+    label.includes("print technology")
+  );
+};
+
+const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "Not recorded");
+
+const toOptionalNumber = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+
+  return Number(value);
+};
+
 const getAttributeLabelMap = (record) => {
   const definitions = record?.category?.attributeDefinitions || [];
 
@@ -60,6 +111,7 @@ const ItItems = () => {
   const queryClient = useQueryClient();
   const deferredSearch = useDeferredValue(searchText.trim());
   const selectedCategoryId = Form.useWatch("categoryId", form);
+  const selectedStockType = Form.useWatch("itemClass", form);
 
   const { data: itemsData } = useQuery({
     queryKey: ["getItItems", deferredSearch],
@@ -74,8 +126,8 @@ const ItItems = () => {
     queryFn: () => api.get("/admin/it-item-categories"),
   });
 
-  const items = itemsData?.data || [];
-  const categories = categoriesData?.data || [];
+  const items = useMemo(() => itemsData?.data || [], [itemsData]);
+  const categories = useMemo(() => categoriesData?.data || [], [categoriesData]);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId) || null,
@@ -87,15 +139,46 @@ const ItItems = () => {
     [selectedCategory]
   );
 
-  const selectedAttributeKeys = Form.useWatch("validationRules", form) || [];
+  const attributeDefinitionsForDetails = useMemo(
+    () => allCategoryDefinitions.filter((definition) => !isClassificationLikeDefinition(definition)),
+    [allCategoryDefinitions]
+  );
+
+  const selectedAttributeKeys = Form.useWatch("validationRules", form);
+  const selectedAttributeKeyList = useMemo(() => selectedAttributeKeys || [], [selectedAttributeKeys]);
 
   const templateDefinitions = useMemo(
     () =>
-      allCategoryDefinitions.filter(
+      attributeDefinitionsForDetails.filter(
         (definition) =>
-          ["TEMPLATE", "BOTH"].includes(definition.scope) && selectedAttributeKeys.includes(definition.key)
+          ["TEMPLATE", "BOTH"].includes(definition.scope) && selectedAttributeKeyList.includes(definition.key)
       ),
-    [allCategoryDefinitions, selectedAttributeKeys]
+    [attributeDefinitionsForDetails, selectedAttributeKeyList]
+  );
+
+  const formFactorOptionsFromCategory = useMemo(() => {
+    const sourceDefinitions = allCategoryDefinitions.filter(
+      (item) =>
+        isClassificationLikeDefinition(item) &&
+        item?.dataType === "SELECT" &&
+        Array.isArray(item?.optionsJson)
+    );
+
+    const combined = sourceDefinitions.flatMap((definition) =>
+      definition.optionsJson.filter((option) => typeof option === "string" && option.trim() !== "")
+    );
+
+    return [...new Set(combined)];
+  }, [allCategoryDefinitions]);
+
+  const formFactorOptions = useMemo(
+    () => {
+      if (formFactorOptionsFromCategory.length) {
+        return formFactorOptionsFromCategory;
+      }
+      return getFormFactorOptionsForCategory(selectedCategory?.name);
+    },
+    [formFactorOptionsFromCategory, selectedCategory?.name]
   );
 
   useEffect(() => {
@@ -107,10 +190,29 @@ const ItItems = () => {
       form.setFieldValue("itemClass", selectedCategory.defaultItemClass);
     }
 
+    const currentFormFactor = form.getFieldValue("formFactor");
+    const allowedFormFactors = getFormFactorOptionsForCategory(selectedCategory.name);
+    if (currentFormFactor && !allowedFormFactors.includes(currentFormFactor)) {
+      form.setFieldValue("formFactor", undefined);
+    }
+
     // Default: pre-check all attribute keys when category changes
-    const allKeys = (selectedCategory.attributeDefinitions || []).map((d) => d.key);
+    const allKeys = (selectedCategory.attributeDefinitions || [])
+      .filter((definition) => !isClassificationLikeDefinition(definition))
+      .map((d) => d.key);
     form.setFieldValue("validationRules", allKeys);
   }, [form, selectedCategory]);
+
+  useEffect(() => {
+    if (selectedStockType !== "CONSUMABLE") {
+      form.setFieldsValue({
+        unitOfMeasure: undefined,
+        reorderLevel: undefined,
+        minimumLevel: undefined,
+        maximumLevel: undefined,
+      });
+    }
+  }, [form, selectedStockType]);
 
   const stats = useMemo(() => {
     const totalStock = items.reduce((sum, item) => sum + (item.stock?.quantityInStock ?? 0), 0);
@@ -135,6 +237,9 @@ const ItItems = () => {
       setIsModalOpen(false);
       toast.success("Item added successfully");
       form.resetFields();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to add item");
     },
   });
 
@@ -162,12 +267,17 @@ const ItItems = () => {
 
   const columns = [
     {
-      title: "Category",
+      title: "Item Category",
+      key: "itemCategory",
+      render: () => <span className="font-semibold text-[#212121]">{ITEM_CATEGORY_LABEL}</span>,
+    },
+    {
+      title: "Sub Category",
       key: "category",
       render: (_, record) => <span className="font-semibold text-[#212121]">{record.category?.name || formatCapitalizedLabel(record.deviceType)}</span>,
     },
     {
-      title: "Item Class",
+      title: "Stock Type",
       dataIndex: "itemClass",
       key: "itemClass",
       render: (value) => formatCapitalizedLabel(value),
@@ -183,9 +293,43 @@ const ItItems = () => {
       key: "model",
     },
     {
+      title: "Form Factor",
+      dataIndex: "formFactor",
+      key: "formFactor",
+      render: (value) => value || "-",
+    },
+    {
+      title: "Description",
+      dataIndex: "description",
+      key: "description",
+      render: (value) => value || "Not provided",
+    },
+    {
+      title: "Unit",
+      dataIndex: "unitOfMeasure",
+      key: "unitOfMeasure",
+      render: (value) => value || "-",
+    },
+    {
+      title: "Reorder Level",
+      key: "reorderLevel",
+      render: (_, record) => record.stock?.reorderThreshold ?? "-",
+    },
+    {
       title: "Quantity In Stock",
       key: "quantityInStock",
       render: (_, record) => record.stock?.quantityInStock ?? 0,
+    },
+    {
+      title: "Registered Date",
+      dataIndex: "createdAt",
+      key: "createdAt",
+      render: formatDate,
+    },
+    {
+      title: "Recorded By",
+      key: "recordedBy",
+      render: (_, record) => record.recordedBy?.name || record.recordedBy?.staffId || "Not recorded",
     },
     {
       title: "Action",
@@ -238,7 +382,12 @@ const ItItems = () => {
       itemClass: values.itemClass,
       brand: values.brand,
       model: values.model,
-      defaultWarranty: Number(values.defaultWarranty || 12),
+      formFactor: values.formFactor,
+      description: values.description,
+      unitOfMeasure: values.itemClass === "CONSUMABLE" ? values.unitOfMeasure : undefined,
+      reorderLevel: values.itemClass === "CONSUMABLE" ? toOptionalNumber(values.reorderLevel) : undefined,
+      minimumLevel: values.itemClass === "CONSUMABLE" ? toOptionalNumber(values.minimumLevel) : undefined,
+      maximumLevel: values.itemClass === "CONSUMABLE" ? toOptionalNumber(values.maximumLevel) : undefined,
       specifications: values.attributes || {},
       validationRules: values.validationRules || [],
     });
@@ -248,7 +397,7 @@ const ItItems = () => {
     <PageShell
       eyebrow="Back Office"
       title="IT Item Catalog"
-      description="Create category-driven item templates used by stock intake, issuance, and asset tracking so the catalog can support more than computer hardware."
+      description="Create item templates used by stock intake, issuance, and asset tracking for computers and accessories."
       stats={stats}
       actions={
         <>
@@ -257,7 +406,7 @@ const ItItems = () => {
             onChange={(event) => setSearchText(event.target.value)}
             allowClear
             prefix={<SearchOutlined />}
-            placeholder="Search item ID, brand, model, category, or class"
+            placeholder="Search item ID, brand, model, sub category, or stock type"
             className="w-full sm:w-[340px]"
           />
           <Button
@@ -288,7 +437,7 @@ const ItItems = () => {
           columns={columns}
           rowKey="id"
           size="middle"
-          scroll={{ x: 1180 }}
+          scroll={{ x: 1600 }}
           pagination={{
             current: currentPage,
             pageSize,
@@ -319,7 +468,7 @@ const ItItems = () => {
                     {selectedItem.brand} {selectedItem.model}
                   </h3>
                   <p className="mt-1 text-sm text-[#616161]">
-                    {selectedItem.category?.name || formatCapitalizedLabel(selectedItem.deviceType)}
+                    {ITEM_CATEGORY_LABEL} / {selectedItem.category?.name || formatCapitalizedLabel(selectedItem.deviceType)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -337,13 +486,21 @@ const ItItems = () => {
               <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4">
                 <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-[#111827]">Core Details</h4>
                 <div className="mt-3 space-y-2 text-sm text-[#374151]">
-                  <p><span className="font-semibold text-[#111827]">Category:</span> {selectedItem.category?.name || "N/A"}</p>
+                  <p><span className="font-semibold text-[#111827]">Item Category:</span> {ITEM_CATEGORY_LABEL}</p>
+                  <p><span className="font-semibold text-[#111827]">Sub Category:</span> {selectedItem.category?.name || "N/A"}</p>
                   <p><span className="font-semibold text-[#111827]">Brand:</span> {selectedItem.brand || "N/A"}</p>
                   <p><span className="font-semibold text-[#111827]">Model:</span> {selectedItem.model || "N/A"}</p>
-                  <p><span className="font-semibold text-[#111827]">Item Class:</span> {formatCapitalizedLabel(selectedItem.itemClass)}</p>
+                  <p><span className="font-semibold text-[#111827]">Form Factor:</span> {selectedItem.formFactor || "N/A"}</p>
+                  <p><span className="font-semibold text-[#111827]">Description:</span> {selectedItem.description || "N/A"}</p>
+                  <p><span className="font-semibold text-[#111827]">Stock Type:</span> {formatCapitalizedLabel(selectedItem.itemClass)}</p>
+                  <p><span className="font-semibold text-[#111827]">Unit of Measure:</span> {selectedItem.unitOfMeasure || "N/A"}</p>
                   <p><span className="font-semibold text-[#111827]">Legacy Type:</span> {formatCapitalizedLabel(selectedItem.deviceType)}</p>
-                  <p><span className="font-semibold text-[#111827]">Default Warranty:</span> {selectedItem.defaultWarranty ?? 0} months</p>
                   <p><span className="font-semibold text-[#111827]">Quantity In Stock:</span> {selectedItem.stock?.quantityInStock ?? 0}</p>
+                  <p><span className="font-semibold text-[#111827]">Reorder Level:</span> {selectedItem.stock?.reorderThreshold ?? "N/A"}</p>
+                  <p><span className="font-semibold text-[#111827]">Minimum Level:</span> {selectedItem.stock?.minimumLevel ?? "N/A"}</p>
+                  <p><span className="font-semibold text-[#111827]">Maximum Level:</span> {selectedItem.stock?.maximumLevel ?? "N/A"}</p>
+                  <p><span className="font-semibold text-[#111827]">Registered Date:</span> {formatDate(selectedItem.createdAt)}</p>
+                  <p><span className="font-semibold text-[#111827]">Recorded By:</span> {selectedItem.recordedBy?.name || selectedItem.recordedBy?.staffId || "N/A"}</p>
                 </div>
               </div>
 
@@ -384,40 +541,128 @@ const ItItems = () => {
         ) : null}
       </Modal>
 
-      <Modal title="Add New Item" open={isModalOpen} footer={null} onCancel={() => setIsModalOpen(false)} width={820} destroyOnClose>
+      <Modal
+        title={
+          <div className="flex items-center gap-2">
+            <span className="text-base font-bold text-[#111827]">Add New Item</span>
+            <Tag className="m-0 rounded-full border-0 bg-[#FEF3C7] px-3 py-0.5 text-xs font-semibold text-[#92400E]">
+              {ITEM_CATEGORY_LABEL}
+            </Tag>
+          </div>
+        }
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        width={860}
+        destroyOnClose
+        centered
+        styles={{
+          body: {
+            maxHeight: "77vh",
+            overflowY: "auto",
+            overflowX: "hidden",
+            paddingRight: 4,
+          },
+        }}
+        footer={
+          <Button
+            type="primary"
+            htmlType="submit"
+            block
+            className="!h-11 !rounded-2xl"
+            onClick={() => form.submit()}
+            loading={addItem.isPending}
+          >
+            Submit
+          </Button>
+        }
+      >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
-            <Form.Item name="categoryId" label="Item Category" rules={[{ required: true }]}>
-              <Select placeholder="Select item category" showSearch optionFilterProp="children">
-                {categories.map((category) => (
-                  <Select.Option key={category.id} value={category.id}>
-                    {category.name}
-                  </Select.Option>
-                ))}
-              </Select>
-            </Form.Item>
+          {/* ── Classification ─────────────────────────────────────────── */}
+          <div className="mb-5 rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] px-5 pt-4 pb-2">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">Classification</p>
+            <div className="grid grid-cols-1 gap-x-4 md:grid-cols-3">
 
-            <Form.Item name="itemClass" label="Item Class" rules={[{ required: true }]}>
-              <Select placeholder="Select item class">
-                <Select.Option value="FIXED_ASSET">Fixed Asset</Select.Option>
-                <Select.Option value="CONSUMABLE">Consumable</Select.Option>
-              </Select>
-            </Form.Item>
+              <Form.Item name="categoryId" label="Sub Category" rules={[{ required: true }]}>
+                <Select placeholder="Select sub category" showSearch optionFilterProp="children">
+                  {categories.map((category) => (
+                    <Select.Option key={category.id} value={category.id}>
+                      {category.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
 
-            <Form.Item name="brand" label="Brand" rules={[{ required: true }]}>
-              <Input placeholder="Brand" />
-            </Form.Item>
+              <Form.Item
+                name="formFactor"
+                label="Form Factor"
+                rules={[{ required: true, message: "Select form factor" }]}
+              >
+                <Select
+                  placeholder={selectedCategory ? "Select form factor" : "Select sub category first"}
+                  disabled={!selectedCategory}
+                  showSearch
+                  optionFilterProp="children"
+                >
+                  {formFactorOptions.map((factor) => (
+                    <Select.Option key={factor} value={factor}>
+                      {factor}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
 
-            <Form.Item name="model" label="Model" rules={[{ required: true }]}>
-              <Input placeholder="Model" />
-            </Form.Item>
-
-            <Form.Item name="defaultWarranty" label="Default Warranty (months)">
-              <Input placeholder="12" type="number" />
-            </Form.Item>
+              <Form.Item name="itemClass" label="Stock Type" rules={[{ required: true }]}>
+                <Select placeholder="Select stock type">
+                  <Select.Option value="FIXED_ASSET">Fixed Asset</Select.Option>
+                  <Select.Option value="CONSUMABLE">Consumable</Select.Option>
+                </Select>
+              </Form.Item>
+            </div>
           </div>
 
-          {selectedCategory && allCategoryDefinitions.length ? (
+          {/* ── Item Details ────────────────────────────────────────────── */}
+          <div className="mb-5 rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] px-5 pt-4 pb-2">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">Item Details</p>
+            <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+              <Form.Item name="brand" label="Brand" rules={[{ required: true }]}>
+                <Input placeholder="e.g. Dell" />
+              </Form.Item>
+
+              <Form.Item name="model" label="Model" rules={[{ required: true }]}>
+                <Input placeholder="e.g. OptiPlex" />
+              </Form.Item>
+
+              <Form.Item name="description" label="Description" rules={[{ required: true, message: "Description is required" }]}>
+                <Input placeholder="e.g. OptiPlex 2039" />
+              </Form.Item>
+            </div>
+          </div>
+
+          {/* ── Stock Controls (Consumable only) ────────────────────────── */}
+          {selectedStockType === "CONSUMABLE" ? (
+            <div className="mb-5 rounded-2xl border border-[#DBEAFE] bg-[#EFF6FF] px-5 pt-4 pb-2">
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#3B82F6]">Stock Controls</p>
+              <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
+                <Form.Item name="unitOfMeasure" label="Unit of Measure">
+                  <Input placeholder="1" />
+                </Form.Item>
+
+                <Form.Item name="reorderLevel" label="Reorder Level">
+                  <Input placeholder="49" type="number" min={0} />
+                </Form.Item>
+
+                <Form.Item name="minimumLevel" label="Minimum Level">
+                  <Input placeholder="Minimum quantity" type="number" min={0} />
+                </Form.Item>
+
+                <Form.Item name="maximumLevel" label="Maximum Level">
+                  <Input placeholder="Maximum quantity" type="number" min={0} />
+                </Form.Item>
+              </div>
+            </div>
+          ) : null}
+
+          {selectedCategory && attributeDefinitionsForDetails.length ? (
             <div className="mb-6 rounded-3xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div>
@@ -433,7 +678,7 @@ const ItItems = () => {
 
               <Form.Item name="validationRules" className="mb-4">
                 <Checkbox.Group className="flex flex-col gap-2">
-                  {allCategoryDefinitions.map((definition) => (
+                  {attributeDefinitionsForDetails.map((definition) => (
                     <Checkbox key={definition.key} value={definition.key}>
                       <span className="font-medium">{definition.label}</span>
                       <Tag className="ml-2" color="default">{definition.dataType}</Tag>
@@ -465,11 +710,6 @@ const ItItems = () => {
             </div>
           ) : null}
 
-          <Form.Item className="mb-0">
-            <Button type="primary" htmlType="submit" block className="!h-11 !rounded-2xl">
-              Submit
-            </Button>
-          </Form.Item>
         </Form>
       </Modal>
     </PageShell>

@@ -35,11 +35,6 @@ const Acknowledge = () => {
         value: acknowledgments.length,
         caption: "Issued items awaiting confirmation",
       },
-      {
-        label: "Issued Units",
-        value: acknowledgments.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-        caption: "Total quantity awaiting acknowledgment",
-      },
     ],
     [acknowledgments]
   );

@@ -88,28 +88,39 @@ const ItItemCategories = () => {
   const openCreate = () => {
     setEditingRecord(null);
     form.resetFields();
-    form.setFieldsValue({ attributeDefinitions: [] });
+    form.setFieldsValue({ attributeDefinitions: [], formFactorOptions: [] });
     setModalOpen(true);
   };
 
   const openEdit = (record) => {
     setEditingRecord(record);
+    // Extract existing formFactor attribute options for the dedicated field
+    const formFactorAttr = (record.attributeDefinitions || []).find(
+      (a) => a.key === "formFactor"
+    );
+    const formFactorOptions = Array.isArray(formFactorAttr?.optionsJson)
+      ? formFactorAttr.optionsJson
+      : [];
+
     form.setFieldsValue({
       name: record.name,
       description: record.description,
       defaultItemClass: record.defaultItemClass ?? undefined,
       legacyDeviceType: record.legacyDeviceType ?? undefined,
-      attributeDefinitions: (record.attributeDefinitions || []).map((attr) => ({
-        key: attr.key,
-        label: attr.label,
-        dataType: attr.dataType,
-        scope: attr.scope,
-        isRequired: attr.isRequired,
-        helpText: attr.helpText,
-        optionsJson: Array.isArray(attr.optionsJson)
-          ? attr.optionsJson.join(", ")
-          : attr.optionsJson ?? "",
-      })),
+      formFactorOptions,
+      attributeDefinitions: (record.attributeDefinitions || [])
+        .filter((attr) => attr.key !== "formFactor")
+        .map((attr) => ({
+          key: attr.key,
+          label: attr.label,
+          dataType: attr.dataType,
+          scope: attr.scope,
+          isRequired: attr.isRequired,
+          helpText: attr.helpText,
+          optionsJson: Array.isArray(attr.optionsJson)
+            ? attr.optionsJson.join(", ")
+            : attr.optionsJson ?? "",
+        })),
     });
     setModalOpen(true);
   };
@@ -121,27 +132,44 @@ const ItItemCategories = () => {
   };
 
   const handleSubmit = (values) => {
+    const otherAttrs = (values.attributeDefinitions || []).map((attr, index) => ({
+      key: attr.key.trim().replace(/\s+/g, "_").toLowerCase(),
+      label: attr.label,
+      dataType: attr.dataType,
+      scope: attr.scope || "BOTH",
+      isRequired: attr.isRequired || false,
+      sortOrder: index + 1,
+      helpText: attr.helpText,
+      optionsJson:
+        attr.dataType === "SELECT"
+          ? attr.optionsJson
+              ?.split(",")
+              .map((o) => o.trim())
+              .filter(Boolean)
+          : undefined,
+    }));
+
+    // Always inject formFactor as the first attribute when options are provided
+    const formFactorOptions = (values.formFactorOptions || []).filter(Boolean);
+    const formFactorAttr = formFactorOptions.length
+      ? [{
+          key: "formFactor",
+          label: "Form Factor",
+          dataType: "SELECT",
+          scope: "BOTH",
+          isRequired: false,
+          sortOrder: 0,
+          helpText: undefined,
+          optionsJson: formFactorOptions,
+        }]
+      : [];
+
     const payload = {
       name: values.name,
       description: values.description,
       defaultItemClass: values.defaultItemClass,
       legacyDeviceType: values.legacyDeviceType,
-      attributeDefinitions: (values.attributeDefinitions || []).map((attr, index) => ({
-        key: attr.key.trim().replace(/\s+/g, "_").toLowerCase(),
-        label: attr.label,
-        dataType: attr.dataType,
-        scope: attr.scope || "BOTH",
-        isRequired: attr.isRequired || false,
-        sortOrder: index,
-        helpText: attr.helpText,
-        optionsJson:
-          attr.dataType === "SELECT"
-            ? attr.optionsJson
-                ?.split(",")
-                .map((o) => o.trim())
-                .filter(Boolean)
-            : undefined,
-      })),
+      attributeDefinitions: [...formFactorAttr, ...otherAttrs],
     };
 
     if (editingRecord) {
@@ -302,14 +330,26 @@ const ItItemCategories = () => {
                   <p className="px-4 py-3 text-sm text-[#9CA3AF]">No attribute definitions for this category.</p>
                 );
               }
+    {/* Form Factor column in table expand */}
               return (
                 <div className="flex flex-wrap gap-2 px-4 py-3">
                   {attrs.map((attr) => (
                     <div
                       key={attr.key}
-                      className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] px-3 py-2 text-xs"
+                      className={`rounded-2xl border px-3 py-2 text-xs ${
+                        attr.key === "formFactor"
+                          ? "border-[#D32F2F]/20 bg-[#FFF5F5]"
+                          : "border-[#E5E7EB] bg-[#FAFAFA]"
+                      }`}
                     >
-                      <p className="font-semibold text-[#111827]">{attr.label}</p>
+                      <p className="font-semibold text-[#111827]">
+                        {attr.key === "formFactor" ? "Form Factor" : attr.label}
+                      </p>
+                      {attr.key === "formFactor" && Array.isArray(attr.optionsJson) && (
+                        <p className="mt-0.5 text-[10px] text-[#D32F2F]">
+                          {attr.optionsJson.join(" · ")}
+                        </p>
+                      )}
                       <div className="mt-1 flex flex-wrap gap-1">
                         <Tag color={dataTypeColor[attr.dataType] || "default"} className="m-0 text-[10px]">
                           {attr.dataType}
@@ -375,6 +415,22 @@ const ItItemCategories = () => {
                       </Select.Option>
                     ))}
                   </Select>
+                </Form.Item>
+              </div>
+
+              {/* Form Factor Options */}
+              <div className="mb-4 rounded-2xl border-2 border-[#D32F2F]/20 bg-[#FFF5F5] p-4">
+                <h4 className="mb-1 text-sm font-bold text-[#D32F2F]">Form Factor Options</h4>
+                <p className="mb-3 text-xs text-[#616161]">
+                  These are the options shown in the Form Factor dropdown when adding a new item. Type an option and press Enter to add it.
+                </p>
+                <Form.Item name="formFactorOptions" className="mb-0">
+                  <Select
+                    mode="tags"
+                    placeholder="e.g. Laser, Inkjet — press Enter to add"
+                    tokenSeparators={[","]}
+                    allowClear
+                  />
                 </Form.Item>
               </div>
 

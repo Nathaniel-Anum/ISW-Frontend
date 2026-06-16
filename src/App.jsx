@@ -49,12 +49,14 @@ const AdminLogs = lazy(() => import("./Components/AdminLogs"));
 const UserGuide = lazy(() => import("./Components/UserGuide"));
 const PMSchedules = lazy(() => import("./Components/PMSchedules"));
 const KnowledgeBase = lazy(() => import("./Components/KnowledgeBase"));
+const AssetHealth = lazy(() => import("./Components/AssetHealth"));
 
 // Back office
 const Employees = lazy(() => import("./BackOffice/Employees"));
 const Department = lazy(() => import("./BackOffice/Department"));
 const Units = lazy(() => import("./BackOffice/Units"));
 const Supplier = lazy(() => import("./BackOffice/Supplier"));
+const Projects = lazy(() => import("./BackOffice/Projects"));
 const Roles = lazy(() => import("./BackOffice/Roles"));
 const ItItems = lazy(() => import("./BackOffice/ItItems"));
 const ItItemCategories = lazy(() => import("./BackOffice/ItItemCategories"));
@@ -62,6 +64,7 @@ const Permissions = lazy(() => import("./BackOffice/Permissions"));
 const ServiceDeskCategories = lazy(() => import("./BackOffice/ServiceDeskCategories"));
 const SupportProfiles = lazy(() => import("./BackOffice/SupportProfiles"));
 const SkillTags = lazy(() => import("./BackOffice/SkillTags"));
+const RequisitionItems = lazy(() => import("./BackOffice/RequisitionItems"));
 
 const PageLoader = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -124,6 +127,7 @@ function AppContent() {
           <Route path="itd-approval" element={<Suspense fallback={<PageLoader />}><ITDApproval /></Suspense>} />
           <Route path="stores-officer" element={<Suspense fallback={<PageLoader />}><StoresOfficer /></Suspense>} />
           <Route path="inventory" element={<Suspense fallback={<PageLoader />}><InvOfficer /></Suspense>} />
+          <Route path="asset-health" element={<Suspense fallback={<PageLoader />}><AssetHealth /></Suspense>} />
           <Route path="stores" element={<Suspense fallback={<PageLoader />}><StoresPage /></Suspense>} />
           <Route path="maintenance" element={<Suspense fallback={<PageLoader />}><Maintenance /></Suspense>} />
           <Route path="maintenance-report" element={<Suspense fallback={<PageLoader />}><MaintenanceReport /></Suspense>} />
@@ -153,10 +157,12 @@ function AppContent() {
           <Route path="skill-tags" element={<Suspense fallback={<PageLoader />}><SkillTags /></Suspense>} />
           <Route path="unit" element={<Suspense fallback={<PageLoader />}><Units /></Suspense>} />
           <Route path="supplier" element={<Suspense fallback={<PageLoader />}><Supplier /></Suspense>} />
+          <Route path="projects" element={<Suspense fallback={<PageLoader />}><Projects /></Suspense>} />
           <Route path="roles" element={<Suspense fallback={<PageLoader />}><Roles /></Suspense>} />
           <Route path="permissions" element={<Suspense fallback={<PageLoader />}><Permissions /></Suspense>} />
           <Route path="it-items" element={<Suspense fallback={<PageLoader />}><ItItems /></Suspense>} />
           <Route path="it-item-categories" element={<Suspense fallback={<PageLoader />}><ItItemCategories /></Suspense>} />
+          <Route path="requisition-items" element={<Suspense fallback={<PageLoader />}><RequisitionItems /></Suspense>} />
         </Route>
       </Routes>
     </ErrorBoundary>

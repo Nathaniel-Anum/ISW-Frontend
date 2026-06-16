@@ -1,6 +1,6 @@
 import React, { useDeferredValue, useEffect, useState } from "react";
 import { SearchOutlined } from "@ant-design/icons";
-import { Modal, Form, Input, Button, Table, Tag, Popconfirm } from "antd";
+import { Modal, Form, Input, Button, Table, Tag, Popconfirm, Select } from "antd";
 import { LuPlus } from "react-icons/lu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -103,7 +103,6 @@ const Requisition = () => {
     setEditingRequisition(record);
     editForm.setFieldsValue({
       quantity: record.quantity,
-      justification: record.purpose,
       itItemId: record.itItemId,
     });
     setIsEditModalOpen(true);
@@ -114,11 +113,13 @@ const Requisition = () => {
   };
 
   const handleSubmit = (values) => {
+    const selected = requisitionItemOptions.find((item) => item.value === values.itItemId);
     const payload = {
-      itemDescription: values.itemDescription,
+      itItemId: values.itItemId,
+      itemDescription: selected ? selected.label : values.itItemId,
       quantity: Number(values.quantity),
-      purpose: values.purpose,
-      unitId: user.unit.id,
+      purpose: "For Official Use",
+      unitId: user.unit?.id,
       departmentId: user.department.id,
       roomNo: user.roomNo,
       staffId: user.staffId,
@@ -126,6 +127,16 @@ const Requisition = () => {
 
     createRequisition(payload);
   };
+
+  const { data: requisitionItemsResponse } = useQuery({
+    queryKey: ["requisitionItems"],
+    queryFn: () => api.get("/user/requisition-items"),
+  });
+
+  const requisitionItemOptions = (requisitionItemsResponse?.data || []).map((item) => ({
+    value: item.id,
+    label: `${item.brand} · ${item.model}`,
+  }));
 
   const { data: requisitionResponse } = useQuery({
     queryKey: ["requisition", deferredSearch],
@@ -156,13 +167,7 @@ const Requisition = () => {
       render: (text, record, index) => (currentPage - 1) * pageSize + index + 1,
     },
     {
-      title: "Category",
-      dataIndex: ["category", "name"],
-      key: "category",
-      render: (value) => value || "N/A",
-    },
-    {
-      title: "Description",
+      title: "Item Required",
       dataIndex: "itemDescription",
       key: "itemDescription",
     },
@@ -174,8 +179,8 @@ const Requisition = () => {
     },
     {
       title: "Purpose",
-      dataIndex: "purpose",
       key: "purpose",
+      render: () => "For Official Use",
     },
     {
       title: "Status",
@@ -321,11 +326,18 @@ const Requisition = () => {
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           <Form.Item
-            name="itemDescription"
+            name="itItemId"
             label="Item Required"
-            rules={[{ required: true, message: "Please enter the item required" }]}
+            rules={[{ required: true, message: "Please select the item required" }]}
           >
-            <Input placeholder="e.g. Dell Latitude Laptop, USB-C Hub" />
+            <Select
+              showSearch
+              placeholder="Search received items e.g. Dell Laptop"
+              options={requisitionItemOptions}
+              filterOption={(input, option) =>
+                (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+            />
           </Form.Item>
 
           <Form.Item
@@ -334,14 +346,6 @@ const Requisition = () => {
             rules={[{ required: true, message: "Please enter the quantity" }]}
           >
             <Input type="number" min={1} placeholder="Enter quantity" />
-          </Form.Item>
-
-          <Form.Item
-            name="purpose"
-            label="Purpose / Justification"
-            rules={[{ required: true, message: "Please enter the purpose" }]}
-          >
-            <Input.TextArea rows={3} placeholder="e.g. For use in the server room" />
           </Form.Item>
 
           <Form.Item className="mb-0">
@@ -365,9 +369,6 @@ const Requisition = () => {
         <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
           <Form.Item name="quantity" label="Quantity" rules={[{ required: true }]}>
             <Input type="number" min={1} placeholder="Enter Quantity" />
-          </Form.Item>
-          <Form.Item name="justification" label="Purpose / Justification">
-            <Input.TextArea rows={3} placeholder="Update purpose" />
           </Form.Item>
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" loading={isUpdatePending} block>

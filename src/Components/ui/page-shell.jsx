@@ -29,7 +29,14 @@ const PageShell = ({ eyebrow, title, description, stats = [], actions, children 
             {stats.map((stat) => (
               <div
                 key={stat.label}
-                className="rounded-3xl border border-[#F1F1F1] bg-[#F9FAFB] px-5 py-5 sm:px-6 sm:py-6"
+                onClick={stat.onClick}
+                className={`rounded-3xl border px-5 py-5 sm:px-6 sm:py-6 transition-all ${
+                  stat.active
+                    ? "border-[#D32F2F] bg-[#FFF7F7] shadow-sm cursor-pointer"
+                    : stat.onClick
+                    ? "border-[#F1F1F1] bg-[#F9FAFB] cursor-pointer hover:border-[#D32F2F] hover:bg-[#FFF7F7]"
+                    : "border-[#F1F1F1] bg-[#F9FAFB]"
+                }`}
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#616161]">
                   {stat.label}

@@ -364,7 +364,7 @@ const StoresOfficer = () => {
           >
             {batchesData?.map((batch) => (
               <Select.Option key={batch.id} value={batch.id}>
-                Batch: {batch.batchCode} - Qty: {batch.quantity}
+                Batch: {batch.batchCode} — Qty: {batch.quantity} | Serial: {batch.stockReceived?.serialNumber || "—"}
               </Select.Option>
             ))}
           </Select>

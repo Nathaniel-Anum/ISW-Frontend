@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Switch, Table, Tabs, Tag } from "antd";
+import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Switch, Table, Tabs, Tag, Divider } from "antd";
 import { MoreOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import { LuQrCode } from "react-icons/lu";
 import { toast } from "react-toastify";
@@ -161,6 +161,9 @@ const InvOfficer = () => {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedITItem, setSelectedITItem] = useState(null);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [itItemSearch, setItItemSearch] = useState("");
+  const [quickCreateForm] = Form.useForm();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const [createForm] = Form.useForm();
@@ -177,6 +180,12 @@ const InvOfficer = () => {
   const { data: assignmentHistoryRes, isLoading: isHistoryLoading } = useQuery({
     queryKey: ["assignmentHistory", selectedRecord?.id],
     queryFn: () => api.get(`/inventory/${selectedRecord.id}/assignment-history`),
+    enabled: !!selectedRecord?.id && modalMode === "view",
+  });
+
+  const { data: stockHistoryRes, isLoading: isStockHistoryLoading } = useQuery({
+    queryKey: ["stockHistory", selectedRecord?.id],
+    queryFn: () => api.get(`/inventory/${selectedRecord.id}/stock-history`),
     enabled: !!selectedRecord?.id && modalMode === "view",
   });
 
@@ -233,17 +242,47 @@ const InvOfficer = () => {
   const handleCreateCancel = () => {
     setCreateModalOpen(false);
     setSelectedITItem(null);
+    setQuickCreateOpen(false);
+    setItItemSearch("");
     createForm.resetFields();
+    quickCreateForm.resetFields();
   };
+
+  // Built-in category slug → which legacy deviceTypes it covers
+  const LEGACY_DEVICE_CATEGORY_MAP = { LAPTOP: "computer", DESKTOP: "computer", PRINTER: "printer", UPS: "power" };
 
   const createAttributeDefinitions = useMemo(() => {
     if (!selectedITItem) return [];
-    const validationRules = Array.isArray(selectedITItem.validationRules) ? selectedITItem.validationRules : [];
-    const definitions = selectedITItem.category?.attributeDefinitions || [];
-    return definitions.filter(
-      (d) => validationRules.includes(d.key) && ["ASSET", "BOTH"].includes(d.scope)
-    );
-  }, [selectedITItem]);
+
+    // 1. Item has its own category with definitions — use those
+    const ownDefs = selectedITItem.category?.attributeDefinitions || [];
+    if (ownDefs.length > 0) {
+      const assetDefs = ownDefs.filter((d) => ["ASSET", "BOTH"].includes(d.scope));
+      const validationRules = Array.isArray(selectedITItem.validationRules) ? selectedITItem.validationRules : [];
+      return validationRules.length > 0 ? assetDefs.filter((d) => validationRules.includes(d.key)) : assetDefs;
+    }
+
+    // 2. Legacy item — look up the matching built-in category from deviceFieldsData
+    const slug = LEGACY_DEVICE_CATEGORY_MAP[selectedITItem.deviceType];
+    if (slug) {
+      const builtinCategory = (deviceFieldsData?.data?.categories || []).find((c) => c.slug === slug);
+      if (builtinCategory) {
+        return (builtinCategory.attributeDefinitions || []).filter((d) => ["ASSET", "BOTH"].includes(d.scope));
+      }
+    }
+
+    return [];
+  }, [selectedITItem, deviceFieldsData]);
+
+  // Legacy device fields — only shown when no built-in category covers the device type
+  const createLegacyDeviceFields = useMemo(() => {
+    if (!selectedITItem || selectedITItem.category) return [];
+    const slug = LEGACY_DEVICE_CATEGORY_MAP[selectedITItem.deviceType];
+    const categories = deviceFieldsData?.data?.categories || [];
+    if (slug && categories.some((c) => c.slug === slug)) return []; // built-in category covers it
+    const allFields = DEVICE_FIELDS[selectedITItem.deviceType || "LAPTOP"] || [];
+    return allFields.filter((f) => !f.disabled);
+  }, [selectedITItem, DEVICE_FIELDS, deviceFieldsData]);
 
   const tabItems = [
     { key: "user", label: "Main" },
@@ -425,6 +464,7 @@ const InvOfficer = () => {
 
     const lifecycleItems = [
       { label: "Status", value: formatCapitalizedLabel(selectedRecord.status) },
+      { label: "Tag Number", value: selectedRecord.stockReceived?.tagNumber },
       { label: "Warranty Period", value: selectedRecord.warrantyPeriod },
       { label: "Purchase Date", value: formatDateTime(selectedRecord.purchaseDate) },
       { label: "Created At", value: formatDateTime(selectedRecord.createdAt) },
@@ -528,6 +568,25 @@ const InvOfficer = () => {
     }
   }, [selectedRecord, form, DEVICE_FIELDS]);
 
+  const { mutate: quickCreateITItem, isPending: isQuickCreating } = useMutation({
+    mutationKey: ["quickCreateITItem"],
+    mutationFn: (payload) => api.post("/inventory/it-items/quick-create", payload),
+    onSuccess: (res) => {
+      const item = res.data.item;
+      const wasExisting = res.data.existing;
+      queryClient.invalidateQueries({ queryKey: ["itItemsForCreate"] });
+      setSelectedITItem(item);
+      createForm.setFieldsValue({ itItemId: item.id, attributes: {} });
+      setQuickCreateOpen(false);
+      quickCreateForm.resetFields();
+      toast.success(wasExisting ? `"${item.brand} ${item.model}" already exists — selected for you` : `"${item.brand} ${item.model}" registered and selected`);
+    },
+    onError: (error) => {
+      const msg = error?.response?.data?.message || "Failed to register item";
+      toast.error(Array.isArray(msg) ? msg.join(", ") : msg);
+    },
+  });
+
   const { mutate: createInventory, isPending: isCreating } = useMutation({
     mutationKey: ["createInventory"],
     mutationFn: (payload) => api.post("/inventory/create", payload),
@@ -578,6 +637,19 @@ const InvOfficer = () => {
   };
 
   const handleCreateSubmit = (values) => {
+    // If we're showing category-style attribute definitions (whether the item has its own
+    // category or we're using a matching built-in category for a legacy item), always
+    // store the result in assetAttributes so it's consistent and searchable.
+    const usingAttributeDefs = createAttributeDefinitions.length > 0;
+
+    let assetAttributes;
+    let deviceDetails;
+    if (usingAttributeDefs && values.attributes && Object.keys(values.attributes).length) {
+      assetAttributes = values.attributes;
+    } else if (!usingAttributeDefs && values.deviceFields && Object.keys(values.deviceFields).length) {
+      deviceDetails = { ...values.deviceFields };
+    }
+
     const payload = {
       itItemId: values.itItemId,
       userId: values.userId,
@@ -589,9 +661,8 @@ const InvOfficer = () => {
       lpoReference: values.lpoReference || undefined,
       supplierId: values.supplierId || undefined,
       remarks: values.remarks || undefined,
-      assetAttributes: values.attributes && Object.keys(values.attributes).length
-        ? values.attributes
-        : undefined,
+      assetAttributes,
+      deviceDetails,
     };
     createInventory(payload);
   };
@@ -877,6 +948,45 @@ const InvOfficer = () => {
                 )}
               </section>
 
+              <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4">
+                <div className="mb-4">
+                  <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-[#111827]">Stock History</h4>
+                  <p className="mt-1 text-sm text-[#616161]">
+                    Received, issued, and inventory update events related to this item.
+                  </p>
+                </div>
+                {isStockHistoryLoading ? (
+                  <p className="text-sm text-[#9CA3AF]">Loading stock history…</p>
+                ) : stockHistoryRes?.data?.length ? (
+                  <Table
+                    size="small"
+                    dataSource={stockHistoryRes.data}
+                    rowKey="id"
+                    pagination={false}
+                    columns={[
+                      {
+                        title: "Event",
+                        dataIndex: "eventType",
+                        render: (value) => (
+                          <Tag className="rounded-full border-0 bg-[#F3F4F6] px-3 py-0.5 text-xs font-semibold text-[#374151]">
+                            {formatCapitalizedLabel(String(value || "").replaceAll("_", " "))}
+                          </Tag>
+                        ),
+                      },
+                      { title: "Date", dataIndex: "eventDate", render: (v) => formatDateTime(v) },
+                      { title: "Tag", dataIndex: "tagNumber", render: (v) => v || "—" },
+                      { title: "Serial", dataIndex: "serialNumber", render: (v) => v || "—" },
+                      { title: "Qty", dataIndex: "quantity", render: (v) => (v ?? "—") },
+                      { title: "Reference", dataIndex: "reference", render: (v) => v || "—" },
+                      { title: "Actor", dataIndex: "actorName", render: (v) => v || "—" },
+                      { title: "For", dataIndex: "counterparty", render: (v) => v || "—" },
+                    ]}
+                  />
+                ) : (
+                  <p className="text-sm text-[#9CA3AF]">No stock history found for this item yet.</p>
+                )}
+              </section>
+
               <div className="flex justify-end pt-2">
                 <Button
                   icon={<LuQrCode size={15} />}
@@ -1029,162 +1139,263 @@ const InvOfficer = () => {
         open={createModalOpen}
         onCancel={handleCreateCancel}
         footer={null}
-        title="Create New Inventory Item"
-        width={720}
+        title={null}
+        width={760}
         destroyOnClose
+        styles={{ body: { padding: 0 } }}
       >
-        <Form form={createForm} layout="vertical" onFinish={handleCreateSubmit}>
-          <Form.Item name="itItemId" label="IT Item" rules={[{ required: true, message: "Please select an IT item" }]}>
-            <Select
-              showSearch
-              placeholder="Select an IT item"
-              optionFilterProp="children"
-              filterOption={(input, option) =>
-                String(option?.children || "").toLowerCase().includes(input.toLowerCase())
-              }
-              onChange={(value) => {
-                const item = itItemsList.find((i) => i.id === value);
-                setSelectedITItem(item || null);
-                createForm.setFieldsValue({ attributes: {} });
-                if (item?.specifications) {
-                  const validationRules = Array.isArray(item.validationRules) ? item.validationRules : [];
-                  const defs = item.category?.attributeDefinitions || [];
-                  const prefill = {};
-                  defs.forEach((d) => {
-                    if (validationRules.includes(d.key) && ["BOTH"].includes(d.scope) && item.specifications[d.key] != null) {
-                      prefill[d.key] = item.specifications[d.key];
-                    }
-                  });
-                  if (Object.keys(prefill).length) {
-                    createForm.setFieldsValue({ attributes: prefill });
+        {/* Modal Header */}
+        <div className="rounded-t-2xl bg-[#D32F2F] px-6 py-5">
+          <p className="text-xs font-semibold uppercase tracking-widest text-[#FFCDD2]">Inventory Officer</p>
+          <h2 className="mt-1 text-xl font-bold text-white">Register Inventory Asset</h2>
+          <p className="mt-0.5 text-sm text-[#FFCDD2]">
+            {selectedITItem
+              ? `${selectedITItem.brand} ${selectedITItem.model} • ${selectedITItem.category?.name || selectedITItem.deviceType || "Uncategorized"}`
+              : "Select a subcategory to begin"}
+          </p>
+        </div>
+
+        <Form form={createForm} layout="vertical" onFinish={handleCreateSubmit} className="px-6 pt-5 pb-6 space-y-6">
+
+          {/* ── Section 1: Item ── */}
+          <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">1 · Item</p>
+
+            <Form.Item name="itItemId" label="Subcategory" rules={[{ required: true, message: "Please select a subcategory" }]} className="mb-3">
+              <Select
+                showSearch
+                placeholder="Search by brand or model…"
+                optionFilterProp="children"
+                filterOption={(input, option) =>
+                  String(option?.children || "").toLowerCase().includes(input.toLowerCase())
+                }
+                onSearch={(val) => setItItemSearch(val)}
+                dropdownRender={(menu) => (
+                  <>
+                    {menu}
+                    {itItemSearch.trim() && (
+                      <>
+                        <Divider style={{ margin: "6px 0" }} />
+                        <div className="px-3 pb-2">
+                          <p className="mb-2 text-xs text-[#9CA3AF]">Not finding what you need?</p>
+                          <Button
+                            size="small"
+                            type="dashed"
+                            block
+                            onClick={() => {
+                              const parts = itItemSearch.trim().split(" ");
+                              quickCreateForm.setFieldsValue({ brand: parts[0] || "", model: parts.slice(1).join(" ") || "" });
+                              setQuickCreateOpen(true);
+                            }}
+                          >
+                            + Register "{itItemSearch.trim()}" as a new item
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+                onChange={(value) => {
+                  const item = itItemsList.find((i) => i.id === value);
+                  setSelectedITItem(item || null);
+                  createForm.setFieldsValue({ attributes: {}, deviceFields: {} });
+                  if (item?.specifications) {
+                    const validationRules = Array.isArray(item.validationRules) ? item.validationRules : [];
+                    const defs = item.category?.attributeDefinitions || [];
+                    const prefill = {};
+                    defs.forEach((d) => {
+                      if (validationRules.includes(d.key) && ["BOTH"].includes(d.scope) && item.specifications[d.key] != null) {
+                        prefill[d.key] = item.specifications[d.key];
+                      }
+                    });
+                    if (Object.keys(prefill).length) createForm.setFieldsValue({ attributes: prefill });
                   }
-                }
-                if (item?.defaultWarranty) {
-                  createForm.setFieldsValue({ warrantyPeriod: item.defaultWarranty });
-                }
-              }}
-            >
-              {itItemsList.map((item) => (
-                <Select.Option key={item.id} value={item.id}>
-                  {item.brand} {item.model} — {item.category?.name || item.deviceType || "Uncategorized"}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          {createAttributeDefinitions.length > 0 && (
-            <>
-              <p className="mb-3 text-sm font-semibold text-[#616161]">Category Attributes</p>
-              {createAttributeDefinitions.map((definition) => (
-                <Form.Item
-                  key={definition.id}
-                  name={["attributes", definition.key]}
-                  label={definition.label}
-                  rules={definition.isRequired ? [{ required: true, message: `${definition.label} is required` }] : undefined}
-                  valuePropName={getDefinitionInputType(definition) === "switch" ? "checked" : "value"}
-                >
-                  {renderCategoryFieldInput(definition)}
-                </Form.Item>
-              ))}
-            </>
-          )}
-
-          <Form.Item name="userId" label="Assigned User" rules={[{ required: true, message: "Please select a user" }]}>
-            <Select
-              showSearch
-              placeholder="Select a user"
-              optionFilterProp="children"
-              filterOption={(input, option) =>
-                String(option?.children || "").toLowerCase().includes(input.toLowerCase())
-              }
-              onChange={(value) => {
-                const user = invuser?.data?.find((u) => u.id === value);
-                if (user) {
-                  createForm.setFieldsValue({
-                    department: user.department?.name || "",
-                    unit: user.unit?.name || "",
-                    departmentId: user.departmentId,
-                    unitIdHidden: user.unitId,
-                  });
-                }
-              }}
-            >
-              {invuser?.data?.map((user) => (
-                <Select.Option key={user.id} value={user.id}>
-                  {user.name}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="department" label="Department">
-            <Input disabled />
-          </Form.Item>
-
-          <Form.Item name="unit" label="Unit">
-            <Input disabled />
-          </Form.Item>
-
-          <Form.Item name="departmentId" hidden>
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="unitIdHidden" hidden>
-            <Input />
-          </Form.Item>
-
-          <Form.Item name="warrantyPeriod" label="Warranty Period (months)">
-            <InputNumber min={0} className="w-full" placeholder="e.g. 12" />
-          </Form.Item>
-
-          <Form.Item name="purchaseDate" label="Purchase Date">
-            <DatePicker className="w-full" />
-          </Form.Item>
-
-          <Form.Item name="status" label="Status">
-            <Select placeholder="Select status (defaults to ACTIVE)">
-              <Select.Option value="ACTIVE">Active</Select.Option>
-              <Select.Option value="INACTIVE">Inactive</Select.Option>
-              <Select.Option value="NON_FUNCTIONAL">Non Functional</Select.Option>
-              <Select.Option value="UNDER_REPAIR">Under Repair</Select.Option>
-              <Select.Option value="LOANED">Loaned</Select.Option>
-            </Select>
-          </Form.Item>
-
-          <Form.Item name="lpoReference" label="LPO Reference">
-            <Input placeholder="LPO reference number" />
-          </Form.Item>
-
-          <Form.Item name="supplierId" label="Supplier">
-            <Select
-              showSearch
-              allowClear
-              placeholder="Select supplier (optional)"
-              optionFilterProp="children"
-              filterOption={(input, option) =>
-                String(option?.children || "").toLowerCase().includes(input.toLowerCase())
-              }
-            >
-              {itItemsList
-                .filter((item) => item.supplier)
-                .reduce((acc, item) => {
-                  if (!acc.find((s) => s.id === item.supplier.id)) acc.push(item.supplier);
-                  return acc;
-                }, [])
-                .map((supplier) => (
-                  <Select.Option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
+                  if (item?.defaultWarranty) createForm.setFieldsValue({ warrantyPeriod: item.defaultWarranty });
+                }}
+              >
+                {itItemsList.map((item) => (
+                  <Select.Option key={item.id} value={item.id}>
+                    {item.brand} {item.model} — {item.category?.name || item.deviceType || "Uncategorized"}
                   </Select.Option>
                 ))}
-            </Select>
-          </Form.Item>
+              </Select>
+            </Form.Item>
 
-          <Form.Item name="remarks" label="Remarks">
-            <Input.TextArea rows={3} placeholder="Any additional notes" />
-          </Form.Item>
+            {/* Quick-create panel — uses component=false to avoid a nested <form> inside the outer form */}
+            {quickCreateOpen && (
+              <div className="mb-3 rounded-xl border border-dashed border-[#D32F2F] bg-[#FFF5F5] p-4">
+                <p className="mb-3 text-sm font-bold text-[#D32F2F]">Register New Item</p>
+                <Form form={quickCreateForm} layout="vertical" component={false} onFinish={(values) => quickCreateITItem(values)}>
+                  <div className="grid grid-cols-2 gap-x-4">
+                    <Form.Item name="brand" label="Brand" rules={[{ required: true, message: "Required" }]}>
+                      <Input placeholder="e.g. Dell" />
+                    </Form.Item>
+                    <Form.Item name="model" label="Model" rules={[{ required: true, message: "Required" }]}>
+                      <Input placeholder="e.g. Latitude 5520" />
+                    </Form.Item>
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-4">
+                    <Form.Item name="categoryId" label="Category">
+                      <Select allowClear placeholder="Select category">
+                        {(deviceFieldsData?.data?.categories || []).map((cat) => (
+                          <Select.Option key={cat.id} value={cat.id}>{cat.name}</Select.Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                    <Form.Item name="itemClass" label="Item Class" rules={[{ required: true, message: "Required" }]}>
+                      <Select placeholder="Select class">
+                        <Select.Option value="FIXED_ASSET">Fixed Asset</Select.Option>
+                        <Select.Option value="CONSUMABLE">Consumable</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </div>
+                  <Form.Item name="description" label="Description">
+                    <Input placeholder="Brief description (optional)" />
+                  </Form.Item>
+                  <div className="flex gap-2">
+                    <Button
+                      type="primary"
+                      loading={isQuickCreating}
+                      size="small"
+                      onClick={() => quickCreateForm.submit()}
+                    >
+                      Register Item
+                    </Button>
+                    <Button size="small" onClick={() => { setQuickCreateOpen(false); quickCreateForm.resetFields(); }}>Cancel</Button>
+                  </div>
+                </Form>
+              </div>
+            )}
 
-          <Button type="primary" htmlType="submit" block loading={isCreating}>
-            Create Inventory Item
+            {/* Category-driven device details */}
+            {createAttributeDefinitions.length > 0 && (
+              <div className="mt-3 rounded-xl border border-[#E5E7EB] bg-white p-3">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">
+                  Device Details · {selectedITItem?.category?.name}
+                </p>
+                <div className="grid grid-cols-2 gap-x-4">
+                  {createAttributeDefinitions.map((definition) => {
+                    const isWide = getDefinitionInputType(definition) === "textarea";
+                    return (
+                      <div key={definition.key} style={isWide ? { gridColumn: "1 / -1" } : {}}>
+                        <Form.Item
+                          name={["attributes", definition.key]}
+                          label={definition.label}
+                          rules={definition.isRequired ? [{ required: true, message: `${definition.label} is required` }] : undefined}
+                          valuePropName={getDefinitionInputType(definition) === "switch" ? "checked" : "value"}
+                        >
+                          {renderCategoryFieldInput(definition)}
+                        </Form.Item>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Legacy device fields */}
+            {createLegacyDeviceFields.length > 0 && (
+              <div className="mt-3 rounded-xl border border-[#E5E7EB] bg-white p-3">
+                <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">
+                  Device Details · {selectedITItem?.deviceType}
+                </p>
+                <div className="grid grid-cols-2 gap-x-4">
+                  {createLegacyDeviceFields.map((field) => (
+                    <Form.Item
+                      key={field.name}
+                      name={["deviceFields", field.name]}
+                      label={field.label}
+                      valuePropName={field.type === "switch" ? "checked" : "value"}
+                    >
+                      {field.type === "switch" ? <Switch /> : <Input placeholder={field.label} />}
+                    </Form.Item>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Section 2: Assignment ── */}
+          <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">2 · Assignment</p>
+            <Form.Item name="userId" label="Assigned User" rules={[{ required: true, message: "Please select a user" }]} className="mb-3">
+              <Select
+                showSearch
+                placeholder="Select a user"
+                optionFilterProp="children"
+                filterOption={(input, option) =>
+                  String(option?.children || "").toLowerCase().includes(input.toLowerCase())
+                }
+                onChange={(value) => {
+                  const user = invuser?.data?.find((u) => u.id === value);
+                  if (user) {
+                    createForm.setFieldsValue({
+                      department: user.department?.name || "",
+                      unit: user.unit?.name || "",
+                      departmentId: user.departmentId,
+                      unitIdHidden: user.unitId,
+                    });
+                  }
+                }}
+              >
+                {invuser?.data?.map((user) => (
+                  <Select.Option key={user.id} value={user.id}>{user.name}</Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <div className="grid grid-cols-2 gap-x-4">
+              <Form.Item name="department" label="Department"><Input disabled /></Form.Item>
+              <Form.Item name="unit" label="Unit"><Input disabled /></Form.Item>
+            </div>
+            <Form.Item name="departmentId" hidden><Input /></Form.Item>
+            <Form.Item name="unitIdHidden" hidden><Input /></Form.Item>
+          </div>
+
+          {/* ── Section 3: Procurement (optional) ── */}
+          <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+            <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">3 · Procurement <span className="normal-case font-normal text-[#D1D5DB]">— optional</span></p>
+            <div className="grid grid-cols-2 gap-x-4">
+              <Form.Item name="status" label="Status">
+                <Select placeholder="Defaults to Active">
+                  <Select.Option value="ACTIVE">Active</Select.Option>
+                  <Select.Option value="INACTIVE">Inactive</Select.Option>
+                  <Select.Option value="NON_FUNCTIONAL">Non Functional</Select.Option>
+                  <Select.Option value="UNDER_REPAIR">Under Repair</Select.Option>
+                  <Select.Option value="LOANED">Loaned</Select.Option>
+                </Select>
+              </Form.Item>
+              <Form.Item name="warrantyPeriod" label="Warranty Period (months)">
+                <InputNumber min={0} className="w-full" placeholder="e.g. 12" />
+              </Form.Item>
+              <Form.Item name="purchaseDate" label="Purchase Date">
+                <DatePicker className="w-full" />
+              </Form.Item>
+              <Form.Item name="lpoReference" label="LPO Reference">
+                <Input placeholder="LPO reference number" />
+              </Form.Item>
+            </div>
+            <Form.Item name="supplierId" label="Supplier">
+              <Select showSearch allowClear placeholder="Select supplier (optional)" optionFilterProp="children"
+                filterOption={(input, option) => String(option?.children || "").toLowerCase().includes(input.toLowerCase())}>
+                {itItemsList
+                  .filter((item) => item.supplier)
+                  .reduce((acc, item) => {
+                    if (!acc.find((s) => s.id === item.supplier.id)) acc.push(item.supplier);
+                    return acc;
+                  }, [])
+                  .map((supplier) => (
+                    <Select.Option key={supplier.id} value={supplier.id}>{supplier.name}</Select.Option>
+                  ))}
+              </Select>
+            </Form.Item>
+            <Form.Item name="remarks" label="Remarks" className="mb-0">
+              <Input.TextArea rows={2} placeholder="Any additional notes" />
+            </Form.Item>
+          </div>
+
+          <Button type="primary" htmlType="submit" block size="large" loading={isCreating}
+            className="!bg-[#D32F2F] !border-[#D32F2F] hover:!bg-[#B71C1C]">
+            Create Inventory Asset
           </Button>
         </Form>
       </Modal>

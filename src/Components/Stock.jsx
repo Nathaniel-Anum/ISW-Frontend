@@ -87,15 +87,13 @@ const Stock = () => {
 
   // ── Adjustments state ───────────────────────────────────────────────────
   const [adjModalOpen, setAdjModalOpen] = useState(false);
-  const [rejectAdjModalOpen, setRejectAdjModalOpen] = useState(false);
-  const [selectedAdj, setSelectedAdj] = useState(null);
   const [adjForm] = Form.useForm();
-  const [rejectAdjForm] = Form.useForm();
 
   // ── Returns state ───────────────────────────────────────────────────────
   const [returnModalOpen, setReturnModalOpen] = useState(false);
   const [rejectReturnModalOpen, setRejectReturnModalOpen] = useState(false);
   const [selectedReturn, setSelectedReturn] = useState(null);
+  const [returnItemFilter, setReturnItemFilter] = useState(null);
   const [returnForm] = Form.useForm();
   const [rejectReturnForm] = Form.useForm();
 
@@ -123,6 +121,12 @@ const Stock = () => {
     queryKey: ["stockReturns"],
     queryFn: () => api.get("/stores/returns"),
   });
+
+  const { data: stockIssuedRes } = useQuery({
+    queryKey: ["stockIssuedList"],
+    queryFn: () => api.get("/stores/stock-issued"),
+  });
+  const stockIssuedList = stockIssuedRes?.data || [];
 
   const stockData = (stockResponse?.data?.data || []).map((item) => ({
     ...item,
@@ -161,33 +165,13 @@ const Stock = () => {
   const createAdjMutation = useMutation({
     mutationFn: (values) => api.post("/stores/stock-adjustments", values),
     onSuccess: () => {
-      toast.success("Adjustment submitted.");
+      toast.success("Stock adjusted successfully.");
       queryClient.invalidateQueries(["stockAdjustments"]);
+      queryClient.invalidateQueries(["stockLevels"]);
       setAdjModalOpen(false);
       adjForm.resetFields();
     },
     onError: () => toast.error("Failed to submit adjustment."),
-  });
-
-  const approveAdjMutation = useMutation({
-    mutationFn: (id) => api.patch(`/stores/stock-adjustments/${id}/approve`),
-    onSuccess: () => {
-      toast.success("Adjustment approved.");
-      queryClient.invalidateQueries(["stockAdjustments", "stockLevels"]);
-    },
-    onError: () => toast.error("Failed to approve adjustment."),
-  });
-
-  const rejectAdjMutation = useMutation({
-    mutationFn: ({ id, rejectReason }) =>
-      api.patch(`/stores/stock-adjustments/${id}/reject`, { rejectReason }),
-    onSuccess: () => {
-      toast.success("Adjustment rejected.");
-      queryClient.invalidateQueries(["stockAdjustments"]);
-      setRejectAdjModalOpen(false);
-      rejectAdjForm.resetFields();
-    },
-    onError: () => toast.error("Failed to reject adjustment."),
   });
 
   const createReturnMutation = useMutation({
@@ -197,6 +181,7 @@ const Stock = () => {
       queryClient.invalidateQueries(["stockReturns"]);
       setReturnModalOpen(false);
       returnForm.resetFields();
+      setReturnItemFilter(null);
     },
     onError: () => toast.error("Failed to log return."),
   });
@@ -280,53 +265,15 @@ const Stock = () => {
 
   const adjColumns = [
     { title: "Item", key: "item", render: (_, r) => `${r.itItem?.brand} ${r.itItem?.model}` },
-    { title: "Delta", dataIndex: "quantityDelta", key: "quantityDelta", render: (v) => (v > 0 ? `+${v}` : v) },
+    { title: "Delta", dataIndex: "quantityDelta", key: "quantityDelta", render: (v) => <span className={`font-semibold ${v > 0 ? "text-[#166534]" : "text-[#D32F2F]"}`}>{v > 0 ? `+${v}` : v}</span> },
     { title: "Reason", dataIndex: "reason", key: "reason", render: formatCapitalizedLabel },
     { title: "Justification", dataIndex: "justification", key: "justification" },
-    {
-      title: "Status",
-      dataIndex: "status",
-      key: "status",
-      render: (status) => (
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ADJ_STATUS_STYLES[status] || ""}`}>
-          {formatCapitalizedLabel(status)}
-        </span>
-      ),
-    },
+    { title: "Adjusted By", key: "adjustedBy", render: (_, r) => r.adjustedBy?.name || "—" },
     {
       title: "Date",
       dataIndex: "createdAt",
       key: "createdAt",
       render: (d) => new Date(d).toLocaleString("en-US", { dateStyle: "medium" }),
-    },
-    {
-      title: "Actions",
-      key: "actions",
-      render: (_, record) =>
-        record.status === "PENDING" ? (
-          <div className="flex gap-2">
-            <Button
-              size="small"
-              type="primary"
-              loading={approveAdjMutation.isPending}
-              onClick={() => approveAdjMutation.mutate(record.id)}
-            >
-              Approve
-            </Button>
-            <Button
-              size="small"
-              danger
-              onClick={() => {
-                setSelectedAdj(record);
-                setRejectAdjModalOpen(true);
-              }}
-            >
-              Reject
-            </Button>
-          </div>
-        ) : (
-          <span className="text-xs text-[#9CA3AF]">{formatCapitalizedLabel(record.status)}</span>
-        ),
     },
   ];
 
@@ -615,39 +562,11 @@ const Stock = () => {
         </Form>
       </Modal>
 
-      {/* ── Reject Adjustment Modal ───────────────────────────────────────── */}
-      <Modal
-        title="Reject Adjustment"
-        open={rejectAdjModalOpen}
-        onCancel={() => { setRejectAdjModalOpen(false); rejectAdjForm.resetFields(); }}
-        footer={null}
-        destroyOnClose
-      >
-        <Form
-          form={rejectAdjForm}
-          layout="vertical"
-          onFinish={(values) => rejectAdjMutation.mutate({ id: selectedAdj?.id, ...values })}
-        >
-          <p className="mb-4 text-sm text-[#616161]">
-            Provide a reason for rejecting the adjustment for{" "}
-            <strong>{selectedAdj?.itItem?.brand} {selectedAdj?.itItem?.model}</strong>.
-          </p>
-          <Form.Item name="rejectReason" label="Rejection Reason" rules={[{ required: true }]}>
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Form.Item>
-            <Button danger type="primary" htmlType="submit" className="w-full" loading={rejectAdjMutation.isPending}>
-              Reject Adjustment
-            </Button>
-          </Form.Item>
-        </Form>
-      </Modal>
-
       {/* ── Log Return Modal ──────────────────────────────────────────────── */}
       <Modal
         title="Log Stock Return"
         open={returnModalOpen}
-        onCancel={() => { setReturnModalOpen(false); returnForm.resetFields(); }}
+        onCancel={() => { setReturnModalOpen(false); returnForm.resetFields(); setReturnItemFilter(null); }}
         footer={null}
         destroyOnClose
       >
@@ -656,17 +575,46 @@ const Stock = () => {
           layout="vertical"
           onFinish={(values) => createReturnMutation.mutate(values)}
         >
-          <Form.Item name="itItemId" label="IT Item" rules={[{ required: true }]}>
-            <Select placeholder="Select item" showSearch optionFilterProp="children">
-              {itItemsList.map((item) => (
-                <Select.Option key={item.id} value={item.id}>
-                  {`${item.brand} — ${item.model}`}
-                </Select.Option>
-              ))}
-            </Select>
+          <Form.Item name="itItemId" hidden><input /></Form.Item>
+          <Form.Item label="IT Item">
+            <Select
+              placeholder="Search item by name..."
+              showSearch
+              allowClear
+              optionFilterProp="label"
+              value={returnItemFilter}
+              onChange={(val) => {
+                setReturnItemFilter(val);
+                returnForm.setFieldValue("stockIssuedId", undefined);
+                returnForm.setFieldValue("itItemId", undefined);
+              }}
+              options={[
+                ...new Map(
+                  stockIssuedList.map((r) => [r.itItemId, { value: r.itItemId, label: `${r.itItem?.brand} ${r.itItem?.model}` }])
+                ).values(),
+              ]}
+            />
           </Form.Item>
-          <Form.Item name="stockIssuedId" label="Stock Issued Reference ID" rules={[{ required: true }]}>
-            <Input placeholder="Paste the Stock Issued record ID" />
+          <Form.Item name="stockIssuedId" label="LPO Number" rules={[{ required: true, message: "Select an issued record by LPO" }]}>
+            <Select
+              placeholder={returnItemFilter ? "Select LPO..." : "Select an item first"}
+              showSearch
+              disabled={!returnItemFilter}
+              optionFilterProp="label"
+              filterOption={(input, option) =>
+                (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
+              }
+              onChange={(issuedId) => {
+                const issued = stockIssuedList.find((r) => r.id === issuedId);
+                if (issued) returnForm.setFieldValue("itItemId", issued.itItemId);
+              }}
+              options={stockIssuedList
+                .filter((r) => !returnItemFilter || r.itItemId === returnItemFilter)
+                .map((issued) => ({
+                  value: issued.id,
+                  label: `${issued.stockBatch?.stockReceived?.lpoReference || "No LPO"} — Qty issued: ${issued.quantityIssued}`,
+                }))}
+            />
           </Form.Item>
           <Form.Item name="quantity" label="Quantity Returned" rules={[{ required: true }]}>
             <InputNumber min={1} className="w-full" />

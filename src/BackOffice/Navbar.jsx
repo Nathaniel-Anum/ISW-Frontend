@@ -2,6 +2,8 @@ import { Button, Dropdown, Space } from "antd";
 import { DownOutlined } from "@ant-design/icons";
 import { LuArrowRightLeft, LuMenu } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useUser } from "../utils/userContext";
 
 const Navbar = ({ onOpenMenu = () => {} }) => {
@@ -27,6 +29,7 @@ const Navbar = ({ onOpenMenu = () => {} }) => {
   ];
 
   return (
+    <>
     <header className="fixed left-0 right-0 top-0 z-30 h-[72px] border-b border-[#E0E0E0] bg-white md:left-[280px]">
       <div className="flex h-full items-center justify-between gap-4 px-4 md:px-8 xl:px-10">
         <div className="flex items-center gap-3">
@@ -83,6 +86,8 @@ const Navbar = ({ onOpenMenu = () => {} }) => {
         </div>
       </div>
     </header>
+    <ToastContainer position="top-right" autoClose={4000} hideProgressBar={false} closeOnClick pauseOnHover />
+    </>
   );
 };
 

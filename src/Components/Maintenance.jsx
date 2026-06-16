@@ -150,8 +150,15 @@ const Maintenance = () => {
     enabled: !!partsHistoryRecord?.assetId,
   });
 
+  const { data: techHistoryResponse, isFetching: techHistoryLoading } = useQuery({
+    queryKey: ["technicianHistory", partsHistoryRecord?.assetId],
+    queryFn: () => api.get(`/hardware/assets/${partsHistoryRecord?.assetId}/technician-history`),
+    enabled: !!partsHistoryRecord?.assetId,
+  });
+
   const workload = workloadResponse?.data || [];
   const partsHistory = partsHistoryResponse?.data || null;
+  const techHistory = techHistoryResponse?.data || [];
 
   const tickets = ticketsResponse?.data || [];
 
@@ -292,7 +299,7 @@ const Maintenance = () => {
         const items = [
           {
             key: "parts-history",
-            label: "Parts History",
+            label: "Device History",
             icon: <LuHistory size={14} />,
             onClick: () => {
               setPartsHistoryRecord(currentRecord);
@@ -366,7 +373,6 @@ const Maintenance = () => {
       unitId: selectedDevice.unitId,
       description: values.description,
       issueType: values.issueType,
-      technicianReceivedById: values.technicianReceivedById,
       priority: "MEDIUM",
     };
 
@@ -488,7 +494,7 @@ const Maintenance = () => {
         destroyOnClose
       >
         <Input
-          placeholder="Search device by brand or model"
+          placeholder="Search device by tag number, brand, model, user, or serial number"
           onChange={(event) => setSearchTerm(event.target.value)}
           allowClear
           style={{ marginBottom: 16 }}
@@ -510,6 +516,12 @@ const Maintenance = () => {
                 <p className="text-sm text-[#616161]">
                   {device.userName || "Unassigned user"}
                 </p>
+                <p className="text-xs text-[#9CA3AF]">
+                  Serial: {device.serialNumber || "N/A"}
+                </p>
+                <p className="text-xs text-[#9CA3AF]">
+                  Tag Number: {device.tagNumber || "N/A"}
+                </p>
               </li>
             ))}
           </ul>
@@ -519,9 +531,9 @@ const Maintenance = () => {
               <p className="text-sm font-semibold text-[#212121]">
                 Selected device: {selectedDevice.brand} {selectedDevice.model}
               </p>
-              <p className="mt-1 text-sm text-[#616161]">
-                Asset #{selectedDevice.inventoryId}
-              </p>
+              <p className="mt-1 text-sm text-[#616161]">Asset Tag: {selectedDevice.assetId}</p>
+              <p className="mt-1 text-sm text-[#616161]">Inventory ID: {selectedDevice.inventoryId}</p>
+              <p className="mt-1 text-sm text-[#616161]">Tag Number: {selectedDevice.tagNumber || "N/A"}</p>
             </div>
 
             <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
@@ -529,20 +541,6 @@ const Maintenance = () => {
                 <Select>
                   <Select.Option value="HARDWARE">HARDWARE</Select.Option>
                   <Select.Option value="SOFTWARE">SOFTWARE</Select.Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item
-                name="technicianReceivedById"
-                label="Received By"
-                rules={[{ required: true, message: "Please select a technician" }]}
-              >
-                <Select placeholder="Select technician">
-                  {technicians?.data?.map((technician) => (
-                    <Select.Option key={technician.id} value={technician.id}>
-                      {technician.name}
-                    </Select.Option>
-                  ))}
                 </Select>
               </Form.Item>
             </div>
@@ -702,51 +700,85 @@ const Maintenance = () => {
 
       <Modal
         open={isPartsHistoryOpen}
-        title={`Parts History — ${partsHistoryRecord?.brand || ""} ${partsHistoryRecord?.model || ""}`}
+        title={`Device History — ${partsHistoryRecord?.brand || ""} ${partsHistoryRecord?.model || ""}`}
         onCancel={() => { setIsPartsHistoryOpen(false); setPartsHistoryRecord(null); }}
         footer={null}
-        width={760}
+        width={820}
         destroyOnClose
       >
-        {partsHistoryLoading ? (
-          <Spin />
-        ) : partsHistory ? (
-          <div className="space-y-4">
-            {partsHistory.tickets.length === 0 && (
-              <p className="text-sm text-[#757575]">No maintenance history for this asset yet.</p>
-            )}
-            {partsHistory.tickets.map((t) => (
-              <div key={t.ticketId} className="rounded-2xl border border-[#E0E0E0] bg-[#FAFAFA] p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-bold text-[#212121]">{t.ticketId}</p>
-                    <p className="text-xs text-[#616161]">{t.issueType} · {t.priority}</p>
+        <Tabs defaultActiveKey="parts" items={[
+          {
+            key: "parts",
+            label: "Parts History",
+            children: partsHistoryLoading ? <Spin /> : partsHistory ? (
+              <div className="space-y-4">
+                {partsHistory.tickets.length === 0 && (
+                  <p className="text-sm text-[#757575]">No maintenance history for this asset yet.</p>
+                )}
+                {partsHistory.tickets.map((t) => (
+                  <div key={t.ticketId} className="rounded-2xl border border-[#E0E0E0] bg-[#FAFAFA] p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-bold text-[#212121]">{t.ticketId}</p>
+                        <p className="text-xs text-[#616161]">{t.issueType} · {t.priority}</p>
+                      </div>
+                      <p className="text-xs text-[#757575]">{new Date(t.dateLogged).toLocaleDateString()}</p>
+                    </div>
+                    {t.parts.length > 0 && (
+                      <Table
+                        className="mt-3"
+                        size="small"
+                        rowKey="requisitionID"
+                        pagination={false}
+                        dataSource={t.parts}
+                        columns={[
+                          { title: "Requisition", dataIndex: "requisitionID", key: "req" },
+                          { title: "Item", dataIndex: "itemDescription", key: "item" },
+                          { title: "Qty", dataIndex: "quantity", key: "qty" },
+                          { title: "Status", dataIndex: "status", key: "status", render: (v) => <Tag>{v?.replaceAll("_", " ")}</Tag> },
+                          { title: "Issued", dataIndex: "issuedAt", key: "issued", render: (v) => v ? new Date(v).toLocaleDateString() : "—" },
+                        ]}
+                      />
+                    )}
+                    {t.parts.length === 0 && (
+                      <p className="mt-2 text-xs text-[#9E9E9E]">No parts requisitioned for this job.</p>
+                    )}
                   </div>
-                  <p className="text-xs text-[#757575]">{new Date(t.dateLogged).toLocaleDateString()}</p>
-                </div>
-                {t.parts.length > 0 && (
-                  <Table
-                    className="mt-3"
-                    size="small"
-                    rowKey="requisitionID"
-                    pagination={false}
-                    dataSource={t.parts}
-                    columns={[
-                      { title: "Requisition", dataIndex: "requisitionID", key: "req" },
-                      { title: "Item", dataIndex: "itemDescription", key: "item" },
-                      { title: "Qty", dataIndex: "quantity", key: "qty" },
-                      { title: "Status", dataIndex: "status", key: "status", render: (v) => <Tag>{v?.replaceAll("_", " ")}</Tag> },
-                      { title: "Issued", dataIndex: "issuedAt", key: "issued", render: (v) => v ? new Date(v).toLocaleDateString() : "—" },
-                    ]}
-                  />
-                )}
-                {t.parts.length === 0 && (
-                  <p className="mt-2 text-xs text-[#9E9E9E]">No parts requisitioned for this job.</p>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
-        ) : null}
+            ) : null,
+          },
+          {
+            key: "technicians",
+            label: "Technician History",
+            children: techHistoryLoading ? <Spin /> : (
+              techHistory.length === 0 ? (
+                <p className="text-sm text-[#757575]">No technician activity recorded yet.</p>
+              ) : (
+                <Table
+                  size="small"
+                  rowKey="id"
+                  dataSource={techHistory}
+                  pagination={false}
+                  columns={[
+                    { title: "Ticket", dataIndex: "ticketId", key: "ticketId" },
+                    { title: "Technician", dataIndex: "technicianName", key: "tech" },
+                    { title: "Action", dataIndex: "action", key: "action", render: (v) => <Tag>{v}</Tag> },
+                    {
+                      title: "Status Change",
+                      key: "status",
+                      render: (_, r) => r.fromStatus && r.fromStatus !== r.toStatus
+                        ? `${r.fromStatus?.replaceAll("_", " ")} → ${r.toStatus?.replaceAll("_", " ")}`
+                        : r.toStatus?.replaceAll("_", " ") || "—",
+                    },
+                    { title: "Note", dataIndex: "note", key: "note", render: (v) => v || "—" },
+                    { title: "Date", dataIndex: "loggedAt", key: "date", render: (v) => new Date(v).toLocaleString() },
+                  ]}
+                />
+              )
+            ),
+          },
+        ]} />
       </Modal>
 
       <Modal

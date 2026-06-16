@@ -26,7 +26,15 @@ const sections = [
     title: "Catalog",
     items: [
       { label: "Suppliers", to: "/backoffice/dashboard/supplier", icon: Districts },
-      { label: "IT Items", to: "/backoffice/dashboard/it-items", icon: AppConfigIcon },
+    ],
+  },
+  {
+    title: "Setup",
+    items: [
+      { label: "Purchase Type", to: "/backoffice/dashboard/projects", icon: AppConfigIcon },
+      { label: "Item Categories", to: "/backoffice/dashboard/it-item-categories", icon: AppConfigIcon },
+      { label: "Item Registration", to: "/backoffice/dashboard/it-items", icon: AppConfigIcon },
+      { label: "Requisition Items", to: "/backoffice/dashboard/requisition-items", icon: AppConfigIcon },
     ],
   },
   {
