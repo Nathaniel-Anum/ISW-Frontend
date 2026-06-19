@@ -365,11 +365,12 @@ const ServiceDeskQueue = () => {
   };
 
   const columns = [
-    { title: "Ticket", dataIndex: "ticketNo", key: "ticketNo", render: (value) => <span className="font-semibold">{value}</span> },
-    { title: "Subject", dataIndex: "subject", key: "subject" },
+    { title: "Ticket", dataIndex: "ticketNo", key: "ticketNo", width: 96, render: (value) => <span className="font-semibold">{value}</span> },
+    { title: "Subject", dataIndex: "subject", key: "subject", width: 190, ellipsis: true },
     {
       title: "Reporter",
       key: "reporter",
+      width: 170,
       render: (_, record) => {
         const dept = record.reporter?.department?.name;
         const room = record.reporter?.roomNo;
@@ -385,12 +386,13 @@ const ServiceDeskQueue = () => {
         );
       },
     },
-    { title: "Work Type", dataIndex: ["category", "name"], key: "category", render: (value) => value || "-" },
-    { title: "Priority", dataIndex: "priority", key: "priority" },
+    { title: "Work Type", dataIndex: ["category", "name"], key: "category", width: 130, ellipsis: true, render: (value) => value || "-" },
+    { title: "Priority", dataIndex: "priority", key: "priority", width: 86 },
     {
       title: "SLA",
       dataIndex: "dueAt",
       key: "dueAt",
+      width: 110,
       render: (dueAt, record) => {
         if (!dueAt || ["RESOLVED", "CLOSED", "CANCELLED"].includes(record.status)) return <span className="text-xs text-[#9E9E9E]">—</span>;
         const minsLeft = Math.floor((new Date(dueAt) - Date.now()) / 60000);
@@ -405,6 +407,7 @@ const ServiceDeskQueue = () => {
       title: "Status",
       dataIndex: "status",
       key: "status",
+      width: 132,
       render: (status) => (
         <Tag
           bordered
@@ -419,6 +422,8 @@ const ServiceDeskQueue = () => {
       title: "Assigned To",
       dataIndex: ["assignedTo", "name"],
       key: "assignedTo",
+      width: 135,
+      ellipsis: true,
       render: (value) =>
         value ? (
           <span className="text-sm">{value}</span>
@@ -428,10 +433,13 @@ const ServiceDeskQueue = () => {
           </Tag>
         ),
     },
-    { title: "Comments", dataIndex: ["_count", "comments"], key: "comments" },
+    { title: "Comments", dataIndex: ["_count", "comments"], key: "comments", width: 84 },
     {
       title: "Actions",
       key: "actions",
+      width: 64,
+      fixed: "right",
+      align: "center",
       render: (_, record) => {
         const isTerminal = ["RESOLVED", "CLOSED", "CANCELLED"].includes(record.status);
         const items = [
@@ -570,7 +578,7 @@ const ServiceDeskQueue = () => {
           </div>
         )}
 
-        <Table columns={columns} dataSource={tableData} rowKey="id" loading={isLoading} scroll={{ x: 1200 }}
+        <Table columns={columns} dataSource={tableData} rowKey="id" loading={isLoading} scroll={{ x: "max-content" }} tableLayout="fixed"
           onRow={(record) => ({ style: getQueueRowStyle(record) })}
           rowSelection={canAssignTickets ? {
             selectedRowKeys,

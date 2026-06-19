@@ -67,6 +67,8 @@ const SERVICE_DESK_DISTRIBUTION_ORDER = [
   { key: "CANCELLED", name: "Cancelled", color: "#94A3B8" },
 ];
 
+const formatLabel = (value) => value?.replaceAll("_", " ") || "-";
+
 const SummaryCard = ({ card }) => {
   const Icon = card.icon;
   return (
@@ -382,6 +384,38 @@ const Dashboard = () => {
     color: item.color,
   })).filter((item) => item.value > 0);
 
+  const sdAnalytics = React.useMemo(() => {
+    if (!sdTickets.length) return null;
+
+    const statusCount = {};
+    const priorityCount = {};
+    const categoryCount = {};
+
+    sdTickets.forEach((ticket) => {
+      statusCount[ticket.status] = (statusCount[ticket.status] || 0) + 1;
+      priorityCount[ticket.priority] = (priorityCount[ticket.priority] || 0) + 1;
+
+      const categoryName = ticket.category?.name || "Uncategorised";
+      categoryCount[categoryName] = (categoryCount[categoryName] || 0) + 1;
+    });
+
+    const priorityOrder = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+    const resolvedWithDueAt = sdTickets.filter((ticket) => ["RESOLVED", "CLOSED"].includes(ticket.status) && ticket.dueAt);
+    const resolvedInSla = resolvedWithDueAt.filter(
+      (ticket) => new Date(ticket.resolvedAt || ticket.closedAt) <= new Date(ticket.dueAt)
+    ).length;
+
+    return {
+      byStatus: Object.entries(statusCount).map(([name, value]) => ({ name: formatLabel(name), value })),
+      byPriority: priorityOrder.filter((priority) => priorityCount[priority]).map((priority) => ({ name: priority, value: priorityCount[priority] })),
+      byCategory: Object.entries(categoryCount)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name, value]) => ({ name, value })),
+      slaCompliance: resolvedWithDueAt.length ? Math.round((resolvedInSla / resolvedWithDueAt.length) * 100) : null,
+    };
+  }, [sdTickets]);
+
   const renderCards = (cards) => (
     <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
       {cards.map((card) => (
@@ -664,6 +698,106 @@ const Dashboard = () => {
             subtitle="All active support tickets across the system"
           />
           {renderCards(sdAllCards)}
+        </section>
+      )}
+
+      {showSdAll && sdAnalytics && (
+        <section className="mt-6 rounded-xl border border-[#E0E0E0] bg-white p-5">
+          <div className="mb-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[#9E9E9E]">Analytics</p>
+            <h3 className="mt-1 text-base font-bold text-[#212121]">Ticket breakdown &amp; SLA performance</h3>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="flex flex-col items-center justify-center rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-6">
+              <p className="mb-2 text-sm font-semibold text-[#616161]">SLA Compliance Rate</p>
+              {sdAnalytics.slaCompliance !== null ? (
+                <>
+                  <span className={`text-5xl font-bold ${sdAnalytics.slaCompliance >= 80 ? "text-[#166534]" : sdAnalytics.slaCompliance >= 50 ? "text-[#B45309]" : "text-[#B71C1C]"}`}>
+                    {sdAnalytics.slaCompliance}%
+                  </span>
+                  <p className="mt-2 text-xs text-[#9E9E9E]">of resolved tickets closed within SLA deadline</p>
+                  <div className="mt-4 h-3 w-full max-w-xs overflow-hidden rounded-full bg-[#E0E0E0]">
+                    <div
+                      className={`h-full rounded-full transition-all ${sdAnalytics.slaCompliance >= 80 ? "bg-[#16A34A]" : sdAnalytics.slaCompliance >= 50 ? "bg-[#D97706]" : "bg-[#DC2626]"}`}
+                      style={{ width: `${sdAnalytics.slaCompliance}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-[#9E9E9E]">No SLA data available</p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-4">
+              <p className="mb-3 text-sm font-semibold text-[#616161]">Tickets by Priority</p>
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={sdAnalytics.byPriority} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    {sdAnalytics.byPriority.map((entry) => {
+                      const colors = { CRITICAL: "#DC2626", HIGH: "#EA580C", MEDIUM: "#D97706", LOW: "#16A34A" };
+                      return <Cell key={entry.name} fill={colors[entry.name] || "#6B7280"} />;
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div className="rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-4">
+              <p className="mb-3 text-sm font-semibold text-[#616161]">Tickets by Status</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={sdAnalytics.byStatus}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    innerRadius={46}
+                    paddingAngle={3}
+                    label={({ name, percent }) => (percent > 0.04 ? `${name} ${Math.round(percent * 100)}%` : "")}
+                    labelLine={false}
+                  >
+                    {sdAnalytics.byStatus.map((entry) => {
+                      const statusColors = {
+                        NEW: "#3B82F6",
+                        TRIAGED: "#F97316",
+                        ASSIGNED: "#F59E0B",
+                        "IN PROGRESS": "#EAB308",
+                        "WAITING FOR USER": "#A855F7",
+                        RESOLVED: "#22C55E",
+                        CLOSED: "#16A34A",
+                        ESCALATED: "#EF4444",
+                        CANCELLED: "#9CA3AF",
+                        REOPENED: "#FB923C",
+                      };
+                      return <Cell key={entry.name} fill={statusColors[entry.name] || "#6B7280"} />;
+                    })}
+                  </Pie>
+                  <Tooltip />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-4">
+              <p className="mb-3 text-sm font-semibold text-[#616161]">Tickets by Category (top 8)</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={sdAnalytics.byCategory} layout="vertical" margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                  <YAxis dataKey="name" type="category" width={110} tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#3B82F6" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
         </section>
       )}
 
