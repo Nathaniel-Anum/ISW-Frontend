@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SearchOutlined } from "@ant-design/icons";
-import { Button, Checkbox, Form, Input, Popconfirm, Select, Table, Tag, Tooltip } from "antd";
+import { Button, Checkbox, Form, Input, Select, Table, Tag, Tooltip } from "antd";
 import { useDeferredValue, useMemo, useState } from "react";
-import { LuBoxes, LuLayers, LuPlus, LuShield, LuTrash2, LuPencil } from "react-icons/lu";
+import { LuBoxes, LuLayers, LuPlus, LuShield, LuPencil } from "react-icons/lu";
 import { toast } from "react-toastify";
 import PageShell from "../Components/ui/page-shell";
 import api from "../utils/config";
@@ -74,15 +74,6 @@ const ItItemCategories = () => {
       closeModal();
     },
     onError: (err) => toast.error(err?.response?.data?.message || "Failed to update category"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => api.delete(`/admin/it-item-categories/${id}`),
-    onSuccess: () => {
-      toast.success("Category deleted");
-      refreshCategories();
-    },
-    onError: (err) => toast.error(err?.response?.data?.message || "Failed to delete category"),
   });
 
   const openCreate = () => {
@@ -246,27 +237,6 @@ const ItItemCategories = () => {
           >
             Edit
           </Button>
-          {!record.isBuiltIn && (
-            <Popconfirm
-              title="Delete category"
-              description={
-                record._count?.items > 0
-                  ? `This category has ${record._count.items} active item(s). Re-assign them first.`
-                  : "This will permanently remove the category."
-              }
-              onConfirm={() => {
-                if (record._count?.items > 0) return;
-                deleteMutation.mutate(record.id);
-              }}
-              okText="Delete"
-              cancelText="Cancel"
-              okButtonProps={{ disabled: record._count?.items > 0 }}
-            >
-              <button className="rounded-full p-1.5 transition hover:bg-[#FFEBEE]">
-                <LuTrash2 size={16} className="text-[#EF4444]" />
-              </button>
-            </Popconfirm>
-          )}
         </div>
       ),
     },

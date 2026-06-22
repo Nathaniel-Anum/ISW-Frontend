@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Switch, Table, Tabs, Tag, Divider } from "antd";
+import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popconfirm, Select, Switch, Table, Tabs, Tag, Divider } from "antd";
 import { MoreOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
-import { LuQrCode } from "react-icons/lu";
+import { LuQrCode, LuTrash2 } from "react-icons/lu";
 import { toast } from "react-toastify";
 import api from "../utils/config";
 import { formatCapitalizedLabel } from "../utils/formatText";
@@ -163,6 +163,7 @@ const InvOfficer = () => {
   const [selectedITItem, setSelectedITItem] = useState(null);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [itItemSearch, setItItemSearch] = useState("");
+  const [selectedInventoryIds, setSelectedInventoryIds] = useState([]);
   const [quickCreateForm] = Form.useForm();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
@@ -626,6 +627,21 @@ const InvOfficer = () => {
     },
   });
 
+  const { mutate: deleteInventory, isPending: isDeletingInventory } = useMutation({
+    mutationKey: ["deleteInventory"],
+    mutationFn: (inventoryIds) =>
+      Promise.all(inventoryIds.map((inventoryId) => api.delete(`/inventory/${inventoryId}`))),
+    onSuccess: (_, inventoryIds) => {
+      setSelectedInventoryIds([]);
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      toast.success(`${inventoryIds.length} inventory record${inventoryIds.length === 1 ? "" : "s"} deleted`);
+    },
+    onError: (error) => {
+      const message = error?.response?.data?.message || "Failed to delete selected inventory records";
+      toast.error(Array.isArray(message) ? message.join(", ") : message);
+    },
+  });
+
   const handleSubmit = (values) => {
     updateInventory({
       userId: values.userId,
@@ -726,12 +742,41 @@ const InvOfficer = () => {
           </span>
         </div>
 
+        {selectedInventoryIds.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3">
+            <span className="text-sm font-semibold text-[#991B1B]">
+              {selectedInventoryIds.length} inventory record{selectedInventoryIds.length === 1 ? "" : "s"} selected
+            </span>
+            <div className="flex items-center gap-2">
+              <Button size="small" type="link" onClick={() => setSelectedInventoryIds([])}>
+                Clear
+              </Button>
+              <Popconfirm
+                title="Delete selected inventory records?"
+                description="This removes the selected records from the inventory register and cannot be undone."
+                okText="Delete"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true, loading: isDeletingInventory }}
+                onConfirm={() => deleteInventory(selectedInventoryIds)}
+              >
+                <Button size="small" danger icon={<LuTrash2 size={14} />} loading={isDeletingInventory}>
+                  Delete selected
+                </Button>
+              </Popconfirm>
+            </div>
+          </div>
+        )}
+
         <Table
           columns={columns}
           dataSource={inventoryData}
           loading={inventoryLoading}
           rowKey="id"
           scroll={{ x: 1400 }}
+          rowSelection={{
+            selectedRowKeys: selectedInventoryIds,
+            onChange: setSelectedInventoryIds,
+          }}
         />
 
         <Modal

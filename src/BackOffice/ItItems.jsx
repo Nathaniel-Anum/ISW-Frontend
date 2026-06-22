@@ -4,7 +4,7 @@ import { Button, Checkbox, Form, Input, Modal, Popconfirm, Select, Table, Tag } 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { LuBoxes, LuPlus } from "react-icons/lu";
 import { toast } from "react-toastify";
-import { Delete } from "../Components/icons/icons.components";
+import { LuTrash2 } from "react-icons/lu";
 import PageShell from "../Components/ui/page-shell";
 import api from "../utils/config";
 import { formatCapitalizedLabel } from "../utils/formatText";
@@ -341,14 +341,14 @@ const ItItems = () => {
           </Button>
           <Popconfirm
             title="Delete item"
-            description="This action removes the item template."
+            description="This removes the item template from future use while preserving linked records."
             onConfirm={() => handleDelete(record.id)}
             okText="Delete"
             cancelText="Cancel"
           >
-            <button className="rounded-full p-1.5 transition hover:bg-[#FFEBEE]">
-              <Delete size={18} />
-            </button>
+            <Button type="text" size="small" danger icon={<LuTrash2 size={14} />}>
+              Delete
+            </Button>
           </Popconfirm>
         </div>
       ),
