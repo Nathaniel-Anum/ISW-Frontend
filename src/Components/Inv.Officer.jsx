@@ -630,7 +630,7 @@ const InvOfficer = () => {
   const { mutate: deleteInventory, isPending: isDeletingInventory } = useMutation({
     mutationKey: ["deleteInventory"],
     mutationFn: (inventoryIds) =>
-      Promise.all(inventoryIds.map((inventoryId) => api.delete(`/inventory/${inventoryId}`))),
+      api.delete("/inventory/bulk", { data: { inventoryIds } }),
     onSuccess: (_, inventoryIds) => {
       setSelectedInventoryIds([]);
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
