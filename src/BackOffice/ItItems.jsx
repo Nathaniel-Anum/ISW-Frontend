@@ -1,10 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SearchOutlined } from "@ant-design/icons";
-import { Button, Checkbox, Form, Input, Modal, Popconfirm, Select, Table, Tag } from "antd";
+import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, Checkbox, Dropdown, Form, Input, Modal, Select, Table, Tag, Tooltip } from "antd";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { LuBoxes, LuPlus } from "react-icons/lu";
+import { LuBoxes, LuEye, LuPencil, LuPlus, LuTrash2 } from "react-icons/lu";
 import { toast } from "react-toastify";
-import { LuTrash2 } from "react-icons/lu";
 import PageShell from "../Components/ui/page-shell";
 import api from "../utils/config";
 import { formatCapitalizedLabel } from "../utils/formatText";
@@ -104,6 +103,7 @@ const ItItems = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -196,12 +196,13 @@ const ItItems = () => {
       form.setFieldValue("formFactor", undefined);
     }
 
-    // Default: pre-check all attribute keys when category changes
-    const allKeys = (selectedCategory.attributeDefinitions || [])
-      .filter((definition) => !isClassificationLikeDefinition(definition))
-      .map((d) => d.key);
-    form.setFieldValue("validationRules", allKeys);
-  }, [form, selectedCategory]);
+    if (!editingItem) {
+      const allKeys = (selectedCategory.attributeDefinitions || [])
+        .filter((definition) => !isClassificationLikeDefinition(definition))
+        .map((d) => d.key);
+      form.setFieldValue("validationRules", allKeys);
+    }
+  }, [editingItem, form, selectedCategory]);
 
   useEffect(() => {
     if (selectedStockType !== "CONSUMABLE") {
@@ -243,17 +244,28 @@ const ItItems = () => {
     },
   });
 
-  const handleDelete = (id) => {
-    api
-      .delete(`/admin/it-items/${id}`)
-      .then(() => {
-        toast.success("Item deleted successfully");
-        queryClient.invalidateQueries({ queryKey: ["getItItems"] });
-      })
-      .catch(() => {
-        toast.error("Failed to delete item");
-      });
-  };
+  const updateItem = useMutation({
+    mutationFn: ({ id, values }) => api.patch(`/admin/it-items/${id}`, values),
+    onSuccess: () => {
+      toast.success("Item updated successfully");
+      queryClient.invalidateQueries({ queryKey: ["getItItems"] });
+      closeItemModal();
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to update item");
+    },
+  });
+
+  const deleteItem = useMutation({
+    mutationFn: (id) => api.delete(`/admin/it-items/${id}`),
+    onSuccess: () => {
+      toast.success("Item deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["getItItems"] });
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.message || "Failed to delete item");
+    },
+  });
 
   const openViewModal = (record) => {
     setSelectedItem(record);
@@ -263,6 +275,47 @@ const ItItems = () => {
   const closeViewModal = () => {
     setSelectedItem(null);
     setIsViewModalOpen(false);
+  };
+
+  const closeItemModal = () => {
+    setIsModalOpen(false);
+    setEditingItem(null);
+    form.resetFields();
+  };
+
+  const openCreateModal = () => {
+    setEditingItem(null);
+    form.resetFields();
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (record) => {
+    setEditingItem(record);
+    form.setFieldsValue({
+      categoryId: record.categoryId,
+      itemClass: record.itemClass,
+      brand: record.brand,
+      model: record.model,
+      formFactor: record.formFactor,
+      description: record.description,
+      unitOfMeasure: record.unitOfMeasure,
+      reorderLevel: record.stock?.reorderThreshold,
+      minimumLevel: record.stock?.minimumLevel,
+      maximumLevel: record.stock?.maximumLevel,
+      validationRules: record.validationRules || [],
+      attributes: record.specifications || {},
+    });
+    setIsModalOpen(true);
+  };
+
+  const confirmDelete = (record) => {
+    Modal.confirm({
+      title: "Delete item",
+      content: "This removes the item template from future use while preserving linked records.",
+      okText: "Delete",
+      okButtonProps: { danger: true },
+      onOk: () => deleteItem.mutateAsync(record.id),
+    });
   };
 
   const columns = [
@@ -334,23 +387,25 @@ const ItItems = () => {
     {
       title: "Action",
       key: "action",
+      align: "center",
+      width: 72,
       render: (_, record) => (
-        <div className="flex items-center gap-2">
-          <Button type="default" size="small" className="rounded-xl" onClick={() => openViewModal(record)}>
-            View
-          </Button>
-          <Popconfirm
-            title="Delete item"
-            description="This removes the item template from future use while preserving linked records."
-            onConfirm={() => handleDelete(record.id)}
-            okText="Delete"
-            cancelText="Cancel"
-          >
-            <Button type="text" size="small" danger icon={<LuTrash2 size={14} />}>
-              Delete
-            </Button>
-          </Popconfirm>
-        </div>
+        <Dropdown
+          trigger={["click"]}
+          placement="bottomRight"
+          menu={{
+            items: [
+              { key: "view", label: "View", icon: <LuEye size={15} />, onClick: () => openViewModal(record) },
+              { key: "edit", label: "Edit", icon: <LuPencil size={15} />, onClick: () => openEditModal(record) },
+              { type: "divider" },
+              { key: "delete", label: "Delete", icon: <LuTrash2 size={15} />, danger: true, onClick: () => confirmDelete(record) },
+            ],
+          }}
+        >
+          <Tooltip title="Actions">
+            <Button type="text" shape="circle" icon={<MoreOutlined />} aria-label={`Actions for ${record.brand} ${record.model}`} />
+          </Tooltip>
+        </Dropdown>
       ),
     },
   ];
@@ -377,7 +432,7 @@ const ItItems = () => {
   }, [selectedItem]);
 
   const handleSubmit = (values) => {
-    addItem.mutate({
+    const payload = {
       categoryId: values.categoryId,
       itemClass: values.itemClass,
       brand: values.brand,
@@ -390,7 +445,13 @@ const ItItems = () => {
       maximumLevel: values.itemClass === "CONSUMABLE" ? toOptionalNumber(values.maximumLevel) : undefined,
       specifications: values.attributes || {},
       validationRules: values.validationRules || [],
-    });
+    };
+
+    if (editingItem) {
+      updateItem.mutate({ id: editingItem.id, values: payload });
+    } else {
+      addItem.mutate(payload);
+    }
   };
 
   return (
@@ -413,7 +474,7 @@ const ItItems = () => {
             type="primary"
             icon={<LuPlus size={16} />}
             className="!h-11 !rounded-2xl !px-5"
-            onClick={() => setIsModalOpen(true)}
+            onClick={openCreateModal}
           >
             Add Item
           </Button>
@@ -544,14 +605,14 @@ const ItItems = () => {
       <Modal
         title={
           <div className="flex items-center gap-2">
-            <span className="text-base font-bold text-[#111827]">Add New Item</span>
+            <span className="text-base font-bold text-[#111827]">{editingItem ? "Edit Item" : "Add New Item"}</span>
             <Tag className="m-0 rounded-full border-0 bg-[#FEF3C7] px-3 py-0.5 text-xs font-semibold text-[#92400E]">
               {ITEM_CATEGORY_LABEL}
             </Tag>
           </div>
         }
         open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
+        onCancel={closeItemModal}
         width={860}
         destroyOnClose
         centered
@@ -570,9 +631,9 @@ const ItItems = () => {
             block
             className="!h-11 !rounded-2xl"
             onClick={() => form.submit()}
-            loading={addItem.isPending}
+            loading={addItem.isPending || updateItem.isPending}
           >
-            Submit
+            {editingItem ? "Save Changes" : "Submit"}
           </Button>
         }
       >
