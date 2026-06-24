@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Popconfirm, Select, Switch, Table, Tabs, Tag, Divider } from "antd";
+import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Steps, Switch, Table, Tabs, Tag, Divider } from "antd";
 import { MoreOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
-import { LuQrCode, LuTrash2 } from "react-icons/lu";
+import { LuQrCode } from "react-icons/lu";
 import { toast } from "react-toastify";
 import api from "../utils/config";
 import { formatCapitalizedLabel } from "../utils/formatText";
@@ -36,6 +36,39 @@ const PRIORITY_STYLES = {
   HIGH: "bg-[#FEE2E2] text-[#B91C1C]",
   MEDIUM: "bg-[#FEF3C7] text-[#92400E]",
   LOW: "bg-[#ECFDF3] text-[#166534]",
+};
+
+const getQuickCreateFormFactorOptions = (category) => {
+  const definitions = (category?.attributeDefinitions || []).filter((item) => {
+    const key = String(item.key || "").toLowerCase();
+    const label = String(item.label || "").toLowerCase();
+    return (
+      key === "formfactor" ||
+      key === "form_factor" ||
+      key === "devicetype" ||
+      key === "device_type" ||
+      key === "printtechnology" ||
+      key === "print_technology" ||
+      label.includes("form factor") ||
+      label.includes("device type") ||
+      label.includes("print technology")
+    );
+  });
+
+  const configuredOptions = definitions.flatMap((definition) =>
+    Array.isArray(definition.optionsJson) ? definition.optionsJson : []
+  );
+  if (configuredOptions.length) {
+    return [...new Set(configuredOptions)];
+  }
+
+  const categoryName = String(category?.name || "").toLowerCase();
+  if (categoryName.includes("computer")) return ["Laptop", "Desktop", "Mini PC", "All-in-One", "Workstation"];
+  if (categoryName.includes("print")) return ["Laser", "Inkjet", "Thermal", "Dot Matrix"];
+  if (categoryName.includes("network")) return ["Router", "Switch", "Firewall", "Access Point", "Load Balancer", "Modem", "Gateway", "Repeater"];
+  if (categoryName.includes("cctv") || categoryName.includes("security")) return ["IP Camera", "NVR", "DVR", "Access Control Panel", "Alarm System", "Intercom Panel"];
+  if (categoryName.includes("consumable")) return ["Accessories"];
+  return [];
 };
 
 const formatDateTime = (value) => {
@@ -160,15 +193,19 @@ const InvOfficer = () => {
   const [activeForm, setActiveForm] = useState("user");
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createStep, setCreateStep] = useState(0);
   const [selectedITItem, setSelectedITItem] = useState(null);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [itItemSearch, setItItemSearch] = useState("");
-  const [selectedInventoryIds, setSelectedInventoryIds] = useState([]);
   const [quickCreateForm] = Form.useForm();
   const queryClient = useQueryClient();
   const [form] = Form.useForm();
   const [createForm] = Form.useForm();
   const deferredSearch = useDeferredValue(searchText.trim());
+  const quickCreateCategoryId = Form.useWatch("categoryId", quickCreateForm);
+  const quickCreateFormFactor = Form.useWatch("formFactor", quickCreateForm);
+  const createWarrantyPeriod = Form.useWatch("warrantyPeriod", createForm);
+  const createPurchaseDate = Form.useWatch("purchaseDate", createForm);
 
   const { data: inventoryResponse, isLoading: inventoryLoading } = useQuery({
     queryKey: ["inventory", deferredSearch],
@@ -206,6 +243,24 @@ const InvOfficer = () => {
 
   const itItemsList = itItemsResponse?.data || [];  const DEVICE_FIELDS = deviceFieldsData?.data || {};
   const inventoryData = inventoryResponse?.data || [];
+  const quickCreateCategory = useMemo(
+    () => (deviceFieldsData?.data?.categories || []).find((category) => category.id === quickCreateCategoryId) || null,
+    [deviceFieldsData, quickCreateCategoryId]
+  );
+  const quickCreateFormFactorOptions = useMemo(
+    () => getQuickCreateFormFactorOptions(quickCreateCategory),
+    [quickCreateCategory]
+  );
+  const showQuickCreateMonitorDetails =
+    quickCreateCategory?.name?.toLowerCase().includes("computer") &&
+    String(quickCreateFormFactor || "").toLowerCase() === "desktop";
+  const warrantyExpiryDate = useMemo(() => {
+    if (!createPurchaseDate || createWarrantyPeriod === undefined || createWarrantyPeriod === null) {
+      return null;
+    }
+
+    return createPurchaseDate.add(Number(createWarrantyPeriod), "month");
+  }, [createPurchaseDate, createWarrantyPeriod]);
 
   const stats = [
     { label: "Inventory Assets", value: inventoryData.length, caption: "Tracked devices" },
@@ -242,11 +297,26 @@ const InvOfficer = () => {
 
   const handleCreateCancel = () => {
     setCreateModalOpen(false);
+    setCreateStep(0);
     setSelectedITItem(null);
     setQuickCreateOpen(false);
     setItItemSearch("");
     createForm.resetFields();
     quickCreateForm.resetFields();
+  };
+
+  const advanceCreateStep = async () => {
+    const fields = createStep === 0
+      ? [
+          "itItemId",
+          ...createAttributeDefinitions
+            .filter((definition) => definition.isRequired)
+            .map((definition) => ["attributes", definition.key]),
+        ]
+      : ["userId"];
+
+    await createForm.validateFields(fields);
+    setCreateStep((step) => Math.min(step + 1, 2));
   };
 
   // Built-in category slug → which legacy deviceTypes it covers
@@ -627,21 +697,6 @@ const InvOfficer = () => {
     },
   });
 
-  const { mutate: deleteInventory, isPending: isDeletingInventory } = useMutation({
-    mutationKey: ["deleteInventory"],
-    mutationFn: (inventoryIds) =>
-      api.delete("/inventory/bulk", { data: { inventoryIds } }),
-    onSuccess: (_, inventoryIds) => {
-      setSelectedInventoryIds([]);
-      queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      toast.success(`${inventoryIds.length} inventory record${inventoryIds.length === 1 ? "" : "s"} deleted`);
-    },
-    onError: (error) => {
-      const message = error?.response?.data?.message || "Failed to delete selected inventory records";
-      toast.error(Array.isArray(message) ? message.join(", ") : message);
-    },
-  });
-
   const handleSubmit = (values) => {
     updateInventory({
       userId: values.userId,
@@ -724,7 +779,7 @@ const InvOfficer = () => {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            onClick={() => setCreateModalOpen(true)}
+            onClick={() => { setCreateStep(0); setCreateModalOpen(true); }}
           >
             Create
           </Button>
@@ -742,41 +797,12 @@ const InvOfficer = () => {
           </span>
         </div>
 
-        {selectedInventoryIds.length > 0 && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#FECACA] bg-[#FFF5F5] px-4 py-3">
-            <span className="text-sm font-semibold text-[#991B1B]">
-              {selectedInventoryIds.length} inventory record{selectedInventoryIds.length === 1 ? "" : "s"} selected
-            </span>
-            <div className="flex items-center gap-2">
-              <Button size="small" type="link" onClick={() => setSelectedInventoryIds([])}>
-                Clear
-              </Button>
-              <Popconfirm
-                title="Delete selected inventory records?"
-                description="This removes the selected records from the inventory register and cannot be undone."
-                okText="Delete"
-                cancelText="Cancel"
-                okButtonProps={{ danger: true, loading: isDeletingInventory }}
-                onConfirm={() => deleteInventory(selectedInventoryIds)}
-              >
-                <Button size="small" danger icon={<LuTrash2 size={14} />} loading={isDeletingInventory}>
-                  Delete selected
-                </Button>
-              </Popconfirm>
-            </div>
-          </div>
-        )}
-
         <Table
           columns={columns}
           dataSource={inventoryData}
           loading={inventoryLoading}
           rowKey="id"
           scroll={{ x: 1400 }}
-          rowSelection={{
-            selectedRowKeys: selectedInventoryIds,
-            onChange: setSelectedInventoryIds,
-          }}
         />
 
         <Modal
@@ -1200,9 +1226,18 @@ const InvOfficer = () => {
           </p>
         </div>
 
+        <div className="px-6 pt-5">
+          <Steps
+            current={createStep}
+            size="small"
+            items={[{ title: "Item" }, { title: "Assignment" }, { title: "Procurement" }]}
+          />
+        </div>
+
         <Form form={createForm} layout="vertical" onFinish={handleCreateSubmit} className="px-6 pt-5 pb-6 space-y-6">
 
           {/* ── Section 1: Item ── */}
+          {createStep === 0 && (
           <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">1 · Item</p>
 
@@ -1229,6 +1264,13 @@ const InvOfficer = () => {
                             block
                             onClick={() => {
                               const parts = itItemSearch.trim().split(" ");
+                              setSelectedITItem(null);
+                              createForm.setFieldsValue({
+                                itItemId: undefined,
+                                attributes: {},
+                                deviceFields: {},
+                              });
+                              quickCreateForm.resetFields();
                               quickCreateForm.setFieldsValue({ brand: parts[0] || "", model: parts.slice(1).join(" ") || "" });
                               setQuickCreateOpen(true);
                             }}
@@ -1280,8 +1322,18 @@ const InvOfficer = () => {
                     </Form.Item>
                   </div>
                   <div className="grid grid-cols-2 gap-x-4">
-                    <Form.Item name="categoryId" label="Category">
-                      <Select allowClear placeholder="Select category">
+                    <Form.Item name="categoryId" label="Category" rules={[{ required: true, message: "Select a category" }]}>
+                      <Select
+                        placeholder="Select category"
+                        onChange={(value) => {
+                          const category = (deviceFieldsData?.data?.categories || []).find((item) => item.id === value);
+                          quickCreateForm.setFieldsValue({
+                            formFactor: undefined,
+                            monitorDetails: undefined,
+                            ...(category?.defaultItemClass ? { itemClass: category.defaultItemClass } : {}),
+                          });
+                        }}
+                      >
                         {(deviceFieldsData?.data?.categories || []).map((cat) => (
                           <Select.Option key={cat.id} value={cat.id}>{cat.name}</Select.Option>
                         ))}
@@ -1294,6 +1346,31 @@ const InvOfficer = () => {
                       </Select>
                     </Form.Item>
                   </div>
+                  {quickCreateCategory && (
+                    <Form.Item name="formFactor" label="Form Factor" rules={[{ required: true, message: "Select a form factor" }]}>
+                      <Select placeholder="Select form factor">
+                        {quickCreateFormFactorOptions.map((formFactor) => (
+                          <Select.Option key={formFactor} value={formFactor}>{formFactor}</Select.Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
+                  )}
+                  {showQuickCreateMonitorDetails && (
+                    <div className="mb-3 rounded-xl border border-[#E5E7EB] bg-white p-3">
+                      <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">Monitor Details (Optional)</p>
+                      <div className="grid grid-cols-1 gap-x-3 md:grid-cols-3">
+                        <Form.Item name={["monitorDetails", "brand"]} label="Monitor Brand">
+                          <Input placeholder="e.g. Dell" />
+                        </Form.Item>
+                        <Form.Item name={["monitorDetails", "model"]} label="Monitor Model">
+                          <Input placeholder="e.g. P2422H" />
+                        </Form.Item>
+                        <Form.Item name={["monitorDetails", "serialNumber"]} label="Monitor Serial Number">
+                          <Input placeholder="Serial number" />
+                        </Form.Item>
+                      </div>
+                    </div>
+                  )}
                   <Form.Item name="description" label="Description">
                     <Input placeholder="Brief description (optional)" />
                   </Form.Item>
@@ -1359,8 +1436,10 @@ const InvOfficer = () => {
               </div>
             )}
           </div>
+          )}
 
           {/* ── Section 2: Assignment ── */}
+          {createStep === 1 && (
           <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">2 · Assignment</p>
             <Form.Item name="userId" label="Assigned User" rules={[{ required: true, message: "Please select a user" }]} className="mb-3">
@@ -1395,8 +1474,10 @@ const InvOfficer = () => {
             <Form.Item name="departmentId" hidden><Input /></Form.Item>
             <Form.Item name="unitIdHidden" hidden><Input /></Form.Item>
           </div>
+          )}
 
           {/* ── Section 3: Procurement (optional) ── */}
+          {createStep === 2 && (
           <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
             <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">3 · Procurement <span className="normal-case font-normal text-[#D1D5DB]">— optional</span></p>
             <div className="grid grid-cols-2 gap-x-4">
@@ -1419,6 +1500,12 @@ const InvOfficer = () => {
                 <Input placeholder="LPO reference number" />
               </Form.Item>
             </div>
+            {warrantyExpiryDate && (
+              <div className="mb-4 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-widest text-[#166534]">Warranty Expiry Date</p>
+                <p className="mt-1 text-base font-bold text-[#14532D]">{warrantyExpiryDate.format("DD MMMM YYYY")}</p>
+              </div>
+            )}
             <Form.Item name="supplierId" label="Supplier">
               <Select showSearch allowClear placeholder="Select supplier (optional)" optionFilterProp="children"
                 filterOption={(input, option) => String(option?.children || "").toLowerCase().includes(input.toLowerCase())}>
@@ -1437,11 +1524,19 @@ const InvOfficer = () => {
               <Input.TextArea rows={2} placeholder="Any additional notes" />
             </Form.Item>
           </div>
+          )}
 
-          <Button type="primary" htmlType="submit" block size="large" loading={isCreating}
-            className="!bg-[#D32F2F] !border-[#D32F2F] hover:!bg-[#B71C1C]">
-            Create Inventory Asset
-          </Button>
+          <div className="flex items-center justify-between gap-3">
+            {createStep > 0 ? <Button onClick={() => setCreateStep((step) => step - 1)}>Back</Button> : <span />}
+            {createStep < 2 ? (
+              <Button type="primary" onClick={advanceCreateStep} className="!bg-[#D32F2F] !border-[#D32F2F] hover:!bg-[#B71C1C]">Continue</Button>
+            ) : (
+              <Button type="primary" htmlType="submit" loading={isCreating}
+                className="!bg-[#D32F2F] !border-[#D32F2F] hover:!bg-[#B71C1C]">
+                Create Inventory Asset
+              </Button>
+            )}
+          </div>
         </Form>
       </Modal>
     </PageShell>

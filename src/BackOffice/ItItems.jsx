@@ -112,6 +112,7 @@ const ItItems = () => {
   const deferredSearch = useDeferredValue(searchText.trim());
   const selectedCategoryId = Form.useWatch("categoryId", form);
   const selectedStockType = Form.useWatch("itemClass", form);
+  const selectedFormFactor = Form.useWatch("formFactor", form);
 
   const { data: itemsData } = useQuery({
     queryKey: ["getItItems", deferredSearch],
@@ -180,6 +181,10 @@ const ItItems = () => {
     },
     [formFactorOptionsFromCategory, selectedCategory?.name]
   );
+
+  const showMonitorDetails =
+    selectedCategory?.name?.toLowerCase().includes("computer") &&
+    String(selectedFormFactor || "").toLowerCase() === "desktop";
 
   useEffect(() => {
     if (!selectedCategory) {
@@ -290,6 +295,8 @@ const ItItems = () => {
   };
 
   const openEditModal = (record) => {
+    const specifications = record.specifications || {};
+    const { monitorDetails, ...attributes } = specifications;
     setEditingItem(record);
     form.setFieldsValue({
       categoryId: record.categoryId,
@@ -303,7 +310,8 @@ const ItItems = () => {
       minimumLevel: record.stock?.minimumLevel,
       maximumLevel: record.stock?.maximumLevel,
       validationRules: record.validationRules || [],
-      attributes: record.specifications || {},
+      attributes,
+      monitorDetails,
     });
     setIsModalOpen(true);
   };
@@ -420,7 +428,14 @@ const ItItems = () => {
       return [];
     }
 
-    return Object.entries(selectedItem.specifications).filter(([, value]) => value !== null && value !== undefined && value !== "");
+    return Object.entries(selectedItem.specifications).filter(
+      ([key, value]) => key !== "monitorDetails" && value !== null && value !== undefined && value !== ""
+    );
+  }, [selectedItem]);
+
+  const selectedMonitorDetails = useMemo(() => {
+    const monitorDetails = selectedItem?.specifications?.monitorDetails;
+    return monitorDetails && typeof monitorDetails === "object" ? monitorDetails : null;
   }, [selectedItem]);
 
   const selectedItemValidationRules = useMemo(() => {
@@ -445,6 +460,7 @@ const ItItems = () => {
       maximumLevel: values.itemClass === "CONSUMABLE" ? toOptionalNumber(values.maximumLevel) : undefined,
       specifications: values.attributes || {},
       validationRules: values.validationRules || [],
+      monitorDetails: showMonitorDetails ? values.monitorDetails : undefined,
     };
 
     if (editingItem) {
@@ -598,6 +614,17 @@ const ItItems = () => {
                 <p className="mt-3 text-sm text-[#616161]">No template specification values were set for this item.</p>
               )}
             </div>
+
+            {selectedMonitorDetails ? (
+              <div className="rounded-3xl border border-[#E5E7EB] bg-white p-4">
+                <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-[#111827]">Monitor Details</h4>
+                <div className="mt-3 space-y-2 text-sm text-[#374151]">
+                  <p><span className="font-semibold text-[#111827]">Brand:</span> {selectedMonitorDetails.brand || "N/A"}</p>
+                  <p><span className="font-semibold text-[#111827]">Model:</span> {selectedMonitorDetails.model || "N/A"}</p>
+                  <p><span className="font-semibold text-[#111827]">Serial Number:</span> {selectedMonitorDetails.serialNumber || "N/A"}</p>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </Modal>
@@ -698,6 +725,23 @@ const ItItems = () => {
               </Form.Item>
             </div>
           </div>
+
+          {showMonitorDetails ? (
+            <div className="mb-5 rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] px-5 pt-4 pb-2">
+              <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-[#9CA3AF]">Monitor Details (Optional)</p>
+              <div className="grid grid-cols-1 gap-x-4 md:grid-cols-3">
+                <Form.Item name={["monitorDetails", "brand"]} label="Monitor Brand">
+                  <Input placeholder="e.g. Dell" />
+                </Form.Item>
+                <Form.Item name={["monitorDetails", "model"]} label="Monitor Model">
+                  <Input placeholder="e.g. P2422H" />
+                </Form.Item>
+                <Form.Item name={["monitorDetails", "serialNumber"]} label="Monitor Serial Number">
+                  <Input placeholder="Serial number" />
+                </Form.Item>
+              </div>
+            </div>
+          ) : null}
 
           {/* ── Stock Controls (Consumable only) ────────────────────────── */}
           {selectedStockType === "CONSUMABLE" ? (
