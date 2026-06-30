@@ -52,7 +52,6 @@ const EditHoliday = () => {
     try {
       mutate(_values);
     } catch (err) {
-      console.error(err);
     }
   };
 

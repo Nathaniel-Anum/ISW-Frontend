@@ -53,9 +53,14 @@ const Units = () => {
       form.resetFields();
       setIsModalOpen(false);
     },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to create unit"),
   });
 
   const handleDelete = (id) => {
+    if (!id) {
+      toast.error("Unable to delete unit: missing unit ID");
+      return;
+    }
     api
       .delete(`/admin/units/${id}/delete`)
       .then(() => {
@@ -66,6 +71,15 @@ const Units = () => {
       .catch(() => {
         toast.error("Failed to delete unit");
       });
+  };
+
+  const handleCreateUnit = (values) => {
+    const name = values.name?.trim();
+    if (!name || !values.departmentId) {
+      toast.error("Unit name and department are required");
+      return;
+    }
+    addUnit.mutate({ name, departmentId: values.departmentId });
   };
 
   const columns = [
@@ -143,7 +157,7 @@ const Units = () => {
       </section>
 
       <Modal title="Create Unit" open={isModalOpen} onCancel={() => setIsModalOpen(false)} footer={null} width={640} destroyOnClose>
-        <Form form={form} layout="vertical" onFinish={(values) => addUnit.mutate(values)}>
+        <Form form={form} layout="vertical" onFinish={handleCreateUnit}>
           <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
             <Form.Item
               label="Unit Name"
@@ -169,7 +183,7 @@ const Units = () => {
           </div>
 
           <Form.Item className="mb-0">
-            <Button type="primary" htmlType="submit" block className="!h-11 !rounded-2xl">
+            <Button type="primary" htmlType="submit" loading={addUnit.isPending} block className="!h-11 !rounded-2xl">
               Submit
             </Button>
           </Form.Item>

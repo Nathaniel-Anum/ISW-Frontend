@@ -19,7 +19,6 @@ const Login = () => {
       navigate("/dashboard");
     },
     onError: (err) => {
-      console.error("Login failed:", err);
       toast.error(err.response?.data?.message || "Login failed");
       setIsSpinning(false);
     },

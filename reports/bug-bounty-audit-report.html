@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>IT Hub Bug Bounty Audit Report</title>
+  <style>
+    @page { margin: 28mm 20mm; }
+    body {
+      color: #1f2933;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      font-size: 12px;
+      line-height: 1.55;
+      margin: 0;
+    }
+    h1, h2, h3 { color: #111827; line-height: 1.2; margin: 0; }
+    h1 { font-size: 28px; margin-bottom: 8px; }
+    h2 { border-bottom: 1px solid #d7dde8; font-size: 18px; margin-top: 28px; padding-bottom: 6px; }
+    h3 { font-size: 14px; margin-top: 18px; }
+    p { margin: 7px 0; }
+    table { border-collapse: collapse; margin: 10px 0 18px; width: 100%; }
+    th, td { border: 1px solid #d7dde8; padding: 7px 8px; text-align: left; vertical-align: top; }
+    th { background: #f3f6fa; color: #111827; font-weight: 700; }
+    ul { margin: 8px 0 12px 20px; padding: 0; }
+    li { margin: 4px 0; }
+    code { background: #f3f6fa; border-radius: 3px; padding: 1px 4px; }
+    .cover {
+      border: 1px solid #d7dde8;
+      border-radius: 10px;
+      margin-bottom: 22px;
+      padding: 22px;
+    }
+    .subtitle { color: #536171; font-size: 13px; }
+    .meta {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: 1fr 1fr;
+      margin-top: 18px;
+    }
+    .meta div {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 9px 10px;
+    }
+    .label { color: #64748b; display: block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .value { color: #111827; font-weight: 700; }
+    .badge { border-radius: 999px; display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; text-transform: uppercase; }
+    .high { background: #fee2e2; color: #991b1b; }
+    .medium { background: #ffedd5; color: #9a3412; }
+    .low { background: #dcfce7; color: #166534; }
+    .info { background: #e0f2fe; color: #075985; }
+    .status { background: #ecfdf5; border-left: 4px solid #16a34a; padding: 9px 12px; }
+    .warning { background: #fff7ed; border-left: 4px solid #f97316; padding: 9px 12px; }
+    .page-break { break-before: page; }
+  </style>
+</head>
+<body>
+  <section class="cover">
+    <h1>IT Hub Bug Bounty Audit Report</h1>
+    <p class="subtitle">Action-by-action frontend audit for requisitions, inventory, service desk, maintenance, stock, and backoffice administration.</p>
+    <div class="meta">
+      <div><span class="label">Project</span><span class="value">ISW Frontend</span></div>
+      <div><span class="label">Report Date</span><span class="value">June 25, 2026</span></div>
+      <div><span class="label">Scope</span><span class="value">Frontend user actions and mutation flows</span></div>
+      <div><span class="label">Final Scanner Result</span><span class="value">0 high, 3 medium, 0 low</span></div>
+    </div>
+  </section>
+
+  <h2>Executive Summary</h2>
+  <p>
+    A bug bounty hunter agent and automated scanner were added to the repository, then the application was audited action by action.
+    The review focused on user-triggered actions such as create, edit, delete, approve, decline, issue, acknowledge, assign,
+    escalate, resolve, upload, filter, export, and authentication/session flows.
+  </p>
+  <p>
+    The major issue pattern found across the codebase was unsafe mutation execution: several requests built endpoint URLs from
+    modal state or selected records, which could submit to <code>/undefined</code> endpoints or affect stale records. Other repeated
+    patterns included missing error feedback, untrimmed form values, numeric fields submitted as strings, immediate destructive
+    actions without guards, stale query invalidation, and debug output leaking workflow data.
+  </p>
+  <div class="status">
+    <strong>Result:</strong> Build passes. The bug scanner now reports only three remaining medium findings, all from the local
+    <code>.env</code> backend URL. The <code>.env</code> file was intentionally left untouched at the user's request.
+  </div>
+
+  <h2>Verification Summary</h2>
+  <table>
+    <thead>
+      <tr><th>Check</th><th>Result</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>npm run build</code></td>
+        <td><span class="badge low">Pass</span></td>
+        <td>Vite production build completes successfully. Existing large chunk warning remains informational.</td>
+      </tr>
+      <tr>
+        <td><code>npm run bug:bounty</code></td>
+        <td><span class="badge low">Pass</span></td>
+        <td>Findings reduced to 3 medium, 0 high, 0 low.</td>
+      </tr>
+      <tr>
+        <td><code>npm run lint</code></td>
+        <td><span class="badge medium">Known Pre-existing Issues</span></td>
+        <td>Lint was not used as the success gate because the repository contains unrelated pre-existing lint issues.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Bug Bounty Agent</h2>
+  <table>
+    <thead>
+      <tr><th>Artifact</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>.agents/bug-bounty-hunter.md</code></td>
+        <td>Defines a repo-local bug bounty hunter agent profile for action-based audits.</td>
+      </tr>
+      <tr>
+        <td><code>scripts/bug-bounty-scan.mjs</code></td>
+        <td>Scans for common frontend risks such as hard-coded local APIs, insecure HTTP URLs, console output, unstable index keys, and direct window navigation.</td>
+      </tr>
+      <tr>
+        <td><code>package.json</code></td>
+        <td>Adds <code>npm run bug:bounty</code> for repeatable local scanning.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Fixed Findings By Action Area</h2>
+
+  <h3>1. Authentication and Session Handling</h3>
+  <table>
+    <thead><tr><th>Risk</th><th>Fix Applied</th><th>Files</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Logout cleared only part of the session, leaving refresh and reset flags behind.</td>
+        <td>Moved logout flows to a shared helper that clears <code>access_token</code>, <code>refresh_token</code>, <code>mustResetPassword</code>, and user data.</td>
+        <td><code>src/lib/auth.ts</code>, <code>src/Components/NavBar.jsx</code>, <code>src/BackOffice/Navbar.jsx</code></td>
+      </tr>
+      <tr>
+        <td>Failed refresh forced <code>window.location.href</code>, bypassing router state.</td>
+        <td>Replaced direct navigation with an <code>auth:session-expired</code> event handled by the app router.</td>
+        <td><code>src/utils/config.js</code>, <code>src/App.jsx</code></td>
+      </tr>
+      <tr>
+        <td>Auth flows and old comparison login printed sensitive workflow data to console.</td>
+        <td>Removed debug output and preserved toast-based user feedback.</td>
+        <td><code>src/Components/Login.jsx</code>, <code>src/Components/LoginWithToken.jsx</code>, <code>src/Components/ForgotPassword.jsx</code>, <code>src/Components/ResetPassword.jsx</code>, <code>src/Components/LoginCompare.jsx</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>2. User Requisitions and Approval Flow</h3>
+  <table>
+    <thead><tr><th>Action</th><th>Risk</th><th>Fix Applied</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Create/edit/cancel/follow up requisition</td>
+        <td>Missing profile hydration could crash creation; quantity and ID handling were inconsistent.</td>
+        <td>Added profile fallback, numeric quantity normalization, ID guards, row key fallback, and stronger query invalidation.</td>
+      </tr>
+      <tr>
+        <td>Department approve/decline</td>
+        <td>Approve/decline could hit <code>/undefined</code>; decline reason accepted whitespace.</td>
+        <td>Added record ID guards, trimmed reasons, error toasts, disabled pending buttons, and queue invalidations.</td>
+      </tr>
+      <tr>
+        <td>ITD approve/decline</td>
+        <td>Same stale/missing ID and whitespace risks as department approval.</td>
+        <td>Applied the same guarded approve/decline handling and invalidation cleanup.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Files:</strong> <code>src/Components/Requisition.jsx</code>, <code>src/Components/DeptApproval.jsx</code>, <code>src/Components/ITDApproval.jsx</code></p>
+
+  <h3>3. Stores, Stock, Issuance, and Acknowledgment</h3>
+  <table>
+    <thead><tr><th>Action</th><th>Risk</th><th>Fix Applied</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Issue item / mark pending stock</td>
+        <td>Quantity was capped by total stock instead of selected batch stock; endpoints could use missing IDs.</td>
+        <td>Added selected-batch quantity logic, request ID guards, trimmed remarks, reset state, and broad stock invalidations.</td>
+      </tr>
+      <tr>
+        <td>User acknowledgment</td>
+        <td>Mutation used selected component state, which could be stale or undefined.</td>
+        <td>Mutation now receives <code>stockIssuedId</code> explicitly and validates it before submission.</td>
+      </tr>
+      <tr>
+        <td>Stock returns, adjustments, thresholds</td>
+        <td>Return quantity was not capped, reject/accept could call undefined endpoints, zero adjustments were allowed.</td>
+        <td>Added quantity caps, ID guards, zero-delta prevention, trimmed reasons, and separate query invalidations.</td>
+      </tr>
+      <tr>
+        <td>Stock receiving</td>
+        <td>Fixed asset details were displayed but not enforced; edit save could close before related item update completed.</td>
+        <td>Validated fixed-asset details, normalized quantities, and waited for receipt and item update promises before closing.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Files:</strong> <code>src/Components/StoresOfficer.jsx</code>, <code>src/Components/Acknowledge.jsx</code>, <code>src/Components/Stock.jsx</code>, <code>src/Components/StoresPage.jsx</code></p>
+
+  <h3>4. Inventory Officer and Inventory Creation</h3>
+  <table>
+    <thead><tr><th>Risk</th><th>Fix Applied</th><th>Files</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Update inventory/device details depended on selected state inside mutation functions.</td>
+        <td>Mutation payloads now carry <code>inventoryId</code> explicitly, with guards before request.</td>
+        <td><code>src/Components/Inv.Officer.jsx</code></td>
+      </tr>
+      <tr>
+        <td>Quick-create inventory item could continue without a returned item ID.</td>
+        <td>Added response ID validation and trimmed quick-create fields including monitor details.</td>
+        <td><code>src/Components/Inv.Officer.jsx</code></td>
+      </tr>
+      <tr>
+        <td>Inventory create fields could submit missing item/user values or untrimmed procurement fields.</td>
+        <td>Added required guards, trimmed LPO/remarks, and improved query invalidation.</td>
+        <td><code>src/Components/Inv.Officer.jsx</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>5. Service Desk Requester, Queue, Details, Reports, and Knowledge Base</h3>
+  <table>
+    <thead><tr><th>Action Area</th><th>Risk</th><th>Fix Applied</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Reporter ticket create, confirm, rate, reopen, comment</td>
+        <td>Whitespace-only text, missing ID guards, and missing error handlers.</td>
+        <td>Added trimmed submit handlers, ID checks, error toasts, and modal reset behavior.</td>
+      </tr>
+      <tr>
+        <td>Support queue assign, accept, status, close, comment, escalate, maintenance, bulk</td>
+        <td>Inline handlers used stale <code>selectedTicket</code> state and could target undefined ticket IDs.</td>
+        <td>Moved actions to guarded handlers with explicit IDs and trimmed payloads.</td>
+      </tr>
+      <tr>
+        <td>Ticket detail support actions</td>
+        <td>Support mutations lacked consistent error feedback.</td>
+        <td>Added error toasts across accept, assign, status, escalate, comment, and maintenance creation.</td>
+      </tr>
+      <tr>
+        <td>Service desk SLA configuration</td>
+        <td>Edit modal closed before update succeeded and no error feedback was shown.</td>
+        <td>Close now happens on success only, with success and error toasts.</td>
+      </tr>
+      <tr>
+        <td>Knowledge base create/edit/publish/delete</td>
+        <td>Raw form values and missing record ID checks.</td>
+        <td>Added normalization, tag trimming, missing-ID guards, and selected article refresh after edit.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Files:</strong> <code>src/Components/ServiceDesk.jsx</code>, <code>src/Components/ServiceDeskQueue.jsx</code>, <code>src/Components/ServiceDeskTicketDetails.jsx</code>, <code>src/Components/ServiceDeskReport.jsx</code>, <code>src/Components/KnowledgeBase.jsx</code></p>
+
+  <h3>6. Preventive Maintenance and Maintenance Desk</h3>
+  <table>
+    <thead><tr><th>Action</th><th>Risk</th><th>Fix Applied</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Create/toggle/delete PM schedules</td>
+        <td>Frequency accepted weak numeric input; toggle/delete could use undefined IDs; delete fired immediately.</td>
+        <td>Added <code>InputNumber</code>, due-date guards, ID checks, trimmed notes, and delete confirmation.</td>
+      </tr>
+      <tr>
+        <td>Create maintenance job</td>
+        <td>Device search used manual query string and create could submit without a valid device.</td>
+        <td>Switched to API params, added selected device guards, and trimmed descriptions.</td>
+      </tr>
+      <tr>
+        <td>Resolve job, create requisition, assign technician</td>
+        <td>Mutations built URLs from modal state, risking stale or undefined ticket IDs.</td>
+        <td>Mutation payloads now carry <code>ticketId</code> explicitly, with validation and trimmed text fields.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Files:</strong> <code>src/Components/PMSchedules.jsx</code>, <code>src/Components/Maintenance.jsx</code></p>
+
+  <h3>7. Backoffice Administration</h3>
+  <table>
+    <thead><tr><th>Area</th><th>Risk</th><th>Fix Applied</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Departments, units, suppliers, projects, requisition items</td>
+        <td>Create actions lacked error paths or accepted whitespace-only text; delete actions had no missing-ID guards.</td>
+        <td>Added submit normalizers, onError toasts, loading states, and delete ID checks.</td>
+      </tr>
+      <tr>
+        <td>Employees</td>
+        <td>Edit mutation depended on selected state; delete/reset password could use missing staff IDs; clipboard copy had no failure path.</td>
+        <td>Added explicit staff ID payloads, guards, trimmed identity fields, and clipboard error feedback.</td>
+      </tr>
+      <tr>
+        <td>Roles and permissions</td>
+        <td>Permission edit submitted <code>action</code> but mutation sent <code>actions</code>, risking dropped action updates.</td>
+        <td>Corrected payload shape, added role/permission guards, and normalized resource/role names.</td>
+      </tr>
+      <tr>
+        <td>Service desk categories, support profiles, skill tags</td>
+        <td>Update mutations used editing state inside mutation functions and could submit stale IDs.</td>
+        <td>Moved IDs into mutation payloads and added validation for category names, tag names, profile capacity, and skill tags.</td>
+      </tr>
+      <tr>
+        <td>IT item categories and catalog</td>
+        <td>Category update used stale editing state; item delete/edit lacked guards; submit data was not normalized.</td>
+        <td>Added explicit IDs, trimmed item/category data, validated required attributes, and guarded delete/update actions.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Files:</strong> <code>src/BackOffice/Department.jsx</code>, <code>src/BackOffice/Units.jsx</code>, <code>src/BackOffice/Supplier.jsx</code>, <code>src/BackOffice/Projects.jsx</code>, <code>src/BackOffice/RequisitionItems.jsx</code>, <code>src/BackOffice/Employees.jsx</code>, <code>src/BackOffice/Roles.jsx</code>, <code>src/BackOffice/ServiceDeskCategories.jsx</code>, <code>src/BackOffice/SupportProfiles.jsx</code>, <code>src/BackOffice/SkillTags.jsx</code>, <code>src/BackOffice/ItItemCategories.jsx</code>, <code>src/BackOffice/ItItems.jsx</code></p>
+
+  <h3>8. Notifications, Reports, Uploads, and Legacy Debug Cleanup</h3>
+  <table>
+    <thead><tr><th>Area</th><th>Risk</th><th>Fix Applied</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Notification bell</td>
+        <td>Socket fallback hard-coded localhost and read actions silently failed.</td>
+        <td>Removed hard-coded fallback, required configured base URL, added ID guards and error toasts.</td>
+      </tr>
+      <tr>
+        <td>Reports</td>
+        <td>Debug logs leaked report data; <code>TotalAssets</code> used an invalid Vite env accessor; <code>TotalDevices</code> filter only logged values.</td>
+        <td>Removed logs, used API client params, added filter error feedback, and implemented client-side device filtering.</td>
+      </tr>
+      <tr>
+        <td>Shared upload component</td>
+        <td>Upload posted an empty file field instead of the selected file.</td>
+        <td>Stored selected file list and sent the selected <code>originFileObj</code>.</td>
+      </tr>
+      <tr>
+        <td>Legacy modal folder</td>
+        <td>Console output remained in unused or superseded modal files.</td>
+        <td>Removed modal console statements and replaced inline log callbacks with no-op or notification-safe handlers.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>Files:</strong> <code>src/Components/ui/NotificationBell.jsx</code>, <code>src/Components/InventoryReport.jsx</code>, <code>src/Components/MaintenanceReport.jsx</code>, <code>src/Components/TotalAssets.jsx</code>, <code>src/Components/TotalDevices.jsx</code>, <code>src/Components/upload/upload.component.jsx</code>, <code>src/Components/modals/**</code></p>
+
+  <h2>Remaining Findings</h2>
+  <div class="warning">
+    <strong>Important:</strong> The user explicitly requested that <code>.env</code> remain untouched. The remaining scanner findings are documented here for deployment readiness only.
+  </div>
+  <table>
+    <thead><tr><th>Severity</th><th>Location</th><th>Finding</th><th>Recommended Production Action</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="badge medium">Medium</span></td>
+        <td><code>.env:2</code></td>
+        <td>Commented local API URL <code>http://localhost:7001</code>.</td>
+        <td>Keep local-only values out of production env files.</td>
+      </tr>
+      <tr>
+        <td><span class="badge medium">Medium</span></td>
+        <td><code>.env:3</code></td>
+        <td>Active local-network API URL <code>http://172.16.12.138:7001</code>.</td>
+        <td>Use the production HTTPS API endpoint before deployment.</td>
+      </tr>
+      <tr>
+        <td><span class="badge medium">Medium</span></td>
+        <td><code>.env:3</code></td>
+        <td>HTTP protocol is used for API traffic in local configuration.</td>
+        <td>Use HTTPS in staging and production to protect tokens and user data in transit.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Conclusion</h2>
+  <p>
+    The frontend now has stronger guard rails around user actions, especially destructive actions and mutation flows that previously
+    relied on mutable UI state. The remaining scanner findings are environment-specific and were left untouched by instruction.
+  </p>
+  <p>
+    Recommended next operational step: before production deployment, replace local HTTP API values with the official HTTPS backend
+    endpoint in the deployment environment, not necessarily in this local development <code>.env</code>.
+  </p>
+</body>
+</html>

@@ -243,11 +243,13 @@ const ServiceDeskQueue = () => {
       setAssignOpen(false);
       assignForm.resetFields();
     },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to assign ticket"),
   });
 
   const acceptTicket = useMutation({
     mutationFn: (ticketId) => api.patch(`/service-desk/tickets/${ticketId}/accept`),
     onSuccess: () => { toast.success("Ticket accepted"); refreshQueries(); },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to accept ticket"),
   });
 
   const updateStatus = useMutation({
@@ -258,6 +260,7 @@ const ServiceDeskQueue = () => {
       setStatusOpen(false);
       statusForm.resetFields();
     },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to update ticket"),
   });
 
   const closeTicketMutation = useMutation({
@@ -279,6 +282,7 @@ const ServiceDeskQueue = () => {
       setCommentOpen(false);
       commentForm.resetFields();
     },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to add comment"),
   });
 
   const escalateTicket = useMutation({
@@ -289,6 +293,7 @@ const ServiceDeskQueue = () => {
       setEscalateOpen(false);
       escalateForm.resetFields();
     },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to escalate ticket"),
   });
 
   const createMaintenance = useMutation({
@@ -299,6 +304,7 @@ const ServiceDeskQueue = () => {
       setMaintenanceOpen(false);
       maintenanceForm.resetFields();
     },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to create maintenance job"),
   });
 
   const createTicketOnBehalf = useMutation({
@@ -323,8 +329,85 @@ const ServiceDeskQueue = () => {
       setBulkAssignOpen(false);
       bulkAssignForm.resetFields();
     },
-    onError: () => toast.error("Bulk action failed"),
+    onError: (error) => toast.error(error?.response?.data?.message || "Bulk action failed"),
   });
+
+  const getSelectedTicketId = () => selectedTicket?.id;
+
+  const handleAssignSubmit = (values) => {
+    const ticketId = getSelectedTicketId();
+    if (!ticketId) return toast.error("Unable to assign ticket. Missing ticket ID.");
+    assignTicket.mutate({ ticketId, assignedToId: values.assignedToId });
+  };
+
+  const handleStatusSubmit = (values) => {
+    const ticketId = getSelectedTicketId();
+    if (!ticketId) return toast.error("Unable to update ticket. Missing ticket ID.");
+    updateStatus.mutate({
+      ticketId,
+      values: {
+        ...values,
+        resolutionNotes: values.resolutionNotes?.trim() || undefined,
+      },
+    });
+  };
+
+  const handleCommentSubmit = (values) => {
+    const ticketId = getSelectedTicketId();
+    const body = values.body?.trim();
+    if (!ticketId) return toast.error("Unable to add comment. Missing ticket ID.");
+    if (!body) return toast.error("Please enter a comment.");
+    addComment.mutate({ ticketId, values: { ...values, body } });
+  };
+
+  const handleEscalateSubmit = (values) => {
+    const ticketId = getSelectedTicketId();
+    if (!ticketId) return toast.error("Unable to escalate ticket. Missing ticket ID.");
+    const reason = values.reason?.trim();
+    if (!reason) return toast.error("Please enter an escalation reason.");
+    const { priorityJustification, ...payload } = values;
+    escalateTicket.mutate({
+      ticketId,
+      values: {
+        ...payload,
+        reason,
+        priorityJustification: priorityJustification?.trim() || undefined,
+      },
+    });
+  };
+
+  const handleMaintenanceSubmit = (values) => {
+    const ticketId = getSelectedTicketId();
+    if (!ticketId) return toast.error("Unable to create maintenance job. Missing ticket ID.");
+    createMaintenance.mutate({ ticketId, values });
+  };
+
+  const handleCreateTicketOnBehalf = (values) => {
+    const subject = values.subject?.trim();
+    const description = values.description?.trim();
+    if (!subject || !description) return toast.error("Subject and description are required.");
+    createTicketOnBehalf.mutate({ ...values, subject, description });
+  };
+
+  const handleBulkAction = (action) => {
+    if (!selectedRowKeys.length) return toast.error("Select at least one ticket.");
+    bulkAction.mutate({ ticketIds: selectedRowKeys, action });
+  };
+
+  const handleBulkAssignSubmit = (values) => {
+    if (!selectedRowKeys.length) return toast.error("Select at least one ticket.");
+    bulkAction.mutate({ ticketIds: selectedRowKeys, action: "REASSIGN", assignedToId: values.assignedToId });
+  };
+
+  const handleAcceptTicket = (record) => {
+    if (!record?.id) return toast.error("Unable to accept ticket. Missing ticket ID.");
+    acceptTicket.mutate(record.id);
+  };
+
+  const handleCloseTicket = () => {
+    if (!closeTicketRecord?.id) return toast.error("Unable to close ticket. Missing ticket ID.");
+    closeTicketMutation.mutate(closeTicketRecord.id);
+  };
 
   const openAssignModal = (ticket) => {
     setSelectedTicket(ticket);
@@ -449,7 +532,7 @@ const ServiceDeskQueue = () => {
             onClick: () => navigate(`/dashboard/service-desk/tickets/${record.id}`),
           },
           ...(!isTerminal && canAcceptTicket(record)
-            ? [{ key: "accept", label: getAcceptLabel(record), icon: <LuPlay size={14} />, onClick: () => acceptTicket.mutate(record.id) }]
+            ? [{ key: "accept", label: getAcceptLabel(record), icon: <LuPlay size={14} />, onClick: () => handleAcceptTicket(record) }]
             : []),
           ...(!isTerminal && canAssignTickets
             ? [{ key: "assign", label: "Assign", icon: <LuUserRoundPlus size={14} />, onClick: () => openAssignModal(record) }]
@@ -572,8 +655,8 @@ const ServiceDeskQueue = () => {
           <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#E0E0E0] bg-[#F9FAFB] px-4 py-3">
             <span className="text-sm font-semibold text-[#212121]">{selectedRowKeys.length} selected</span>
             <Button size="small" onClick={() => setBulkAssignOpen(true)}>Reassign</Button>
-            <Button size="small" danger onClick={() => bulkAction.mutate({ ticketIds: selectedRowKeys, action: "CLOSE" })} loading={bulkAction.isPending}>Close All</Button>
-            <Button size="small" onClick={() => bulkAction.mutate({ ticketIds: selectedRowKeys, action: "ESCALATE" })} loading={bulkAction.isPending}>Escalate All</Button>
+            <Button size="small" danger onClick={() => handleBulkAction("CLOSE")} loading={bulkAction.isPending}>Close All</Button>
+            <Button size="small" onClick={() => handleBulkAction("ESCALATE")} loading={bulkAction.isPending}>Escalate All</Button>
             <Button size="small" type="link" onClick={() => setSelectedRowKeys([])}>Clear</Button>
           </div>
         )}
@@ -591,7 +674,7 @@ const ServiceDeskQueue = () => {
         <Form
           form={assignForm}
           layout="vertical"
-          onFinish={(values) => assignTicket.mutate({ ticketId: selectedTicket.id, assignedToId: values.assignedToId })}
+          onFinish={handleAssignSubmit}
         >
           <Form.Item name="assignedToId" label="Assign Technician" rules={[{ required: true, message: "Please select a technician" }]}>
             <Select placeholder="Choose a technician">
@@ -614,7 +697,7 @@ const ServiceDeskQueue = () => {
         <Form
           form={statusForm}
           layout="vertical"
-          onFinish={(values) => updateStatus.mutate({ ticketId: selectedTicket.id, values })}
+          onFinish={handleStatusSubmit}
         >
           <Form.Item name="status" label="Status" rules={[{ required: true, message: "Please select a status" }]}>
             <Select>
@@ -695,7 +778,7 @@ const ServiceDeskQueue = () => {
         <Form
           form={commentForm}
           layout="vertical"
-          onFinish={(values) => addComment.mutate({ ticketId: selectedTicket.id, values })}
+          onFinish={handleCommentSubmit}
         >
           <Form.Item name="visibility" label="Visibility" initialValue="INTERNAL">
             <Select>
@@ -718,10 +801,7 @@ const ServiceDeskQueue = () => {
         <Form
           form={escalateForm}
           layout="vertical"
-          onFinish={(values) => {
-            const { priorityJustification, ...payload } = values;
-            escalateTicket.mutate({ ticketId: selectedTicket.id, values: payload });
-          }}
+          onFinish={handleEscalateSubmit}
         >
           <Form.Item name="reason" label="Escalation Reason" rules={[{ required: true, message: "Please explain why this ticket is being escalated" }]}>
             <Input.TextArea rows={4} placeholder="Describe the blocker, specialist skill needed, or why this needs higher-level attention" />
@@ -799,7 +879,7 @@ const ServiceDeskQueue = () => {
         <Form
           form={maintenanceForm}
           layout="vertical"
-          onFinish={(values) => createMaintenance.mutate({ ticketId: selectedTicket.id, values })}
+          onFinish={handleMaintenanceSubmit}
         >
           {isManager ? (
             <Form.Item
@@ -837,7 +917,7 @@ const ServiceDeskQueue = () => {
           form={createForm}
           layout="vertical"
           initialValues={{ priority: "MEDIUM" }}
-          onFinish={(values) => createTicketOnBehalf.mutate(values)}
+          onFinish={handleCreateTicketOnBehalf}
         >
           <Form.Item
             name="onBehalfOfUserId"
@@ -929,7 +1009,7 @@ const ServiceDeskQueue = () => {
         <Form
           form={bulkAssignForm}
           layout="vertical"
-          onFinish={(values) => bulkAction.mutate({ ticketIds: selectedRowKeys, action: "REASSIGN", assignedToId: values.assignedToId })}
+          onFinish={handleBulkAssignSubmit}
         >
           <p className="mb-4 text-sm text-[#616161]">Reassigning {selectedRowKeys.length} ticket(s) to:</p>
           <Form.Item name="assignedToId" label="Technician" rules={[{ required: true, message: "Please select a technician" }]}>
@@ -954,7 +1034,7 @@ const ServiceDeskQueue = () => {
         title="Close this ticket?"
         open={closeTicketOpen}
         onCancel={() => { setCloseTicketOpen(false); setCloseTicketRecord(null); }}
-        onOk={() => closeTicketMutation.mutate(closeTicketRecord.id)}
+        onOk={handleCloseTicket}
         okText="Yes, close it"
         cancelText="Cancel"
         confirmLoading={closeTicketMutation.isPending}

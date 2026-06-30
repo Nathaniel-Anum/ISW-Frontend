@@ -45,9 +45,14 @@ const Supplier = () => {
       setIsModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["getSupplier"] });
     },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to create supplier"),
   });
 
   const handleDelete = (id) => {
+    if (!id) {
+      toast.error("Unable to delete supplier: missing supplier ID");
+      return;
+    }
     api
       .delete(`/admin/suppliers/${id}`)
       .then(() => {
@@ -57,6 +62,20 @@ const Supplier = () => {
       .catch(() => {
         toast.error("Failed to delete supplier");
       });
+  };
+
+  const handleCreateSupplier = (values) => {
+    const name = values.name?.trim();
+    const contactDetails = values.contactDetails?.trim();
+    if (!name || !contactDetails) {
+      toast.error("Supplier name and contact details are required");
+      return;
+    }
+    createSupplier.mutate({
+      name,
+      contactDetails,
+      remarks: values.remarks?.trim() || undefined,
+    });
   };
 
   const columns = [
@@ -140,7 +159,7 @@ const Supplier = () => {
       </section>
 
       <Modal title="Create Supplier" open={isModalOpen} onCancel={() => setIsModalOpen(false)} footer={null} width={680} destroyOnClose>
-        <Form form={form} layout="vertical" onFinish={(values) => createSupplier.mutate(values)}>
+        <Form form={form} layout="vertical" onFinish={handleCreateSupplier}>
           <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
             <Form.Item
               label="Supplier Name"
@@ -164,7 +183,7 @@ const Supplier = () => {
           </Form.Item>
 
           <Form.Item className="mb-0">
-            <Button type="primary" htmlType="submit" block className="!h-11 !rounded-2xl">
+            <Button type="primary" htmlType="submit" loading={createSupplier.isPending} block className="!h-11 !rounded-2xl">
               Submit
             </Button>
           </Form.Item>

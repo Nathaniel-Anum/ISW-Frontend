@@ -18,7 +18,6 @@ const ForgotPassword = () => {
       setTimeout(() => navigate("/"), 3000);
     },
     onError: (err) => {
-      console.error("Forgot password failed:", err);
       toast.error(err.response?.data?.message || "Something went wrong. Please try again.");
     },
   });

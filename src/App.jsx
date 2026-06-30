@@ -90,24 +90,25 @@ function AppContent() {
       localStorage.getItem("mustResetPassword") === "true";
 
     if (!token && !publicPaths.includes(pathname)) {
-      console.log(
-        `Auth: No token, accessing protected path (${pathname}). Redirecting to /`
-      );
       navigate("/", { replace: true });
     } else if (token && !mustResetPassword && publicPaths.includes(pathname)) {
-      console.log(
-        `Auth: Logged in, no reset needed, on public path (${pathname}). Redirecting to /dashboard`
-      );
       navigate("/dashboard", { replace: true });
     } else if (token && mustResetPassword && pathname !== "/reset-password") {
-      console.log(
-        `Auth: Logged in, reset required, not on reset page (${pathname}). Redirecting to /reset-password`
-      );
       navigate("/reset-password", { replace: true });
-    } else {
-      // console.log(`Auth: No redirect needed for path (${pathname}). Token: ${!!token}, MustReset: ${mustResetPassword}`);
     }
   }, [pathname, navigate]);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      navigate("/", { replace: true });
+    };
+
+    globalThis.addEventListener("auth:session-expired", handleSessionExpired);
+    return () => {
+      globalThis.removeEventListener("auth:session-expired", handleSessionExpired);
+    };
+  }, [navigate]);
+
   return (
     <ErrorBoundary>
       <Routes>

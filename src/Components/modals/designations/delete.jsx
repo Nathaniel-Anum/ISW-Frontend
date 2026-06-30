@@ -55,7 +55,6 @@ const DeleteDesignation = () => {
         mutate(id);
       }
     } catch (err) {
-      console.log(err);
     }
   };
 

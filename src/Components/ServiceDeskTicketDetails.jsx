@@ -294,6 +294,9 @@ const ReporterView = ({ ticket, ticketId, isLoading, refreshQueries }) => {
   const confirmResolution = useMutation({
     mutationFn: () => api.post(`/service-desk/tickets/${ticketId}/confirm-resolution`),
     onSuccess: () => { toast.success("Resolution confirmed"); refreshQueries(); },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to confirm resolution");
+    },
   });
 
   const reopenTicket = useMutation({
@@ -303,6 +306,9 @@ const ReporterView = ({ ticket, ticketId, isLoading, refreshQueries }) => {
       refreshQueries();
       setReopenOpen(false);
       reopenForm.resetFields();
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to reopen ticket");
     },
   });
 
@@ -314,12 +320,69 @@ const ReporterView = ({ ticket, ticketId, isLoading, refreshQueries }) => {
       setRatingOpen(false);
       ratingForm.resetFields();
     },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to submit feedback");
+    },
   });
 
   const addComment = useMutation({
     mutationFn: (values) => api.post(`/service-desk/tickets/${ticketId}/comments`, { ...values, visibility: "PUBLIC" }),
     onSuccess: () => { toast.success("Message sent"); refreshQueries(); commentForm.resetFields(); },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to send message");
+    },
   });
+
+  const handleConfirmResolution = () => {
+    if (!ticketId) {
+      toast.error("Unable to confirm this ticket. Missing ticket ID.");
+      return;
+    }
+
+    confirmResolution.mutate();
+  };
+
+  const handleReopenTicket = (values) => {
+    if (!ticketId) {
+      toast.error("Unable to reopen this ticket. Missing ticket ID.");
+      return;
+    }
+
+    const reason = values.reason?.trim();
+    if (!reason) {
+      toast.error("Please describe why the ticket should be reopened.");
+      return;
+    }
+
+    reopenTicket.mutate({ reason });
+  };
+
+  const handleSubmitSatisfaction = (values) => {
+    if (!ticketId) {
+      toast.error("Unable to submit feedback. Missing ticket ID.");
+      return;
+    }
+
+    submitSatisfaction.mutate({
+      ...values,
+      feedback: values.feedback?.trim() || undefined,
+    });
+  };
+
+  const handleAddComment = (values) => {
+    if (!ticketId) {
+      toast.error("Unable to send message. Missing ticket ID.");
+      return;
+    }
+
+    const body = values.body?.trim();
+    if (!body) {
+      toast.error("Please enter a message.");
+      return;
+    }
+
+    addComment.mutate({ ...values, body });
+  };
 
   const lifecycleItems = useMemo(() => {
     if (!ticket) return [];
@@ -365,7 +428,7 @@ const ReporterView = ({ ticket, ticketId, isLoading, refreshQueries }) => {
         <>
           <Button icon={<LuArrowLeft size={16} />} onClick={() => navigate(-1)}>Back</Button>
           {ticket?.status === "RESOLVED" ? (
-            <Button type="primary" icon={<LuBadgeCheck size={15} />} onClick={() => confirmResolution.mutate()} loading={confirmResolution.isPending}>
+            <Button type="primary" icon={<LuBadgeCheck size={15} />} onClick={handleConfirmResolution} loading={confirmResolution.isPending}>
               Confirm Fixed
             </Button>
           ) : null}
@@ -487,7 +550,7 @@ const ReporterView = ({ ticket, ticketId, isLoading, refreshQueries }) => {
             <section className="rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
               <h4 className="text-base font-bold text-[#212121]">Send a Message</h4>
               <p className="mt-1 text-sm text-[#616161]">Add any extra details or respond to the support team.</p>
-              <Form form={commentForm} layout="vertical" className="mt-4" onFinish={(values) => addComment.mutate(values)}>
+              <Form form={commentForm} layout="vertical" className="mt-4" onFinish={handleAddComment}>
                 <Form.Item name="body" rules={[{ required: true, message: "Please enter a message" }]}>
                   <Input.TextArea rows={4} placeholder="Type your message hereâ€¦" />
                 </Form.Item>
@@ -515,11 +578,11 @@ const ReporterView = ({ ticket, ticketId, isLoading, refreshQueries }) => {
         </div>
       </div>
 
-      <Modal title="Reopen Ticket" open={reopenOpen} onCancel={() => setReopenOpen(false)} footer={null} destroyOnClose>
+      <Modal title="Reopen Ticket" open={reopenOpen} onCancel={() => { setReopenOpen(false); reopenForm.resetFields(); }} footer={null} destroyOnClose>
         <p className="mb-4 text-sm text-[#616161]">
           Tell the support team why the issue was not resolved. They will be notified and pick it up again.
         </p>
-        <Form form={reopenForm} layout="vertical" onFinish={(values) => reopenTicket.mutate(values)}>
+        <Form form={reopenForm} layout="vertical" onFinish={handleReopenTicket}>
           <Form.Item name="reason" label="What is still wrong?" rules={[{ required: true, message: "Please describe the issue" }]}>
             <Input.TextArea rows={4} placeholder="e.g. The problem came back after restarting, the fix only worked temporarily…" />
           </Form.Item>
@@ -531,8 +594,8 @@ const ReporterView = ({ ticket, ticketId, isLoading, refreshQueries }) => {
         </Form>
       </Modal>
 
-      <Modal title="Rate Support" open={ratingOpen} onCancel={() => setRatingOpen(false)} footer={null} destroyOnClose>
-        <Form form={ratingForm} layout="vertical" onFinish={(values) => submitSatisfaction.mutate(values)}>
+      <Modal title="Rate Support" open={ratingOpen} onCancel={() => { setRatingOpen(false); ratingForm.resetFields(); }} footer={null} destroyOnClose>
+        <Form form={ratingForm} layout="vertical" onFinish={handleSubmitSatisfaction}>
           <Form.Item name="rating" label="How would you rate the support you received?" rules={[{ required: true, message: "Please select a rating" }]}>
             <Rate count={5} />
           </Form.Item>
@@ -624,16 +687,19 @@ const SupportView = ({ ticket, ticketId, isLoading, refreshQueries, user }) => {
   const acceptTicket = useMutation({
     mutationFn: () => api.patch(`/service-desk/tickets/${ticketId}/accept`),
     onSuccess: () => { toast.success("Ticket accepted — you are now working on it"); refreshQueries(); },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to accept ticket"),
   });
 
   const assignTicket = useMutation({
     mutationFn: (values) => api.patch(`/service-desk/tickets/${ticketId}/assign`, values),
     onSuccess: () => { toast.success("Ticket assigned"); refreshQueries(); setAssignOpen(false); assignForm.resetFields(); },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to assign ticket"),
   });
 
   const updateStatus = useMutation({
     mutationFn: (values) => api.patch(`/service-desk/tickets/${ticketId}/status`, values),
     onSuccess: () => { toast.success("Ticket updated"); refreshQueries(); setStatusOpen(false); statusForm.resetFields(); },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to update ticket"),
   });
 
   const escalateTicket = useMutation({
@@ -644,11 +710,13 @@ const SupportView = ({ ticket, ticketId, isLoading, refreshQueries, user }) => {
       setEscalateOpen(false);
       escalateForm.resetFields();
     },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to escalate ticket"),
   });
 
   const addComment = useMutation({
     mutationFn: (values) => api.post(`/service-desk/tickets/${ticketId}/comments`, values),
     onSuccess: () => { toast.success("Comment added"); refreshQueries(); commentForm.resetFields(); },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to add comment"),
   });
 
   const createMaintenance = useMutation({
@@ -660,6 +728,7 @@ const SupportView = ({ ticket, ticketId, isLoading, refreshQueries, user }) => {
       setMaintenanceOpen(false);
       maintenanceForm.resetFields();
     },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to create maintenance job"),
   });
 
   const timelineItems = useMemo(() => {

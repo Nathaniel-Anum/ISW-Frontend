@@ -115,41 +115,91 @@ export default function KnowledgeBase() {
   const published = articles.filter((a) => a.isPublished).length;
   const drafts = articles.filter((a) => !a.isPublished).length;
 
+  const invalidateArticles = () => queryClient.invalidateQueries({ queryKey: ["kbArticles"] });
+  const normalizeArticleValues = (values) => ({
+    ...values,
+    title: values.title?.trim(),
+    body: values.body?.trim(),
+    tags: values.tags?.map((tag) => tag.trim()).filter(Boolean),
+  });
+
   // ── Mutations ─────────────────────────────────────────────────────────
   const createMutation = useMutation({
     mutationFn: (data) => api.post("/service-desk/knowledge-base", data),
     onSuccess: () => {
       toast.success("Article created");
-      queryClient.invalidateQueries(["kbArticles"]);
+      invalidateArticles();
       setCreateOpen(false);
       createForm.resetFields();
     },
-    onError: () => toast.error("Failed to create article"),
+    onError: (err) => toast.error(err?.response?.data?.message ?? "Failed to create article"),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, ...data }) =>
       api.patch(`/service-desk/knowledge-base/${id}`, data),
-    onSuccess: () => {
+    onSuccess: (res) => {
       toast.success("Article updated");
-      queryClient.invalidateQueries(["kbArticles"]);
+      invalidateArticles();
+      if (selectedArticle?.id === res?.data?.id) {
+        setSelectedArticle((prev) => ({ ...prev, ...res.data }));
+      }
       setEditRecord(null);
     },
-    onError: () => toast.error("Failed to update article"),
+    onError: (err) => toast.error(err?.response?.data?.message ?? "Failed to update article"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/service-desk/knowledge-base/${id}`),
     onSuccess: () => {
       toast.success("Article deleted");
-      queryClient.invalidateQueries(["kbArticles"]);
+      invalidateArticles();
       setSelectedArticle(null);
     },
-    onError: () => toast.error("Failed to delete article"),
+    onError: (err) => toast.error(err?.response?.data?.message ?? "Failed to delete article"),
   });
 
   const togglePublished = (record) => {
+    if (!record?.id) {
+      toast.error("Unable to update article: missing article ID");
+      return;
+    }
     updateMutation.mutate({ id: record.id, isPublished: !record.isPublished });
+  };
+
+  const handleCreateArticle = () => {
+    createForm.validateFields().then((values) => {
+      const payload = normalizeArticleValues(values);
+      if (!payload.title || !payload.body) {
+        toast.error("Title and content are required");
+        return;
+      }
+      createMutation.mutate(payload);
+    });
+  };
+
+  const handleUpdateArticle = () => {
+    if (!editRecord?.id) {
+      toast.error("Unable to update article: missing article ID");
+      return;
+    }
+
+    editForm.validateFields().then((values) => {
+      const payload = normalizeArticleValues(values);
+      if (!payload.title || !payload.body) {
+        toast.error("Title and content are required");
+        return;
+      }
+      updateMutation.mutate({ id: editRecord.id, ...payload });
+    });
+  };
+
+  const handleDeleteArticle = (article) => {
+    if (!article?.id) {
+      toast.error("Unable to delete article: missing article ID");
+      return;
+    }
+    deleteMutation.mutate(article.id);
   };
 
   const openEdit = (record) => {
@@ -389,7 +439,7 @@ export default function KnowledgeBase() {
                   title: "Delete Article",
                   content: "This article will be soft-deleted. Continue?",
                   okType: "danger",
-                  onOk: () => deleteMutation.mutate(article.id),
+                  onOk: () => handleDeleteArticle(article),
                 })
               }
             >
@@ -610,11 +660,7 @@ export default function KnowledgeBase() {
           setCreateOpen(false);
           createForm.resetFields();
         }}
-        onOk={() =>
-          createForm
-            .validateFields()
-            .then((values) => createMutation.mutate(values))
-        }
+        onOk={handleCreateArticle}
         confirmLoading={createMutation.isPending}
         okText="Create Article"
         width={720}
@@ -629,13 +675,7 @@ export default function KnowledgeBase() {
         title="Edit Article"
         open={!!editRecord}
         onCancel={() => setEditRecord(null)}
-        onOk={() =>
-          editForm
-            .validateFields()
-            .then((values) =>
-              updateMutation.mutate({ id: editRecord.id, ...values })
-            )
-        }
+        onOk={handleUpdateArticle}
         confirmLoading={updateMutation.isPending}
         okText="Save Changes"
         width={720}

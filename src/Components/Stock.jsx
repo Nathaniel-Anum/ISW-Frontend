@@ -96,6 +96,7 @@ const Stock = () => {
   const [returnItemFilter, setReturnItemFilter] = useState(null);
   const [returnForm] = Form.useForm();
   const [rejectReturnForm] = Form.useForm();
+  const selectedReturnStockIssuedId = Form.useWatch("stockIssuedId", returnForm);
 
   // ── Queries ─────────────────────────────────────────────────────────────
 
@@ -136,6 +137,10 @@ const Stock = () => {
   const itItemsList = itItemsResponse?.data || [];
   const adjustments = adjustmentsResponse?.data || [];
   const returns = returnsResponse?.data || [];
+  const selectedIssuedReturn = stockIssuedList.find(
+    (issued) => issued.id === selectedReturnStockIssuedId
+  );
+  const selectedIssuedQuantity = Number(selectedIssuedReturn?.quantityIssued || 0);
 
   // ── Stats ────────────────────────────────────────────────────────────────
 
@@ -155,44 +160,47 @@ const Stock = () => {
     },
     onSuccess: () => {
       toast.success("Reorder threshold updated.");
-      queryClient.invalidateQueries(["stockLevels"]);
+      queryClient.invalidateQueries({ queryKey: ["stockLevels"] });
       setThresholdModalOpen(false);
+      setThresholdItem(null);
       thresholdForm.resetFields();
     },
-    onError: () => toast.error("Failed to update threshold."),
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to update threshold."),
   });
 
   const createAdjMutation = useMutation({
     mutationFn: (values) => api.post("/stores/stock-adjustments", values),
     onSuccess: () => {
       toast.success("Stock adjusted successfully.");
-      queryClient.invalidateQueries(["stockAdjustments"]);
-      queryClient.invalidateQueries(["stockLevels"]);
+      queryClient.invalidateQueries({ queryKey: ["stockAdjustments"] });
+      queryClient.invalidateQueries({ queryKey: ["stockLevels"] });
       setAdjModalOpen(false);
       adjForm.resetFields();
     },
-    onError: () => toast.error("Failed to submit adjustment."),
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to submit adjustment."),
   });
 
   const createReturnMutation = useMutation({
     mutationFn: (values) => api.post("/stores/returns", values),
     onSuccess: () => {
       toast.success("Return logged.");
-      queryClient.invalidateQueries(["stockReturns"]);
+      queryClient.invalidateQueries({ queryKey: ["stockReturns"] });
       setReturnModalOpen(false);
       returnForm.resetFields();
       setReturnItemFilter(null);
     },
-    onError: () => toast.error("Failed to log return."),
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to log return."),
   });
 
   const acceptReturnMutation = useMutation({
     mutationFn: (id) => api.patch(`/stores/returns/${id}/accept`),
     onSuccess: () => {
       toast.success("Return accepted.");
-      queryClient.invalidateQueries(["stockReturns", "stockLevels"]);
+      queryClient.invalidateQueries({ queryKey: ["stockReturns"] });
+      queryClient.invalidateQueries({ queryKey: ["stockLevels"] });
+      queryClient.invalidateQueries({ queryKey: ["stockIssuedList"] });
     },
-    onError: () => toast.error("Failed to accept return."),
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to accept return."),
   });
 
   const rejectReturnMutation = useMutation({
@@ -200,12 +208,87 @@ const Stock = () => {
       api.patch(`/stores/returns/${id}/reject`, { rejectReason }),
     onSuccess: () => {
       toast.success("Return rejected.");
-      queryClient.invalidateQueries(["stockReturns"]);
+      queryClient.invalidateQueries({ queryKey: ["stockReturns"] });
       setRejectReturnModalOpen(false);
+      setSelectedReturn(null);
       rejectReturnForm.resetFields();
     },
-    onError: () => toast.error("Failed to reject return."),
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to reject return."),
   });
+
+  const handleThresholdSubmit = () => {
+    thresholdForm.validateFields().then((values) => {
+      const itItemId = thresholdItem?.itItemId || thresholdItem?.id;
+      if (!itItemId) {
+        toast.error("Unable to update threshold. Missing item ID.");
+        return;
+      }
+
+      thresholdMutation.mutate({ itItemId, thresholdLevel: values.thresholdLevel });
+    });
+  };
+
+  const handleAdjustmentSubmit = (values) => {
+    const quantityDelta = Number(values.quantityDelta);
+    if (!quantityDelta) {
+      toast.error("Quantity delta cannot be zero.");
+      return;
+    }
+
+    createAdjMutation.mutate({
+      ...values,
+      quantityDelta,
+      justification: values.justification?.trim(),
+    });
+  };
+
+  const handleReturnSubmit = (values) => {
+    const issued = stockIssuedList.find((record) => record.id === values.stockIssuedId);
+    const quantity = Number(values.quantity);
+    const maxQuantity = Number(issued?.quantityIssued || 0);
+
+    if (!issued) {
+      toast.error("Select a valid issued stock record.");
+      return;
+    }
+
+    if (!quantity || quantity < 1 || quantity > maxQuantity) {
+      toast.error(`Quantity returned must be between 1 and ${maxQuantity || 1}.`);
+      return;
+    }
+
+    createReturnMutation.mutate({
+      ...values,
+      itItemId: issued.itItemId,
+      quantity,
+      reason: values.reason?.trim(),
+      notes: values.notes?.trim() || undefined,
+    });
+  };
+
+  const handleAcceptReturn = (record) => {
+    if (!record?.id) {
+      toast.error("Unable to accept return. Missing return ID.");
+      return;
+    }
+
+    acceptReturnMutation.mutate(record.id);
+  };
+
+  const handleRejectReturn = (values) => {
+    if (!selectedReturn?.id) {
+      toast.error("Unable to reject return. Missing return ID.");
+      return;
+    }
+
+    const rejectReason = values.rejectReason?.trim();
+    if (!rejectReason) {
+      toast.error("Please provide a rejection reason.");
+      return;
+    }
+
+    rejectReturnMutation.mutate({ id: selectedReturn.id, rejectReason });
+  };
 
   // ── Columns ───────────────────────────────────────────────────────────────
 
@@ -308,15 +391,18 @@ const Stock = () => {
               size="small"
               type="primary"
               loading={acceptReturnMutation.isPending}
-              onClick={() => acceptReturnMutation.mutate(record.id)}
+              disabled={rejectReturnMutation.isPending}
+              onClick={() => handleAcceptReturn(record)}
             >
               Accept
             </Button>
             <Button
               size="small"
               danger
+              disabled={acceptReturnMutation.isPending || rejectReturnMutation.isPending}
               onClick={() => {
                 setSelectedReturn(record);
+                rejectReturnForm.resetFields();
                 setRejectReturnModalOpen(true);
               }}
             >
@@ -485,12 +571,8 @@ const Stock = () => {
       <Modal
         title={`Set Threshold Level — ${thresholdItem?.brand} ${thresholdItem?.model}`}
         open={thresholdModalOpen}
-        onCancel={() => { setThresholdModalOpen(false); thresholdForm.resetFields(); }}
-        onOk={() => {
-          thresholdForm.validateFields().then((values) => {
-            thresholdMutation.mutate({ itItemId: thresholdItem.itItemId, thresholdLevel: values.thresholdLevel });
-          });
-        }}
+        onCancel={() => { setThresholdModalOpen(false); setThresholdItem(null); thresholdForm.resetFields(); }}
+        onOk={handleThresholdSubmit}
         okText="Save"
         confirmLoading={thresholdMutation.isPending}
       >
@@ -530,7 +612,7 @@ const Stock = () => {
         <Form
           form={adjForm}
           layout="vertical"
-          onFinish={(values) => createAdjMutation.mutate(values)}
+          onFinish={handleAdjustmentSubmit}
         >
           <Form.Item name="itItemId" label="IT Item" rules={[{ required: true }]}>
             <Select placeholder="Select item" showSearch optionFilterProp="children">
@@ -573,7 +655,7 @@ const Stock = () => {
         <Form
           form={returnForm}
           layout="vertical"
-          onFinish={(values) => createReturnMutation.mutate(values)}
+          onFinish={handleReturnSubmit}
         >
           <Form.Item name="itItemId" hidden><input /></Form.Item>
           <Form.Item label="IT Item">
@@ -607,6 +689,7 @@ const Stock = () => {
               onChange={(issuedId) => {
                 const issued = stockIssuedList.find((r) => r.id === issuedId);
                 if (issued) returnForm.setFieldValue("itItemId", issued.itItemId);
+                returnForm.setFieldValue("quantity", undefined);
               }}
               options={stockIssuedList
                 .filter((r) => !returnItemFilter || r.itItemId === returnItemFilter)
@@ -617,8 +700,11 @@ const Stock = () => {
             />
           </Form.Item>
           <Form.Item name="quantity" label="Quantity Returned" rules={[{ required: true }]}>
-            <InputNumber min={1} className="w-full" />
+            <InputNumber min={1} max={selectedIssuedQuantity || 1} className="w-full" />
           </Form.Item>
+          {selectedIssuedQuantity ? (
+            <p className="-mt-3 mb-4 text-xs text-[#616161]">Maximum return quantity: {selectedIssuedQuantity}</p>
+          ) : null}
           <Form.Item name="reason" label="Return Reason" rules={[{ required: true }]}>
             <Input.TextArea rows={2} />
           </Form.Item>
@@ -637,14 +723,14 @@ const Stock = () => {
       <Modal
         title="Reject Return"
         open={rejectReturnModalOpen}
-        onCancel={() => { setRejectReturnModalOpen(false); rejectReturnForm.resetFields(); }}
+        onCancel={() => { setRejectReturnModalOpen(false); setSelectedReturn(null); rejectReturnForm.resetFields(); }}
         footer={null}
         destroyOnClose
       >
         <Form
           form={rejectReturnForm}
           layout="vertical"
-          onFinish={(values) => rejectReturnMutation.mutate({ id: selectedReturn?.id, ...values })}
+          onFinish={handleRejectReturn}
         >
           <p className="mb-4 text-sm text-[#616161]">
             Provide a reason for rejecting the return for{" "}

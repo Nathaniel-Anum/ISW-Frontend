@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SearchOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Popconfirm, Select, Table, Tooltip, message } from "antd";
+import { Button, Form, Input, Modal, Popconfirm, Select, Table, Tooltip } from "antd";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { LuBriefcaseBusiness, LuCheck, LuCopy, LuKeyRound, LuMail, LuPlus, LuUsersRound } from "react-icons/lu";
 import { toast } from "react-toastify";
@@ -107,7 +107,7 @@ const Employees = () => {
   });
 
   const editStaff = useMutation({
-    mutationFn: (values) => api.patch(`/admin/user/${editingRecord.staffId}`, values),
+    mutationFn: ({ staffId, values }) => api.patch(`/admin/user/${staffId}`, values),
     onSuccess: () => {
       toast.success("Staff updated successfully");
       form.resetFields();
@@ -125,8 +125,11 @@ const Employees = () => {
     mutationFn: (staffId) => api.delete(`/admin/user/${staffId}/permanent`),
     onSuccess: () => {
       toast.success("Staff deleted successfully");
-      message.success("Staff deleted successfully");
       queryClient.invalidateQueries({ queryKey: ["getAllUsers"] });
+    },
+    onError: (error) => {
+      const msg = error.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg[0] : msg || "Failed to delete staff");
     },
   });
 
@@ -145,14 +148,52 @@ const Employees = () => {
     form.setFieldsValue({ unitId: undefined });
   };
 
+  const normalizeStaffValues = (values) => ({
+    ...values,
+    staffId: values.staffId?.trim(),
+    name: values.name?.trim(),
+    email: values.email?.trim(),
+    roomNo: values.roomNo?.trim(),
+    roleNames: values.roleNames?.filter(Boolean) || [],
+  });
+
   const handleSubmit = (values) => {
-    if (editingRecord) {
-      const { staffId: _staffId, ...updateValues } = values;
-      editStaff.mutate(updateValues);
+    const payload = normalizeStaffValues(values);
+
+    if (!payload.staffId || !payload.name || !payload.email || !payload.departmentId || !payload.roomNo || !payload.roleNames.length) {
+      toast.error("Staff ID, name, email, department, room, and role are required");
       return;
     }
 
-    createStaff.mutate(values);
+    if (editingRecord) {
+      if (!editingRecord.staffId) {
+        toast.error("Unable to update staff: missing staff ID");
+        return;
+      }
+      const { staffId: _staffId, ...updateValues } = payload;
+      editStaff.mutate({ staffId: editingRecord.staffId, values: updateValues });
+      return;
+    }
+
+    createStaff.mutate(payload);
+  };
+
+  const handleDeleteStaff = (record) => {
+    if (!record?.staffId) {
+      toast.error("Unable to delete staff: missing staff ID");
+      return;
+    }
+    deleteStaff.mutate(record.staffId);
+  };
+
+  const handleGenerateTempPassword = (record) => {
+    if (!record?.staffId) {
+      toast.error("Unable to generate password: missing staff ID");
+      return;
+    }
+    setTempPassRecord(record);
+    setTempPassword("");
+    generateTempPassword.mutate(record.staffId);
   };
 
   const columns = [
@@ -213,7 +254,7 @@ const Employees = () => {
           <Tooltip title="Generate temporary password">
             <button
               className="rounded-full p-1.5 transition hover:bg-[#FFF8E1]"
-              onClick={() => { setTempPassRecord(record); setTempPassword(""); generateTempPassword.mutate(record.staffId); }}
+              onClick={() => handleGenerateTempPassword(record)}
             >
               <LuKeyRound size={18} className="text-[#F59E0B]" />
             </button>
@@ -221,7 +262,7 @@ const Employees = () => {
           <Popconfirm
             title="Delete staff"
             description="This action permanently removes the user record."
-            onConfirm={() => deleteStaff.mutate(record.staffId)}
+            onConfirm={() => handleDeleteStaff(record)}
             okText="Delete"
             cancelText="Cancel"
           >
@@ -337,7 +378,7 @@ const Employees = () => {
           </div>
 
           <Form.Item className="mb-0">
-            <Button type="primary" htmlType="submit" block className="!h-11 !rounded-2xl">
+            <Button type="primary" htmlType="submit" loading={createStaff.isPending || editStaff.isPending} block className="!h-11 !rounded-2xl">
               {editingRecord ? "Update Staff" : "Submit"}
             </Button>
           </Form.Item>
@@ -381,9 +422,12 @@ const Employees = () => {
                 disabled={!tempPassword}
                 className="rounded-full p-2 transition hover:bg-[#FFEBEE] disabled:opacity-40"
                 onClick={() => {
-                  navigator.clipboard.writeText(tempPassword);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2500);
+                  navigator.clipboard.writeText(tempPassword)
+                    .then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2500);
+                    })
+                    .catch(() => toast.error("Failed to copy password"));
                 }}
               >
                 {copied ? <LuCheck size={18} className="text-[#4CAF50]" /> : <LuCopy size={18} className="text-[#616161]" />}
@@ -398,7 +442,7 @@ const Employees = () => {
           <div className="mt-5 flex gap-3">
             <Button
               block
-              onClick={() => { generateTempPassword.mutate(tempPassRecord?.staffId); }}
+              onClick={() => handleGenerateTempPassword(tempPassRecord)}
               loading={generateTempPassword.isPending}
               icon={<LuKeyRound size={15} />}
             >

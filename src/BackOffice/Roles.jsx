@@ -86,7 +86,7 @@ const Roles = () => {
   const addRole = useMutation({
     mutationFn: (values) =>
       api.post("/admin/role", {
-        name: values.name,
+        name: values.name?.trim(),
         permissions: values.permissions ?? [],
       }),
     onSuccess: () => {
@@ -95,7 +95,7 @@ const Roles = () => {
       addForm.resetFields();
       setIsAddOpen(false);
     },
-    onError: () => toast.error("Failed to create role"),
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to create role"),
   });
 
   const updatePermissions = useMutation({
@@ -106,20 +106,25 @@ const Roles = () => {
       await queryClient.invalidateQueries({ queryKey: ["roles"] });
       setManageRole(null);
     },
-    onError: () => toast.error("Failed to update permissions"),
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to update permissions"),
   });
 
-  const handleDeleteRole = (id) =>
+  const handleDeleteRole = (id) => {
+    if (!id) {
+      toast.error("Unable to delete role: missing role ID");
+      return;
+    }
     api
       .delete(`/admin/roles/${id}`)
       .then(() => {
         toast.success("Role deleted");
         queryClient.invalidateQueries({ queryKey: ["roles"] });
       })
-      .catch(() => toast.error("Failed to delete role"));
+      .catch((err) => toast.error(err?.response?.data?.message || "Failed to delete role"));
+  };
 
   const openManage = (role) => {
-    setSelectedPermIds(role.permissions.map((p) => p.permission.id));
+    setSelectedPermIds(role.permissions?.map((p) => p.permission?.id).filter(Boolean) || []);
     setAddPickerValue([]);
     setManageRole(role);
   };
@@ -131,10 +136,30 @@ const Roles = () => {
     setAddPickerValue([]);
   };
 
+  const handleCreateRole = (values) => {
+    const name = values.name?.trim();
+    if (!name) {
+      toast.error("Role name is required");
+      return;
+    }
+    addRole.mutate({ name, permissions: values.permissions ?? [] });
+  };
+
+  const handleSaveRolePermissions = () => {
+    if (!manageRole?.id) {
+      toast.error("Unable to update permissions: missing role ID");
+      return;
+    }
+    updatePermissions.mutate({
+      roleId: manageRole.id,
+      permissionIds: selectedPermIds,
+    });
+  };
+
   // ── Permissions mutations ─────────────────────────────────────────────────
   const createPermission = useMutation({
     mutationFn: (values) =>
-      api.post("/admin/permissions", { resource: values.resource, actions: values.actions }),
+      api.post("/admin/permissions", { resource: values.resource?.trim(), actions: values.actions }),
     onSuccess: () => {
       toast.success("Permission created");
       queryClient.invalidateQueries({ queryKey: ["permissions"] });
@@ -147,8 +172,8 @@ const Roles = () => {
   });
 
   const updatePermission = useMutation({
-    mutationFn: ({ id, resource, actions }) =>
-      api.patch(`/admin/permissions/${id}`, { resource, actions }),
+    mutationFn: ({ id, resource, action }) =>
+      api.patch(`/admin/permissions/${id}`, { resource: resource?.trim(), action }),
     onSuccess: () => {
       toast.success("Permission updated");
       queryClient.invalidateQueries({ queryKey: ["permissions"] });
@@ -159,7 +184,11 @@ const Roles = () => {
       toast.error(err?.response?.data?.message || "Failed to update permission"),
   });
 
-  const handleDeletePermission = (id) =>
+  const handleDeletePermission = (id) => {
+    if (!id) {
+      toast.error("Unable to delete permission: missing permission ID");
+      return;
+    }
     api
       .delete(`/admin/permissions/${id}`)
       .then(() => {
@@ -167,7 +196,30 @@ const Roles = () => {
         queryClient.invalidateQueries({ queryKey: ["permissions"] });
         queryClient.invalidateQueries({ queryKey: ["permissionsWithRoles"] });
       })
-      .catch(() => toast.error("Failed to delete permission"));
+      .catch((err) => toast.error(err?.response?.data?.message || "Failed to delete permission"));
+  };
+
+  const handleCreatePermission = (values) => {
+    const resource = values.resource?.trim();
+    if (!resource || !values.actions?.length) {
+      toast.error("Resource and at least one action are required");
+      return;
+    }
+    createPermission.mutate({ resource, actions: values.actions });
+  };
+
+  const handleUpdatePermission = (values) => {
+    if (!editingPerm?.id) {
+      toast.error("Unable to update permission: missing permission ID");
+      return;
+    }
+    const resource = values.resource?.trim();
+    if (!resource || !values.action) {
+      toast.error("Resource and action are required");
+      return;
+    }
+    updatePermission.mutate({ id: editingPerm.id, resource, action: values.action });
+  };
 
   const openEditPerm = (perm) => {
     permEditForm.setFieldsValue({ resource: perm.resource, action: perm.action });
@@ -503,7 +555,7 @@ const Roles = () => {
         width={640}
         destroyOnClose
       >
-        <Form form={addForm} layout="vertical" onFinish={(v) => addRole.mutate(v)}>
+        <Form form={addForm} layout="vertical" onFinish={handleCreateRole}>
           <Form.Item
             name="name"
             label="Role Name"
@@ -658,12 +710,7 @@ const Roles = () => {
                 <Button
                   type="primary"
                   loading={updatePermissions.isPending}
-                  onClick={() =>
-                    updatePermissions.mutate({
-                      roleId: manageRole.id,
-                      permissionIds: selectedPermIds,
-                    })
-                  }
+                  onClick={handleSaveRolePermissions}
                   className="!h-11 !flex-1 !rounded-2xl"
                 >
                   Save Permissions
@@ -688,7 +735,7 @@ const Roles = () => {
         width={520}
         destroyOnClose
       >
-        <Form form={permAddForm} layout="vertical" onFinish={(v) => createPermission.mutate(v)} className="pt-2">
+        <Form form={permAddForm} layout="vertical" onFinish={handleCreatePermission} className="pt-2">
           <PermCreateFields />
           <Form.Item className="mb-0 pt-2">
             <Button
@@ -728,9 +775,7 @@ const Roles = () => {
         <Form
           form={permEditForm}
           layout="vertical"
-          onFinish={(v) =>
-            updatePermission.mutate({ id: editingPerm.id, ...v })
-          }
+          onFinish={handleUpdatePermission}
           className="pt-2"
         >
           <PermEditFields />

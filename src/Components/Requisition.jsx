@@ -1,6 +1,6 @@
 import React, { useDeferredValue, useEffect, useState } from "react";
 import { SearchOutlined } from "@ant-design/icons";
-import { Modal, Form, Input, Button, Table, Tag, Popconfirm, Select } from "antd";
+import { Modal, Form, Input, InputNumber, Button, Table, Tag, Popconfirm, Select } from "antd";
 import { LuPlus } from "react-icons/lu";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -20,12 +20,25 @@ const Requisition = () => {
   const [pageSize, setPageSize] = useState(10);
   const [searchText, setSearchText] = useState("");
   const queryClient = useQueryClient();
-  const { user } = useUser();
+  const { user, setUser } = useUser();
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
   const location = useLocation();
   const navigate = useNavigate();
   const deferredSearch = useDeferredValue(searchText.trim());
+  const effectiveUser = user;
+
+  const { data: profileResponse } = useQuery({
+    queryKey: ["profile"],
+    queryFn: () => api.get("/user/profile"),
+    enabled: !effectiveUser,
+  });
+
+  useEffect(() => {
+    if (!profileResponse?.data) return;
+    setUser(profileResponse.data);
+    localStorage.setItem("user", JSON.stringify(profileResponse.data));
+  }, [profileResponse, setUser]);
 
   useEffect(() => {
     if (user && isModalOpen) {
@@ -53,7 +66,8 @@ const Requisition = () => {
     mutationKey: ["createRequisition"],
     mutationFn: (values) => api.post("/user/requisitions", values),
     onSuccess: () => {
-      queryClient.invalidateQueries(["requisition"]);
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
       form.resetFields();
       setIsModalOpen(false);
       toast.success("Requisition created successfully");
@@ -66,7 +80,8 @@ const Requisition = () => {
   const { mutate: requestFollowUp, isPending: isFollowUpPending } = useMutation({
     mutationFn: (requisitionId) => api.post(`/user/requisitions/${requisitionId}/follow-up`),
     onSuccess: (response) => {
-      queryClient.invalidateQueries(["requisition"]);
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
       toast.success(response?.data?.message || "Stores officer notified successfully");
     },
     onError: (error) => {
@@ -77,7 +92,8 @@ const Requisition = () => {
   const { mutate: cancelRequisition, isPending: isCancelPending } = useMutation({
     mutationFn: (requisitionId) => api.post(`/user/requisitions/${requisitionId}/cancel`),
     onSuccess: () => {
-      queryClient.invalidateQueries(["requisition"]);
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
       toast.success("Requisition cancelled successfully");
     },
     onError: (error) => {
@@ -88,7 +104,8 @@ const Requisition = () => {
   const { mutate: updateRequisition, isPending: isUpdatePending } = useMutation({
     mutationFn: ({ id, data }) => api.patch(`/user/requisitions/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries(["requisition"]);
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
       setIsEditModalOpen(false);
       setEditingRequisition(null);
       editForm.resetFields();
@@ -109,20 +126,34 @@ const Requisition = () => {
   };
 
   const handleEditSubmit = (values) => {
-    updateRequisition({ id: editingRequisition.id, data: values });
+    const requisitionId = editingRequisition?.id || editingRequisition?.requisitionID;
+    if (!requisitionId) {
+      toast.error("Unable to update this requisition. Missing requisition ID.");
+      return;
+    }
+
+    updateRequisition({
+      id: requisitionId,
+      data: { ...values, quantity: Number(values.quantity) },
+    });
   };
 
   const handleSubmit = (values) => {
+    if (!effectiveUser?.department?.id) {
+      toast.error("Your profile is still loading. Please try again in a moment.");
+      return;
+    }
+
     const selected = requisitionItemOptions.find((item) => item.value === values.itItemId);
     const payload = {
       itItemId: values.itItemId,
       itemDescription: selected ? selected.label : values.itItemId,
       quantity: Number(values.quantity),
       purpose: "For Official Use",
-      unitId: user.unit?.id,
-      departmentId: user.department.id,
-      roomNo: user.roomNo,
-      staffId: user.staffId,
+      unitId: effectiveUser.unit?.id,
+      departmentId: effectiveUser.department.id,
+      roomNo: effectiveUser.roomNo,
+      staffId: effectiveUser.staffId,
     };
 
     createRequisition(payload);
@@ -225,7 +256,7 @@ const Requisition = () => {
               <Popconfirm
                 title="Cancel requisition"
                 description="Are you sure you want to cancel this requisition?"
-                onConfirm={() => cancelRequisition(record.id)}
+                onConfirm={() => cancelRequisition(record.id || record.requisitionID)}
                 okText="Yes, cancel"
                 cancelText="No"
                 okButtonProps={{ danger: true }}
@@ -255,7 +286,7 @@ const Requisition = () => {
             type="primary"
             size="small"
             loading={isFollowUpPending}
-            onClick={() => requestFollowUp(record.id)}
+            onClick={() => requestFollowUp(record.id || record.requisitionID)}
           >
             Notify Stores Officer
           </Button>
@@ -307,7 +338,7 @@ const Requisition = () => {
               setPageSize(nextPageSize);
             },
           }}
-          rowKey="requisitionID"
+          rowKey={(record) => record.id || record.requisitionID}
           size="middle"
           scroll={{ x: 980 }}
         />
@@ -345,11 +376,11 @@ const Requisition = () => {
             label="Quantity"
             rules={[{ required: true, message: "Please enter the quantity" }]}
           >
-            <Input type="number" min={1} placeholder="Enter quantity" />
+            <InputNumber min={1} precision={0} placeholder="Enter quantity" className="w-full" />
           </Form.Item>
 
           <Form.Item className="mb-0">
-            <Button type="primary" htmlType="submit" loading={isPending} block>
+            <Button type="primary" htmlType="submit" loading={isPending} disabled={!effectiveUser?.department?.id} block>
               Submit
             </Button>
           </Form.Item>
@@ -368,7 +399,7 @@ const Requisition = () => {
       >
         <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
           <Form.Item name="quantity" label="Quantity" rules={[{ required: true }]}>
-            <Input type="number" min={1} placeholder="Enter Quantity" />
+            <InputNumber min={1} precision={0} placeholder="Enter Quantity" className="w-full" />
           </Form.Item>
           <Form.Item className="mb-0">
             <Button type="primary" htmlType="submit" loading={isUpdatePending} block>

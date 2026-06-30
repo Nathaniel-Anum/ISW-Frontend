@@ -51,7 +51,7 @@ const SkillTags = () => {
   });
 
   const updateTag = useMutation({
-    mutationFn: (values) => api.patch(`/service-desk/admin/skill-tags/${editingRecord.id}`, values),
+    mutationFn: ({ id, ...values }) => api.patch(`/service-desk/admin/skill-tags/${id}`, values),
     onSuccess: () => {
       toast.success("Skill tag updated");
       invalidate();
@@ -86,6 +86,38 @@ const SkillTags = () => {
       isActive: record.isActive,
     });
     setOpen(true);
+  };
+
+  const handleSubmit = (values) => {
+    const payload = {
+      name: values.name?.trim(),
+      description: values.description?.trim() || undefined,
+      isActive: values.isActive,
+    };
+
+    if (!payload.name) {
+      toast.error("Tag name is required");
+      return;
+    }
+
+    if (editingRecord) {
+      if (!editingRecord.id) {
+        toast.error("Unable to update skill tag: missing tag ID");
+        return;
+      }
+      updateTag.mutate({ id: editingRecord.id, ...payload });
+      return;
+    }
+
+    createTag.mutate(payload);
+  };
+
+  const handleDeleteTag = (record) => {
+    if (!record?.id) {
+      toast.error("Unable to delete skill tag: missing tag ID");
+      return;
+    }
+    deleteTag.mutate(record.id);
   };
 
   const columns = [
@@ -137,7 +169,7 @@ const SkillTags = () => {
                 content: "This tag will be removed from the skill tag list. Existing skill assignments on support profiles will not be affected.",
                 okText: "Delete",
                 okButtonProps: { danger: true },
-                onOk: () => deleteTag.mutate(record.id),
+                onOk: () => handleDeleteTag(record),
               });
             }}
           >
@@ -213,13 +245,7 @@ const SkillTags = () => {
         <Form
           layout="vertical"
           form={form}
-          onFinish={(values) => {
-            if (editingRecord) {
-              updateTag.mutate(values);
-            } else {
-              createTag.mutate(values);
-            }
-          }}
+          onFinish={handleSubmit}
         >
           <Form.Item
             name="name"

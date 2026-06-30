@@ -24,7 +24,7 @@ const RequisitionItems = () => {
     const all = data?.data || [];
     if (!deferredSearch) return all;
     return all.filter((item) =>
-      item.name.toLowerCase().includes(deferredSearch.toLowerCase())
+      item.name?.toLowerCase().includes(deferredSearch.toLowerCase())
     );
   }, [data, deferredSearch]);
 
@@ -55,6 +55,10 @@ const RequisitionItems = () => {
   });
 
   const handleDelete = (id) => {
+    if (!id) {
+      toast.error("Unable to delete item: missing item ID");
+      return;
+    }
     api
       .delete(`/admin/requisition-items/${id}`)
       .then(() => {
@@ -65,6 +69,15 @@ const RequisitionItems = () => {
         const msg = err?.response?.data?.message;
         toast.error(Array.isArray(msg) ? msg[0] : msg || "Failed to delete item");
       });
+  };
+
+  const handleCreateItem = (values) => {
+    const name = values.name?.trim();
+    if (!name) {
+      toast.error("Item name is required");
+      return;
+    }
+    createItem.mutate({ name });
   };
 
   const columns = [
@@ -163,7 +176,7 @@ const RequisitionItems = () => {
         width={440}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" onFinish={(values) => createItem.mutate(values)}>
+        <Form form={form} layout="vertical" onFinish={handleCreateItem}>
           <Form.Item
             label="Item Name"
             name="name"

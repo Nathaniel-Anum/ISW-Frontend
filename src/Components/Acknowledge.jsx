@@ -12,7 +12,7 @@ const Acknowledge = () => {
   const [form] = Form.useForm();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [searchText, setSearchText] = useState("");
@@ -40,14 +40,31 @@ const Acknowledge = () => {
   );
 
   const mutateAcknowledgment = useMutation({
-    mutationFn: (values) => api.post(`user/reqs/acknowledge/${selected?.stockIssuedId}`, values),
+    mutationFn: ({ stockIssuedId, values }) => api.post(`user/reqs/acknowledge/${stockIssuedId}`, values),
     onSuccess: () => {
       setOpen(false);
+      setSelected(null);
       toast.success("Acknowledgment submitted");
       queryClient.invalidateQueries({ queryKey: ["acknowledge"] });
       form.resetFields();
     },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to submit acknowledgment");
+    },
   });
+
+  const handleSubmit = (values) => {
+    const stockIssuedId = selected?.stockIssuedId || selected?.id;
+    if (!stockIssuedId) {
+      toast.error("Unable to acknowledge this item. Missing issued stock ID.");
+      return;
+    }
+
+    mutateAcknowledgment.mutate({
+      stockIssuedId,
+      values: { ...values, remarks: values.remarks?.trim() || undefined },
+    });
+  };
 
   const columns = [
     {
@@ -148,12 +165,13 @@ const Acknowledge = () => {
           open={open}
           onCancel={() => {
             setOpen(false);
+            setSelected(null);
             form.resetFields();
           }}
           footer={null}
           title="Acknowledge Device"
         >
-          <Form layout="vertical" form={form} onFinish={(values) => mutateAcknowledgment.mutate(values)}>
+          <Form layout="vertical" form={form} onFinish={handleSubmit}>
             <Form.Item label="Remarks" name="remarks">
               <Input.TextArea rows={4} placeholder="Add acknowledgment remarks" />
             </Form.Item>

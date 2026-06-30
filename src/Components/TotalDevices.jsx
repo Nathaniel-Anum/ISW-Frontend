@@ -11,6 +11,7 @@ import * as XLSX from "xlsx";
 const TotalDevices = () => {
   const [open, setOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [filteredTickets, setFilteredTickets] = useState(null);
   const [form] = Form.useForm();
 
   //get all device details
@@ -21,7 +22,7 @@ const TotalDevices = () => {
     },
   });
 
-  const tickets = data?.data?.assets || [];
+  const tickets = filteredTickets || data?.data?.assets || [];
 
   //get all itItems
   const { data: itItems } = useQuery({
@@ -46,7 +47,7 @@ const TotalDevices = () => {
   };
 
   const handleDownload = () => {
-    const tickets = data?.data?.assets;
+    const tickets = filteredTickets || data?.data?.assets || [];
 
     const cleanData = tickets
       .filter(
@@ -184,6 +185,28 @@ const TotalDevices = () => {
       key: "supplierName",
     },
   ];
+
+  const handleFilter = (values) => {
+    const nextTickets = (data?.data?.assets || []).filter((item) => {
+      const details = item.deviceDetails || {};
+      return (
+        (!values.deviceType || item.deviceType === values.deviceType) &&
+        (!values.brand || item.brand === values.brand) &&
+        (!values.model || item.model === values.model) &&
+        (!values.serialNumber || details.serialNumber === values.serialNumber) &&
+        (!values.tonerNumber || details.tonerNumber === values.tonerNumber) &&
+        (!values.processorType || details.processorType === values.processorType) &&
+        (!values.department || item.departmentId === values.department) &&
+        (!values.unit || item.unitId === values.unit) &&
+        (!values.status || item.status === values.status)
+      );
+    });
+
+    setFilteredTickets(nextTickets);
+    setOpen(false);
+    form.resetFields();
+  };
+
   return (
     <div className="px-[3rem] py-[2rem]">
       <div className="flex justify-end gap-2">
@@ -204,7 +227,7 @@ const TotalDevices = () => {
             <Form
               form={form}
               layout="vertical"
-              onFinish={(values) => console.log(values)}
+              onFinish={handleFilter}
             >
               <Form.Item label="Device Type" name="deviceType">
                 <Select placeholder="Select a device type">
@@ -238,9 +261,9 @@ const TotalDevices = () => {
                   {tickets?.map((item) => (
                     <Select.Option
                       key={item.id}
-                      value={item.deviceDetails.serialNumber}
+                      value={item.deviceDetails?.serialNumber}
                     >
-                      {item.deviceDetails.serialNumber}
+                      {item.deviceDetails?.serialNumber}
                     </Select.Option>
                   ))}
                 </Select>
@@ -250,9 +273,9 @@ const TotalDevices = () => {
                   {tickets?.map((item) => (
                     <Select.Option
                       key={item.id}
-                      value={item.deviceDetails.tonerNumber}
+                      value={item.deviceDetails?.tonerNumber}
                     >
-                      {item.deviceDetails.tonerNumber}
+                      {item.deviceDetails?.tonerNumber}
                     </Select.Option>
                   ))}
                 </Select>
@@ -262,9 +285,9 @@ const TotalDevices = () => {
                   {tickets?.map((item) => (
                     <Select.Option
                       key={item.id}
-                      value={item.deviceDetails.processorType}
+                      value={item.deviceDetails?.processorType}
                     >
-                      {item.deviceDetails.processorType}
+                      {item.deviceDetails?.processorType}
                     </Select.Option>
                   ))}
                 </Select>
@@ -272,9 +295,9 @@ const TotalDevices = () => {
               <Form.Item name="department" label="Select Department">
                 <Select placeholder="Choose a department">
                   {department?.data.map((dept) => (
-                    <Option key={dept.id} value={dept.id}>
+                    <Select.Option key={dept.id} value={dept.id}>
                       {dept.name}
-                    </Option>
+                    </Select.Option>
                   ))}
                 </Select>
               </Form.Item>
@@ -291,11 +314,11 @@ const TotalDevices = () => {
               </Form.Item>
               <Form.Item label="Status" name="status">
                 <Select placeholder="Select status ">
-                  <Option value="ACTIVE">ACTIVE</Option>
-                  <Option value="INACTIVE">INACTIVE</Option>
-                  <Option value="OBSOLETE">OBSOLETE</Option>
-                  <Option value="DISPOSED">DISPOSED</Option>
-                  <Option value="NON_FUNCTIONAL">NON_FUNCTIONAL</Option>
+                  <Select.Option value="ACTIVE">ACTIVE</Select.Option>
+                  <Select.Option value="INACTIVE">INACTIVE</Select.Option>
+                  <Select.Option value="OBSOLETE">OBSOLETE</Select.Option>
+                  <Select.Option value="DISPOSED">DISPOSED</Select.Option>
+                  <Select.Option value="NON_FUNCTIONAL">NON_FUNCTIONAL</Select.Option>
                 </Select>
               </Form.Item>
               <Form.Item>

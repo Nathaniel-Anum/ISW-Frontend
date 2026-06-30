@@ -54,7 +54,6 @@ const DeleteRole = () => {
         mutate(id);
       }
     } catch (err) {
-      console.log(err);
     }
   };
 

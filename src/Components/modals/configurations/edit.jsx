@@ -67,7 +67,6 @@ const EditConfiguration = () => {
       };
       mutate(_values);
     } catch (err) {
-      console.error(err);
     }
   };
 

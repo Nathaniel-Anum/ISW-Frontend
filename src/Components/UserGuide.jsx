@@ -1120,7 +1120,7 @@ const GuideSection = ({ section, accentColor, bgColor }) => {
           )}
           <ol className="space-y-3">
             {section.steps.map((step, i) => (
-              <li key={i} className="flex gap-4">
+              <li key={step} className="flex gap-4">
                 <span
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
                   style={{ backgroundColor: bgColor, color: accentColor }}
@@ -1218,8 +1218,8 @@ const ModuleFeatureCard = ({ module: mod }) => {
         </div>
       </div>
       <div className="divide-y divide-[#F5F5F5] px-6 py-1">
-        {mod.features.map((f, i) => (
-          <div key={i} className="py-4">
+        {mod.features.map((f) => (
+          <div key={f.title || f.label || f.name} className="py-4">
             <FeatureItem feature={f} accentColor={mod.color} bgColor={mod.bg} />
           </div>
         ))}

@@ -26,6 +26,7 @@ const ITDApproval = () => {
   });
 
   const approvals = approvalResponse?.data || [];
+  const getRecordId = (record) => record?.id || record?.requisitionID;
 
   const stats = useMemo(
     () => [
@@ -52,10 +53,13 @@ const ITDApproval = () => {
     mutationFn: (recordId) => api.patch(`/itd/req/${recordId}/approve`),
     onSuccess: () => {
       toast.success("Requisition approved");
-      queryClient.invalidateQueries(["approval"]);
+      queryClient.invalidateQueries({ queryKey: ["approval"] });
+      queryClient.invalidateQueries({ queryKey: ["itd-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
     },
-    onError: () => {
-      toast.error("Failed to approve request.");
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to approve request.");
     },
   });
 
@@ -63,23 +67,44 @@ const ITDApproval = () => {
     mutationFn: ({ id, reason }) => api.patch(`/itd/req/${id}/decline`, { reason }),
     onSuccess: () => {
       toast.success("Requisition declined");
-      queryClient.invalidateQueries(["approval"]);
+      queryClient.invalidateQueries({ queryKey: ["approval"] });
+      queryClient.invalidateQueries({ queryKey: ["itd-queue"] });
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
       setIsModalVisible(false);
       setDeclineReason("");
       setSelectedRecord(null);
     },
-    onError: () => {
-      toast.error("Failed to decline requisition.");
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to decline requisition.");
     },
   });
 
   const handleDecline = () => {
-    if (!declineReason.trim()) {
+    const recordId = getRecordId(selectedRecord);
+    const reason = declineReason.trim();
+
+    if (!recordId) {
+      toast.error("Unable to decline this requisition. Missing requisition ID.");
+      return;
+    }
+
+    if (!reason) {
       toast.error("Please provide a reason for declining");
       return;
     }
 
-    declineRequestMutation.mutate({ id: selectedRecord?.id, reason: declineReason });
+    declineRequestMutation.mutate({ id: recordId, reason });
+  };
+
+  const handleApprove = (record) => {
+    const recordId = getRecordId(record);
+    if (!recordId) {
+      toast.error("Unable to approve this requisition. Missing requisition ID.");
+      return;
+    }
+
+    approveRequestMutation.mutate(recordId);
   };
 
   const columns = [
@@ -147,12 +172,13 @@ const ITDApproval = () => {
         <Space size="middle">
           <Popconfirm
             title="Approve this requisition?"
-            onConfirm={() => approveRequestMutation.mutate(record?.id)}
+            onConfirm={() => handleApprove(record)}
             okText="Approve"
             cancelText="Cancel"
           >
             <button
               type="button"
+              disabled={approveRequestMutation.isPending || declineRequestMutation.isPending}
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ECFDF3] text-[#166534] transition-colors duration-200 hover:bg-[#DCFCE7]"
             >
               <LuCheck />
@@ -161,9 +187,11 @@ const ITDApproval = () => {
 
           <button
             type="button"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFEBEE] text-[#B71C1C] transition-colors duration-200 hover:bg-[#FDE2E2]"
+            disabled={approveRequestMutation.isPending || declineRequestMutation.isPending}
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFEBEE] text-[#B71C1C] transition-colors duration-200 hover:bg-[#FDE2E2] disabled:cursor-not-allowed disabled:opacity-50"
             onClick={() => {
               setSelectedRecord(record);
+              setDeclineReason("");
               setIsModalVisible(true);
             }}
           >
@@ -223,7 +251,7 @@ const ITDApproval = () => {
           >
             Cancel
           </Button>,
-          <Button key="decline" type="primary" danger onClick={handleDecline}>
+          <Button key="decline" type="primary" danger onClick={handleDecline} loading={declineRequestMutation.isPending}>
             Decline
           </Button>,
         ]}

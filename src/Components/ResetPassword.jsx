@@ -29,7 +29,6 @@ const ResetPassword = () => {
       setTimeout(() => navigate("/"), 2000);
     },
     onError: (err) => {
-      console.error("Reset password failed:", err);
       toast.error(err.response?.data?.message || "Failed to reset password. Please try again.");
     },
   });

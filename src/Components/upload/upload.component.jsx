@@ -19,11 +19,16 @@ const Uploader = ({ openFn }) => {
     }
   );
 
-  const handleFileUpload = (values) => {
-    
+  const handleFileUpload = () => {
+    const selectedFile = fileList[0]?.originFileObj;
+    if (!selectedFile) {
+      message.error('Select a file before uploading');
+      return;
+    }
+
     const formData = new FormData();
 
-    formData.append('file', '');
+    formData.append('file', selectedFile);
 
     mutate(formData);
   };
@@ -32,9 +37,7 @@ const Uploader = ({ openFn }) => {
     name: 'file',
     beforeUpload: () => false,
     onChange(info) {
-      if (info.file.status !== 'uploading') {
-        console.log(info.file, info.fileList);
-      }
+      setFileList(info.fileList.slice(-1));
       if (info.file.status === 'done') {
         message.success(`${info.file.name} file uploaded successfully`);
       } else if (info.file.status === 'error') {

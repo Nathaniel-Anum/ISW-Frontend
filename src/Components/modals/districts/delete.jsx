@@ -53,7 +53,6 @@ const DeleteDistrict = () => {
         mutate(id);
       }
     } catch (err) {
-      console.log(err);
     }
   };
 

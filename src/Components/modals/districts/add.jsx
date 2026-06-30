@@ -44,7 +44,6 @@ const AddDistrict = () => {
     try {
       mutate(values);
     } catch (err) {
-      console.error(err);
     }
   };
 

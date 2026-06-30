@@ -61,6 +61,7 @@ const SupportProfiles = () => {
       setEditingRecord(null);
       form.resetFields();
     },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to update support profile"),
   });
 
   const openEditModal = (record) => {
@@ -72,6 +73,29 @@ const SupportProfiles = () => {
       skillTags: record.skillTags || [],
     });
     setOpen(true);
+  };
+
+  const handleUpdateProfile = (values) => {
+    if (!editingRecord?.id) {
+      toast.error("Unable to update profile: missing user ID");
+      return;
+    }
+
+    const maxOpenTickets = Number(values.maxOpenTickets);
+    if (!Number.isFinite(maxOpenTickets) || maxOpenTickets < 1) {
+      toast.error("Max open tickets must be at least 1");
+      return;
+    }
+
+    updateProfile.mutate({
+      userId: editingRecord.id,
+      values: {
+        availabilityStatus: values.availabilityStatus,
+        isAcceptingTickets: values.isAcceptingTickets,
+        maxOpenTickets,
+        skillTags: values.skillTags?.map((tag) => tag.trim()).filter(Boolean) || [],
+      },
+    });
   };
 
   const columns = [
@@ -190,7 +214,7 @@ const SupportProfiles = () => {
         <Form
           layout="vertical"
           form={form}
-          onFinish={(values) => updateProfile.mutate({ userId: editingRecord.id, values })}
+          onFinish={handleUpdateProfile}
         >
           <div className="grid grid-cols-1 gap-x-4 md:grid-cols-2">
             <Form.Item name="availabilityStatus" label="Availability Status" rules={[{ required: true, message: "Please select availability" }]}>

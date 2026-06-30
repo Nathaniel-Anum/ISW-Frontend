@@ -3,6 +3,7 @@ import { LuChevronDown, LuLayoutDashboard, LuMenu, LuPlus } from "react-icons/lu
 import { useNavigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { logout } from "../lib/auth";
 import { useUser } from "../utils/userContext";
 import NotificationBell from "./ui/NotificationBell";
 
@@ -11,9 +12,8 @@ const Navbar = ({ onOpenMenu = () => {} }) => {
   const currentDate = new Date();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
+  const handleLogout = async () => {
+    await logout();
     setUser(null);
     navigate("/");
   };

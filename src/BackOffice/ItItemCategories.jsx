@@ -36,7 +36,7 @@ const ItItemCategories = () => {
     if (!deferredSearch) return categories;
     return categories.filter(
       (c) =>
-        c.name.toLowerCase().includes(deferredSearch) ||
+        c.name?.toLowerCase().includes(deferredSearch) ||
         (c.description || "").toLowerCase().includes(deferredSearch),
     );
   }, [categories, deferredSearch]);
@@ -67,7 +67,7 @@ const ItItemCategories = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (values) => api.patch(`/admin/it-item-categories/${editingRecord.id}`, values),
+    mutationFn: ({ id, ...values }) => api.patch(`/admin/it-item-categories/${id}`, values),
     onSuccess: () => {
       toast.success("Category updated");
       refreshCategories();
@@ -124,13 +124,13 @@ const ItItemCategories = () => {
 
   const handleSubmit = (values) => {
     const otherAttrs = (values.attributeDefinitions || []).map((attr, index) => ({
-      key: attr.key.trim().replace(/\s+/g, "_").toLowerCase(),
-      label: attr.label,
+      key: attr.key?.trim().replace(/\s+/g, "_").toLowerCase(),
+      label: attr.label?.trim(),
       dataType: attr.dataType,
       scope: attr.scope || "BOTH",
       isRequired: attr.isRequired || false,
       sortOrder: index + 1,
-      helpText: attr.helpText,
+      helpText: attr.helpText?.trim() || undefined,
       optionsJson:
         attr.dataType === "SELECT"
           ? attr.optionsJson
@@ -141,7 +141,7 @@ const ItItemCategories = () => {
     }));
 
     // Always inject formFactor as the first attribute when options are provided
-    const formFactorOptions = (values.formFactorOptions || []).filter(Boolean);
+    const formFactorOptions = (values.formFactorOptions || []).map((option) => option.trim()).filter(Boolean);
     const formFactorAttr = formFactorOptions.length
       ? [{
           key: "formFactor",
@@ -156,15 +156,29 @@ const ItItemCategories = () => {
       : [];
 
     const payload = {
-      name: values.name,
-      description: values.description,
+      name: values.name?.trim(),
+      description: values.description?.trim() || undefined,
       defaultItemClass: values.defaultItemClass,
       legacyDeviceType: values.legacyDeviceType,
       attributeDefinitions: [...formFactorAttr, ...otherAttrs],
     };
 
+    if (!payload.name) {
+      toast.error("Category name is required");
+      return;
+    }
+
+    if (otherAttrs.some((attr) => !attr.key || !attr.label || !attr.dataType)) {
+      toast.error("Each attribute needs a label, key, and data type");
+      return;
+    }
+
     if (editingRecord) {
-      updateMutation.mutate(payload);
+      if (!editingRecord.id) {
+        toast.error("Unable to update category: missing category ID");
+        return;
+      }
+      updateMutation.mutate({ id: editingRecord.id, ...payload });
     } else {
       createMutation.mutate(payload);
     }

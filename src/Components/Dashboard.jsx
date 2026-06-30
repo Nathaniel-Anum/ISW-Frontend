@@ -141,9 +141,7 @@ const Dashboard = () => {
         setUser(res.data);
         localStorage.setItem("user", JSON.stringify(res.data));
       })
-      .catch((err) => {
-        console.error("Failed to fetch profile:", err);
-      });
+      .catch(() => {});
   }, [setUser]);
 
   // ── Requisitions (all roles except specialist-only roles) ──────────────────

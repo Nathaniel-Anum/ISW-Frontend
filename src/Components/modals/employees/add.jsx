@@ -99,7 +99,6 @@ const AddEmployee = () => {
       };
       mutate(values);
     } catch (err) {
-      console.error(err);
     }
   };
 

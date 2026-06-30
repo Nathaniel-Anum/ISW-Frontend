@@ -4,15 +4,15 @@ import { LuArrowRightLeft, LuMenu } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { logout } from "../lib/auth";
 import { useUser } from "../utils/userContext";
 
 const Navbar = ({ onOpenMenu = () => {} }) => {
   const { user, setUser } = useUser();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
+  const handleLogout = async () => {
+    await logout();
     setUser(null);
     navigate("/");
   };

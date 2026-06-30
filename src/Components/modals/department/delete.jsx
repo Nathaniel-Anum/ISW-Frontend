@@ -50,7 +50,6 @@ const DeleteDepartment = () => {
         mutate(id);
       }
     } catch (err) {
-      console.log(err);
     }
   };
 

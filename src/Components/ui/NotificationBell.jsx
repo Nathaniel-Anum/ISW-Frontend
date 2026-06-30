@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Badge, Dropdown, Empty, Spin, Tag, Typography } from "antd";
 import { LuBell, LuCheck, LuX } from "react-icons/lu";
 import { io } from "socket.io-client";
+import { toast } from "react-toastify";
 import api from "../../utils/config";
 
-const BACKEND_URL = import.meta.env.VITE_BASE_URL || "http://localhost:9000";
+const BACKEND_URL = import.meta.env.VITE_BASE_URL;
 
 const MAX_NOTIFICATIONS = 50;
 
@@ -65,7 +66,7 @@ export default function NotificationBell() {
   // WebSocket — connect with JWT
   useEffect(() => {
     const token = localStorage.getItem("access_token");
-    if (!token) return;
+    if (!token || !BACKEND_URL) return;
 
     const socket = io(BACKEND_URL, {
       auth: { token },
@@ -102,14 +103,18 @@ export default function NotificationBell() {
   };
 
   const markOneRead = async (id) => {
+    if (!id) {
+      toast.error("Unable to mark notification as read");
+      return;
+    }
     try {
       await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n))
       );
       setUnread((count) => Math.max(0, count - 1));
-    } catch {
-      /* silent */
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to mark notification as read");
     }
   };
 
@@ -119,8 +124,8 @@ export default function NotificationBell() {
       await api.patch("/notifications/read-all");
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnread(0);
-    } catch {
-      /* silent */
+    } catch (err) {
+      toast.error(err?.response?.data?.message || "Failed to mark notifications as read");
     }
   };
 

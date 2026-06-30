@@ -45,6 +45,10 @@ const Projects = () => {
   });
 
   const handleDelete = (id) => {
+    if (!id) {
+      toast.error("Unable to delete purchase type: missing record ID");
+      return;
+    }
     api
       .delete(`/admin/projects/${id}`)
       .then(() => {
@@ -54,6 +58,18 @@ const Projects = () => {
       .catch(() => {
         toast.error("Failed to delete purchase");
       });
+  };
+
+  const handleCreateProject = (values) => {
+    const name = values.name?.trim();
+    if (!name) {
+      toast.error("Purchase type name is required");
+      return;
+    }
+    createProject.mutate({
+      name,
+      description: values.description?.trim() || undefined,
+    });
   };
 
   const columns = [
@@ -131,7 +147,7 @@ const Projects = () => {
       </section>
 
       <Modal title="Create Purchase Type" open={isModalOpen} onCancel={() => setIsModalOpen(false)} footer={null} width={560} destroyOnClose>
-        <Form form={form} layout="vertical" onFinish={(values) => createProject.mutate(values)}>
+        <Form form={form} layout="vertical" onFinish={handleCreateProject}>
           <Form.Item
             label="Purchase Type Name"
             name="name"

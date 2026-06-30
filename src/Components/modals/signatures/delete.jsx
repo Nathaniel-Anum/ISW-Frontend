@@ -54,7 +54,6 @@ const DeleteSignature = () => {
         mutate(id);
       }
     } catch (err) {
-      console.log(err);
     }
   };
 

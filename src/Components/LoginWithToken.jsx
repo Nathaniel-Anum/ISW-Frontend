@@ -18,8 +18,7 @@ const LoginWithToken = () => {
         localStorage.getItem("mustResetPassword") === "true";
       navigate(mustResetPassword ? "/reset-password" : "/dashboard");
     },
-    onError: (err) => {
-      console.error("Token login failed:", err);
+    onError: () => {
       toast.error("Token login failed. Redirecting to login...");
       setTimeout(() => navigate("/"), 2000); // Delay to show toast
     },

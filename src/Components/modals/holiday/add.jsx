@@ -41,7 +41,6 @@ const AddHoliday = () => {
         toggleHolidaysAddModal();
       },
       onError: (err) => {
-        console.log(err);
         openNotification('error', 'Error', capitalize(err.message));
       },
     }
@@ -55,7 +54,6 @@ const AddHoliday = () => {
     try {
       mutate(_values);
     } catch (err) {
-      console.error(err);
     }
   };
 

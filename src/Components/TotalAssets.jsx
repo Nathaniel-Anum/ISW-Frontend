@@ -17,6 +17,7 @@ import {
   InputNumber,
 } from "antd";
 import * as XLSX from "xlsx";
+import { toast } from "react-toastify";
 
 const TotalAssets = () => {
   const [searchText, setSearchText] = useState("");
@@ -248,8 +249,6 @@ const TotalAssets = () => {
       lpoReference: values.lpoReference || null,
       supplier: values.supplier || null,
     };
-    console.log("Filtering with:", filters);
-
     const params = new URLSearchParams();
 
     if (filters.startPurchaseDate)
@@ -268,17 +267,13 @@ const TotalAssets = () => {
     if (values.lpoReference) params.append("lpoReference", values.lpoReference);
     if (values.supplier) params.append("supplierId", values.supplier);
 
-    const url = `${import.meta.VITE_BASE_URL}/reports/inventory/device-age?${params.toString()}`;
-    // console.log("Fetching from:", url);
-
     api
-      .get(url)
+      .get("reports/inventory/device-age", { params })
       .then((res) => {
-        console.log("Filtered data:", res.data);
-        setFilteredTickets(res.data.assets);
+        setFilteredTickets(res.data?.assets || []);
       })
       .catch((err) => {
-        console.error("Error fetching filtered data:", err);
+        toast.error(err?.response?.data?.message || "Failed to filter assets");
       });
 
     setOpen(false);

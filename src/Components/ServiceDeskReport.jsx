@@ -16,6 +16,7 @@ import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
 import { useDeferredValue, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { LuPencil, LuShieldAlert, LuStar } from "react-icons/lu";
+import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import PageShell from "./ui/page-shell";
 import api from "../utils/config";
@@ -80,9 +81,14 @@ const ServiceDeskReport = () => {
   const updateSLAConfig = useMutation({
     mutationFn: ({ priority, values }) => api.patch(`/service-desk/sla-configs/${priority}`, values),
     onSuccess: () => {
+      toast.success("SLA threshold updated");
       queryClient.invalidateQueries({ queryKey: ["sdSLAConfigs"] });
       setSlaOpen(false);
+      setEditingSla(null);
       slaForm.resetFields();
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to update SLA threshold");
     },
   });
 
@@ -480,8 +486,8 @@ const ServiceDeskReport = () => {
                 expandable={{
                   expandedRowRender: (record) => (
                     <div className="pl-4 py-2 space-y-2">
-                      {record.ratings?.map((r, i) => (
-                        <div key={i} className="flex flex-wrap items-start gap-x-3 gap-y-1 text-sm">
+                      {record.ratings?.map((r) => (
+                        <div key={r.id || r.ticketId || r.ticketNo} className="flex flex-wrap items-start gap-x-3 gap-y-1 text-sm">
                           <span className="font-semibold text-[#212121] shrink-0">{r.ticketNo}</span>
                           <span className="text-[#616161] flex-1">{r.subject}</span>
                           <span className={`font-bold shrink-0 ${r.rating >= 4 ? "text-[#166534]" : r.rating >= 3 ? "text-[#B45309]" : "text-[#B71C1C]"}`}>
@@ -601,9 +607,11 @@ const ServiceDeskReport = () => {
           form={slaForm}
           layout="vertical"
           onFinish={(values) => {
-            if (!editingSla) return;
+            if (!editingSla?.priority) {
+              toast.error("Unable to update SLA. Missing priority.");
+              return;
+            }
             updateSLAConfig.mutate({ priority: editingSla.priority, values });
-            setEditingSla(null);
           }}
         >
           <Form.Item

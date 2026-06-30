@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useDeferredValue, useMemo, useState } from "react";
-import { Button, DatePicker, Form, Input, Modal, Select, Switch, Table, Tag } from "antd";
+import { Button, DatePicker, Form, Input, InputNumber, Modal, Popconfirm, Select, Switch, Table, Tag } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { LuCalendarClock, LuPlus, LuTrash2 } from "react-icons/lu";
 import { toast } from "react-toastify";
@@ -51,16 +51,19 @@ const PMSchedules = () => {
     ].some((v) => v?.toLowerCase().includes(deferredSearch)));
   }, [schedules, deferredSearch]);
 
+  const invalidateSchedules = () => queryClient.invalidateQueries({ queryKey: ["pmSchedules"] });
+
   const createMutation = useMutation({
     mutationFn: (data) => api.post("/hardware/pm-schedules", data),
     onSuccess: (res) => {
       const count = Array.isArray(res.data) ? res.data.length : 1;
       toast.success(`${count} PM schedule${count > 1 ? 's' : ''} created`);
-      queryClient.invalidateQueries(["pmSchedules"]);
+      invalidateSchedules();
       setCreateOpen(false);
       createForm.resetFields();
+      setBatchMode(false);
     },
-    onError: () => toast.error("Failed to create PM schedule"),
+    onError: (err) => toast.error(err?.response?.data?.message ?? "Failed to create PM schedule"),
   });
 
   const batchMutation = useMutation({
@@ -68,9 +71,10 @@ const PMSchedules = () => {
     onSuccess: (res) => {
       const count = Array.isArray(res.data) ? res.data.length : 1;
       toast.success(`${count} PM schedule${count > 1 ? 's' : ''} created for all matching assets`);
-      queryClient.invalidateQueries(["pmSchedules"]);
+      invalidateSchedules();
       setCreateOpen(false);
       createForm.resetFields();
+      setBatchMode(false);
     },
     onError: (err) => toast.error(err?.response?.data?.message ?? "Failed to create batch PM schedules"),
   });
@@ -79,19 +83,73 @@ const PMSchedules = () => {
     mutationFn: ({ id, isActive }) => api.patch(`/hardware/pm-schedules/${id}`, { isActive }),
     onSuccess: () => {
       toast.success("Schedule updated");
-      queryClient.invalidateQueries(["pmSchedules"]);
+      invalidateSchedules();
     },
-    onError: () => toast.error("Update failed"),
+    onError: (err) => toast.error(err?.response?.data?.message ?? "Update failed"),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => api.delete(`/hardware/pm-schedules/${id}`),
     onSuccess: () => {
       toast.success("Schedule deleted");
-      queryClient.invalidateQueries(["pmSchedules"]);
+      invalidateSchedules();
     },
-    onError: () => toast.error("Delete failed"),
+    onError: (err) => toast.error(err?.response?.data?.message ?? "Delete failed"),
   });
+
+  const handleCreateSchedule = (values) => {
+    const frequencyDays = Number(values.frequencyDays);
+    const nextDueAt = values.nextDueAt?.toISOString?.();
+
+    if (!Number.isFinite(frequencyDays) || frequencyDays < 1) {
+      toast.error("Enter a valid frequency in days");
+      return;
+    }
+
+    if (!nextDueAt) {
+      toast.error("Select the first due date");
+      return;
+    }
+
+    const payload = {
+      frequencyDays,
+      nextDueAt,
+      assignedTechIds: values.assignedTechIds?.length ? values.assignedTechIds : undefined,
+      notes: values.notes?.trim() || undefined,
+    };
+
+    if (batchMode) {
+      if (!values.deviceType) {
+        toast.error("Select a device category");
+        return;
+      }
+      batchMutation.mutate({ deviceType: values.deviceType, ...payload });
+      return;
+    }
+
+    if (!values.inventoryIds?.length) {
+      toast.error("Select at least one asset");
+      return;
+    }
+
+    createMutation.mutate({ inventoryIds: values.inventoryIds, ...payload });
+  };
+
+  const handleToggleSchedule = (record) => {
+    if (!record?.id) {
+      toast.error("Unable to update schedule: missing schedule ID");
+      return;
+    }
+    toggleActiveMutation.mutate({ id: record.id, isActive: !record.isActive });
+  };
+
+  const handleDeleteSchedule = (record) => {
+    if (!record?.id) {
+      toast.error("Unable to delete schedule: missing schedule ID");
+      return;
+    }
+    deleteMutation.mutate(record.id);
+  };
 
   const stats = [
     { label: "Total Schedules", value: schedules.length, caption: "All PM schedules" },
@@ -148,18 +206,27 @@ const PMSchedules = () => {
           {canManage && (
             <Button
               size="small"
-              onClick={() => toggleActiveMutation.mutate({ id: r.id, isActive: !r.isActive })}
+              loading={toggleActiveMutation.isPending}
+              onClick={() => handleToggleSchedule(r)}
             >
               {r.isActive ? "Pause" : "Resume"}
             </Button>
           )}
           {canDelete && (
-            <Button
-              size="small"
-              danger
-              icon={<LuTrash2 size={13} />}
-              onClick={() => deleteMutation.mutate(r.id)}
-            />
+            <Popconfirm
+              title="Delete schedule?"
+              description="This removes the preventive maintenance schedule."
+              okText="Delete"
+              okButtonProps={{ danger: true, loading: deleteMutation.isPending }}
+              onConfirm={() => handleDeleteSchedule(r)}
+            >
+              <Button
+                size="small"
+                danger
+                icon={<LuTrash2 size={13} />}
+                loading={deleteMutation.isPending}
+              />
+            </Popconfirm>
           )}
         </div>
       ),
@@ -224,25 +291,7 @@ const PMSchedules = () => {
         <Form
           form={createForm}
           layout="vertical"
-          onFinish={(values) => {
-            if (batchMode) {
-              batchMutation.mutate({
-                deviceType: values.deviceType,
-                frequencyDays: Number(values.frequencyDays),
-                nextDueAt: values.nextDueAt.toISOString(),
-                assignedTechIds: values.assignedTechIds?.length ? values.assignedTechIds : undefined,
-                notes: values.notes ?? undefined,
-              });
-            } else {
-              createMutation.mutate({
-                inventoryIds: values.inventoryIds,
-                frequencyDays: Number(values.frequencyDays),
-                nextDueAt: values.nextDueAt.toISOString(),
-                assignedTechIds: values.assignedTechIds?.length ? values.assignedTechIds : undefined,
-                notes: values.notes ?? undefined,
-              });
-            }
-          }}
+          onFinish={handleCreateSchedule}
         >
           {batchMode ? (
             <Form.Item name="deviceType" label="Device Category" rules={[{ required: true, message: "Select a device category" }]}>
@@ -270,7 +319,7 @@ const PMSchedules = () => {
           )}
 
           <Form.Item name="frequencyDays" label="Frequency (days)" rules={[{ required: true }]}>
-            <Input type="number" min={1} placeholder="e.g. 90" />
+            <InputNumber min={1} precision={0} placeholder="e.g. 90" className="w-full" />
           </Form.Item>
           <Form.Item name="nextDueAt" label="First Due Date" rules={[{ required: true }]}>
             <DatePicker className="w-full" disabledDate={(d) => d.isBefore(dayjs())} />

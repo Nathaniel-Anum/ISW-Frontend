@@ -77,7 +77,6 @@ const AddConfiguration = () => {
 
       mutate(_values);
     } catch (err) {
-      console.error(err);
     }
   };
 

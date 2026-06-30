@@ -44,8 +44,6 @@ const EditEmployees = () => {
     });
   };
 
-  console.log(selectedRecord.supervisor?.user.id);
-
   const queryClient = useQueryClient();
   const { data: supervisors } = useGetAllSupervisors();
 

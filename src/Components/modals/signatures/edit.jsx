@@ -75,7 +75,7 @@ const EditSignature = () => {
         });
     },
     {
-      onError: (err) => console.log('Error', err.message),
+      onError: (err) => openNotification('error', 'Error', err.message),
     }
   );
 

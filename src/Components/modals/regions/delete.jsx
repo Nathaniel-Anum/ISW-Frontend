@@ -53,7 +53,6 @@ const DeleteRegion = () => {
         mutate(id);
       }
     } catch (err) {
-      console.log(err);
     }
   };
 

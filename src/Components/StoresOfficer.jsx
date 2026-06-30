@@ -20,6 +20,22 @@ const REQUEST_TYPE_STYLES = {
   MAINTENANCE: "bg-[#FFF7ED] text-[#C2410C]",
 };
 
+const getIssueItemLabel = (item) =>
+  `${item.category?.name || formatCapitalizedLabel(item.deviceType)} - ${item.brand || ""} ${item.model || ""} (Stock: ${item.stock?.quantityInStock ?? 0})`;
+
+const getIssueItemSearchText = (item) =>
+  [
+    item.category?.name,
+    item.deviceType,
+    formatCapitalizedLabel(item.deviceType),
+    item.brand,
+    item.model,
+    item.stock?.quantityInStock,
+  ]
+    .filter((value) => value !== undefined && value !== null && value !== "")
+    .join(" ")
+    .toLowerCase();
+
 const StoresOfficer = () => {
   const queryClient = useQueryClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -66,6 +82,18 @@ const StoresOfficer = () => {
   const issueItemOptions = filteredItemOptionsResponse?.data || [];
   const requestedCategoryOptions = issueItemOptions.filter((item) => item.matchesRequestedCategory);
   const alternativeCategoryOptions = issueItemOptions.filter((item) => !item.matchesRequestedCategory);
+  const selectedBatchData = batchesData?.find((batch) => batch.id === selectedBatch);
+  const selectedItemStock = issueItemOptions?.find((item) => item.id === selectedItem)?.stock?.quantityInStock;
+  const selectedBatchQuantity = Number(selectedBatchData?.availableQuantity ?? selectedBatchData?.quantity ?? 0);
+  const requestedQuantity = Number(selectedRecord?.quantity || 0);
+  const maxIssuableQuantity = Math.max(
+    0,
+    Math.min(
+      selectedItemStock == null ? Number.POSITIVE_INFINITY : Number(selectedItemStock),
+      selectedBatch ? selectedBatchQuantity : Number.POSITIVE_INFINITY,
+      requestedQuantity || Number.POSITIVE_INFINITY,
+    )
+  );
   const readyToIssueRequests = approvedRequests.filter((item) => item.status === "ITD_APPROVED");
   const pendingStockRequests = approvedRequests.filter(
     (item) => item.status === "PENDING_STOCK_ISSUANCE"
@@ -97,36 +125,82 @@ const StoresOfficer = () => {
     [approvedRequests, itemOptionsResponse?.data?.length, pendingStockRequests.length, readyToIssueRequests.length]
   );
 
+  const resetIssueModal = () => {
+    setIsModalOpen(false);
+    setSelectedItem(null);
+    setSelectedBatch(null);
+    setSelectedRecord(null);
+    setQuantity(1);
+    setRemarks("");
+  };
+
+  const getRecordId = (record) => record?.id || record?.requisitionID;
+
   const issueMutation = useMutation({
-    mutationFn: (payload) => api.patch(`/stores/req/${selectedRecord?.id}/issue`, payload),
+    mutationFn: ({ recordId, ...payload }) => api.patch(`/stores/req/${recordId}/issue`, payload),
     onSuccess: () => {
-      queryClient.invalidateQueries(["ITD-Approved"]);
+      queryClient.invalidateQueries({ queryKey: ["ITD-Approved"] });
+      queryClient.invalidateQueries({ queryKey: ["stockLevels"] });
+      queryClient.invalidateQueries({ queryKey: ["stockIssuedList"] });
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
       toast.success("Issued successfully");
-      setIsModalOpen(false);
-      setSelectedItem(null);
-      setSelectedBatch(null);
-      setSelectedRecord(null);
-      setQuantity(1);
-      setRemarks("");
+      resetIssueModal();
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to issue item");
     },
   });
 
   const pendingStockMutation = useMutation({
-    mutationFn: (payload) => api.patch(`/stores/req/${selectedRecord?.id}/pending-stock`, payload),
+    mutationFn: ({ recordId, ...payload }) => api.patch(`/stores/req/${recordId}/pending-stock`, payload),
     onSuccess: (response) => {
-      queryClient.invalidateQueries(["ITD-Approved"]);
+      queryClient.invalidateQueries({ queryKey: ["ITD-Approved"] });
+      queryClient.invalidateQueries({ queryKey: ["requisition"] });
+      queryClient.invalidateQueries({ queryKey: ["requisitions"] });
       toast.success(response?.data?.message || "Requisition moved to pending stock issuance");
-      setIsModalOpen(false);
-      setSelectedItem(null);
-      setSelectedBatch(null);
-      setSelectedRecord(null);
-      setQuantity(1);
-      setRemarks("");
+      resetIssueModal();
     },
     onError: (error) => {
       toast.error(error?.response?.data?.message || "Failed to update requisition status");
     },
   });
+
+  const handleIssue = () => {
+    const recordId = getRecordId(selectedRecord);
+    if (!recordId) {
+      toast.error("Unable to issue this request. Missing requisition ID.");
+      return;
+    }
+
+    if (!selectedItem || !selectedBatch) {
+      toast.error("Select an item and stock batch before issuing.");
+      return;
+    }
+
+    if (!quantity || quantity < 1 || quantity > maxIssuableQuantity) {
+      toast.error(`Quantity must be between 1 and ${maxIssuableQuantity || 1}.`);
+      return;
+    }
+
+    issueMutation.mutate({
+      recordId,
+      itItemId: selectedItem,
+      quantity,
+      stockBatchId: selectedBatch,
+      remarks: remarks.trim() || undefined,
+    });
+  };
+
+  const handlePendingStock = () => {
+    const recordId = getRecordId(selectedRecord);
+    if (!recordId) {
+      toast.error("Unable to mark this request as pending stock. Missing requisition ID.");
+      return;
+    }
+
+    pendingStockMutation.mutate({ recordId, remarks: remarks.trim() || undefined });
+  };
 
   const columns = [
     {
@@ -211,8 +285,12 @@ const StoresOfficer = () => {
           type="button"
           className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#ECFDF3] text-[#166534] transition-colors duration-200 hover:bg-[#DCFCE7]"
           onClick={() => {
-            setIsModalOpen(true);
             setSelectedRecord(record);
+            setSelectedItem(null);
+            setSelectedBatch(null);
+            setQuantity(Math.max(1, Number(record.quantity || 1)));
+            setRemarks("");
+            setIsModalOpen(true);
           }}
         >
           <LuCheck />
@@ -248,53 +326,32 @@ const StoresOfficer = () => {
           </span>
         </div>
 
-        <Table columns={columns} dataSource={approvedRequests} rowKey="id" loading={isLoading} scroll={{ x: 1000 }} />
+        <Table columns={columns} dataSource={approvedRequests} rowKey={(record) => record.id || record.requisitionID} loading={isLoading} scroll={{ x: 1000 }} />
       </section>
 
       <Modal
         title="Issue Item"
         open={isModalOpen}
-        onCancel={() => {
-          setIsModalOpen(false);
-          setSelectedItem(null);
-          setSelectedBatch(null);
-          setSelectedRecord(null);
-          setQuantity(1);
-          setRemarks("");
-        }}
+        onCancel={resetIssueModal}
         footer={[
           <Button
             key="cancel"
-            onClick={() => {
-              setIsModalOpen(false);
-              setSelectedItem(null);
-              setSelectedBatch(null);
-              setSelectedRecord(null);
-              setQuantity(1);
-              setRemarks("");
-            }}
+            onClick={resetIssueModal}
           >
             Cancel
           </Button>,
           <Button
             key="issue"
             type="primary"
-            onClick={() => {
-              issueMutation.mutate({
-                itItemId: selectedItem,
-                quantity,
-                stockBatchId: selectedBatch,
-                remarks,
-              });
-            }}
+            onClick={handleIssue}
             loading={issueMutation.isPending}
-            disabled={!selectedItem || !selectedBatch || quantity <= 0 || pendingStockMutation.isPending}
+            disabled={!selectedItem || !selectedBatch || quantity <= 0 || quantity > maxIssuableQuantity || pendingStockMutation.isPending}
           >
             Issue
           </Button>,
           <Button
             key="pending-stock"
-            onClick={() => pendingStockMutation.mutate({ remarks })}
+            onClick={handlePendingStock}
             loading={pendingStockMutation.isPending}
             disabled={issueMutation.isPending || pendingStockMutation.isPending || !selectedRecord}
           >
@@ -320,17 +377,31 @@ const StoresOfficer = () => {
             style={{ width: "100%" }}
             placeholder="Requested category items appear first"
             loading={isFilteredItemsLoading || isItemsLoading}
+            showSearch
+            allowClear
+            optionFilterProp="searchText"
+            filterOption={(input, option) =>
+              String(option?.searchText || "")
+                .toLowerCase()
+                .includes(input.trim().toLowerCase())
+            }
             onChange={(value) => {
               setSelectedItem(value);
               setSelectedBatch(null);
+              setQuantity(1);
+            }}
+            onClear={() => {
+              setSelectedItem(null);
+              setSelectedBatch(null);
+              setQuantity(1);
             }}
             value={selectedItem}
           >
             {requestedCategoryOptions.length ? (
               <Select.OptGroup label="Requested Category">
                 {requestedCategoryOptions.map((item) => (
-                  <Select.Option key={item.id} value={item.id}>
-                    {(item.category?.name || formatCapitalizedLabel(item.deviceType))} - {item.brand} {item.model} (Stock: {item.stock?.quantityInStock ?? 0})
+                  <Select.Option key={item.id} value={item.id} searchText={getIssueItemSearchText(item)}>
+                    {getIssueItemLabel(item)}
                   </Select.Option>
                 ))}
               </Select.OptGroup>
@@ -338,8 +409,8 @@ const StoresOfficer = () => {
             {alternativeCategoryOptions.length ? (
               <Select.OptGroup label="Other Categories">
                 {alternativeCategoryOptions.map((item) => (
-                  <Select.Option key={item.id} value={item.id}>
-                    {(item.category?.name || formatCapitalizedLabel(item.deviceType))} - {item.brand} {item.model} (Stock: {item.stock?.quantityInStock ?? 0})
+                  <Select.Option key={item.id} value={item.id} searchText={getIssueItemSearchText(item)}>
+                    {getIssueItemLabel(item)}
                   </Select.Option>
                 ))}
               </Select.OptGroup>
@@ -359,7 +430,12 @@ const StoresOfficer = () => {
             placeholder="Select Stock Batch"
             loading={isBatchesLoading}
             disabled={!selectedItem}
-            onChange={(value) => setSelectedBatch(value)}
+            onChange={(value) => {
+              const batch = batchesData?.find((item) => item.id === value);
+              const batchQuantity = Number(batch?.availableQuantity ?? batch?.quantity ?? 1);
+              setSelectedBatch(value);
+              setQuantity(Math.max(1, Math.min(quantity || 1, batchQuantity, requestedQuantity || batchQuantity)));
+            }}
             value={selectedBatch}
           >
             {batchesData?.map((batch) => (
@@ -374,14 +450,16 @@ const StoresOfficer = () => {
           <label className="mb-1 block font-semibold text-[#212121]">Quantity</label>
           <InputNumber
             min={1}
-            max={
-              issueItemOptions?.find((item) => item.id === selectedItem)?.stock
-                ?.quantityInStock || 100
-            }
+            max={maxIssuableQuantity || 1}
             value={quantity}
             onChange={(value) => setQuantity(Number(value || 0))}
             className="w-full"
           />
+          {selectedBatch ? (
+            <p className="mt-2 text-xs text-[#616161]">
+              Max issuable from this request and batch: {maxIssuableQuantity}
+            </p>
+          ) : null}
         </div>
 
         <div className="mb-4">

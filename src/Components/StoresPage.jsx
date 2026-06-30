@@ -57,6 +57,11 @@ const renderDefInput = (def, value, onChange) => {
 
 const TYPE_COLOR = { CONSUMABLE: "blue", FIXED_ASSET: "orange" };
 const TYPE_LABEL = { CONSUMABLE: "Consumable", FIXED_ASSET: "Fixed Asset" };
+const MONITOR_FIELDS = [
+  { key: "brand", label: "Monitor Brand", placeholder: "e.g. Dell" },
+  { key: "model", label: "Monitor Model", placeholder: "e.g. P2422H" },
+  { key: "serialNumber", label: "Monitor Serial Number", placeholder: "Monitor serial number" },
+];
 
 const newKey = () => `row_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
 const emptyItem = () => ({ key: newKey(), categoryId: null, itItemId: null, quantity: 1, serialNumber: "", stockType: null, deviceDetails: {}, warrantyPeriod: null, warrantyDate: null });
@@ -121,17 +126,67 @@ const StoresPage = () => {
   const updateItem = (key, field, value) => {
     setItems((prev) => prev.map((item) => {
       if (item.key !== key) return item;
-      const next = { ...item, [field]: value };
+      const next = { ...item, [field]: field === "quantity" ? Math.max(1, Number(value || 1)) : value };
       if (field === "itItemId") {
         const found = itItemsList.find((x) => x.id === value);
+        const monitorDetails = found?.specifications?.monitorDetails;
         next.stockType = found?.itemClass ?? null;
         next.categoryId = found?.categoryId ?? null;
-        next.deviceDetails = {};
+        next.deviceDetails = monitorDetails && typeof monitorDetails === "object"
+          ? { monitorDetails: { ...monitorDetails } }
+          : {};
       }
       return next;
     }));
   };
   const updateDeviceDetail = (key, defKey, value) => setItems((prev) => prev.map((i) => i.key !== key ? i : { ...i, deviceDetails: { ...i.deviceDetails, [defKey]: value } }));
+  const updateMonitorDetail = (key, field, value) => setItems((prev) => prev.map((i) => (
+    i.key !== key
+      ? i
+      : {
+          ...i,
+          deviceDetails: {
+            ...i.deviceDetails,
+            monitorDetails: {
+              ...(i.deviceDetails?.monitorDetails || {}),
+              [field]: value,
+            },
+          },
+        }
+  )));
+  const getTemplateMonitorDetails = (itItemId) => {
+    const monitorDetails = itItemsList.find((x) => x.id === itItemId)?.specifications?.monitorDetails;
+    return monitorDetails && typeof monitorDetails === "object" ? monitorDetails : null;
+  };
+  const getReceiptMonitorDetails = (record) => {
+    const monitorDetails = record?.itItem?.specifications?.monitorDetails || getTemplateMonitorDetails(record?.itItem?.id ?? record?.itItemId);
+    return monitorDetails && typeof monitorDetails === "object" ? monitorDetails : null;
+  };
+  const getRowMonitorDetails = (record) => {
+    const existing = record?.deviceDetails?.monitorDetails;
+    if (existing && typeof existing === "object") return existing;
+    return getTemplateMonitorDetails(record?.itItemId);
+  };
+  const normalizeMonitorDetails = (monitorDetails) => {
+    if (!monitorDetails || typeof monitorDetails !== "object") return undefined;
+    const normalized = Object.fromEntries(
+      Object.entries(monitorDetails)
+        .map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])
+        .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    );
+    return Object.keys(normalized).length ? normalized : undefined;
+  };
+  const getCurrentItemMonitorDetails = (itItemId) => normalizeMonitorDetails(getTemplateMonitorDetails(itItemId));
+  const monitorDetailsChanged = (itItemId, monitorDetails) => {
+    const current = getCurrentItemMonitorDetails(itItemId) || {};
+    const next = normalizeMonitorDetails(monitorDetails) || {};
+    return MONITOR_FIELDS.some((field) => (current[field.key] || "") !== (next[field.key] || ""));
+  };
+  const monitorDetailsCompleteOrEmpty = (monitorDetails) => {
+    const normalized = normalizeMonitorDetails(monitorDetails);
+    if (!normalized) return true;
+    return MONITOR_FIELDS.every((field) => String(normalized[field.key] || "").trim());
+  };
   const getCategoryDefs = (categoryId) =>
     (categories.find((c) => c.id === categoryId)?.attributeDefinitions || []).filter(
       (d) =>
@@ -146,9 +201,7 @@ const StoresPage = () => {
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => api.patch(`/stores/stock-received/${id}`, data),
     onSuccess: () => {
-      toast.success("Receipt updated successfully!");
-      setViewRecord(null);
-      queryClient.invalidateQueries(["stores"]);
+      queryClient.invalidateQueries({ queryKey: ["stores"] });
     },
     onError: (err) => {
       const msg = err.response?.data?.message;
@@ -161,6 +214,14 @@ const StoresPage = () => {
     onError: (err) => {
       const msg = err.response?.data?.message;
       toast.error(Array.isArray(msg) ? msg[0] : msg || "Failed to update item details.");
+    },
+  });
+
+  const updateItItemMonitorMutation = useMutation({
+    mutationFn: ({ id, data }) => api.patch(`/admin/it-items/${id}`, data),
+    onError: (err) => {
+      const msg = err.response?.data?.message;
+      toast.error(Array.isArray(msg) ? msg[0] : msg || "Failed to update monitor details.");
     },
   });
 
@@ -178,6 +239,7 @@ const StoresPage = () => {
         serialNumber: viewRecord.serialNumber,
         warrantyPeriod: viewRecord.warrantyPeriod,
         warrantyDate: viewRecord.warrantyDate ? dayjs(viewRecord.warrantyDate) : null,
+        monitorDetails: getReceiptMonitorDetails(viewRecord) || undefined,
         remarks: viewRecord.remarks,
       });
     }
@@ -198,26 +260,38 @@ const StoresPage = () => {
       };
       for (const item of itemsList) {
         const dd = { ...(item.deviceDetails || {}) };
+        const monitorDetails = normalizeMonitorDetails(dd.monitorDetails);
+        delete dd.monitorDetails;
         Object.keys(dd).forEach((k) => { const v = dd[k]; if (v?.$d) dd[k] = new Date(v.$d).toISOString().split("T")[0]; else if (v instanceof Date) dd[k] = v.toISOString().split("T")[0]; });
+        if (monitorDetailsChanged(item.itItemId, monitorDetails)) {
+          await api.patch(`/admin/it-items/${item.itItemId}`, { monitorDetails: monitorDetails || null });
+        }
         await api.post("/stores/stock-received/create", {
           ...shared,
           categoryId: item.categoryId,
           itItemId: item.itItemId,
-          quantityReceived: item.quantity || 1,
-          serialNumber: item.serialNumber || undefined,
+          quantityReceived: Number(item.quantity || 1),
+          serialNumber: item.serialNumber?.trim() || undefined,
           warrantyPeriod: item.warrantyPeriod || undefined,
           warrantyDate: formatDateValue(item.warrantyDate),
           deviceDetails: Object.keys(dd).length ? dd : undefined,
         });
       }
     },
-    onSuccess: () => { toast.success("Stock received successfully!"); closeModal(); queryClient.invalidateQueries(["stores"]); },
+    onSuccess: () => {
+      toast.success("Stock received successfully!");
+      closeModal();
+      queryClient.invalidateQueries({ queryKey: ["stores"] });
+      queryClient.invalidateQueries({ queryKey: ["stockLevels"] });
+      queryClient.invalidateQueries({ queryKey: ["itItems"] });
+    },
     onError: (err) => { const msg = err.response?.data?.message; toast.error(Array.isArray(msg) ? msg[0] : msg || "Failed to submit stock received."); },
   });
 
   const handleSubmit = (headerValues) => {
     if (!items.length) { toast.error("Please add at least one item."); return; }
     if (items.some((i) => !i.itItemId)) { toast.error("Please select an IT item for every row."); return; }
+    if (items.some((i) => Number(i.quantity || 0) < 1)) { toast.error("Quantity must be at least 1 for every item."); return; }
     const invalidFixedSerial = items.find((i) => {
       const qty = Number(i.quantity || 1);
       if (i.stockType !== "FIXED_ASSET" || qty <= 1) return false;
@@ -228,7 +302,83 @@ const StoresPage = () => {
       toast.error("For fixed assets with qty above 1, provide one serial per unit (comma-separated) or leave serial blank.");
       return;
     }
+    const incompleteMonitorDetails = items.find((item) => {
+      const monitorDetails = item.deviceDetails?.monitorDetails;
+      return monitorDetailsChanged(item.itItemId, monitorDetails) && !monitorDetailsCompleteOrEmpty(monitorDetails);
+    });
+    if (incompleteMonitorDetails) {
+      toast.error("Complete monitor brand, model, and serial number, or leave all monitor fields blank.");
+      setDetailsItemKey(incompleteMonitorDetails.key);
+      return;
+    }
+    const missingRequiredFixedDetails = items.find((item) => {
+      if (item.stockType !== "FIXED_ASSET") return false;
+      return getCategoryDefs(item.categoryId).some((def) => {
+        if (!def.isRequired) return false;
+        const value = item.deviceDetails?.[def.key];
+        return value == null || value === "";
+      });
+    });
+    if (missingRequiredFixedDetails) {
+      toast.error("Complete required device details for all fixed asset items.");
+      setDetailsItemKey(missingRequiredFixedDetails.key);
+      return;
+    }
+
     mutation.mutate({ headerValues, itemsList: items });
+  };
+
+  const handleEditSubmit = (values) => {
+    const receiptId = viewRecord?.id;
+    if (!receiptId) {
+      toast.error("Unable to update receipt. Missing receipt ID.");
+      return;
+    }
+    const editedMonitorDetails = values.monitorDetails;
+    const itItemId = viewRecord.itItem?.id ?? viewRecord.itItemId;
+    if (monitorDetailsChanged(itItemId, editedMonitorDetails) && !monitorDetailsCompleteOrEmpty(editedMonitorDetails)) {
+      toast.error("Complete monitor brand, model, and serial number, or leave all monitor fields blank.");
+      return;
+    }
+
+    const { monitorDetails: _oldMonitorDetails, ...baseDeviceDetails } = viewRecord.deviceDetails || {};
+    const receiptPayload = {
+      lpoReference: values.lpoReference?.trim() || undefined,
+      lpoDate: values.lpoDate ? formatDateValue(values.lpoDate) : undefined,
+      voucherNumber: values.voucherNumber?.trim() || undefined,
+      dateReceived: values.dateReceived ? formatDateValue(values.dateReceived) : undefined,
+      serialNumber: values.serialNumber?.trim() || undefined,
+      warrantyPeriod: values.warrantyPeriod ?? undefined,
+      warrantyDate: values.warrantyDate ? formatDateValue(values.warrantyDate) : undefined,
+      deviceDetails: baseDeviceDetails,
+      remarks: values.remarks?.trim() || undefined,
+    };
+    if (!Object.keys(receiptPayload.deviceDetails).length) {
+      delete receiptPayload.deviceDetails;
+    }
+    const brand = values.brand?.trim();
+    const model = values.model?.trim();
+    const brandChanged = brand !== viewRecord.itItem?.brand;
+    const modelChanged = model !== viewRecord.itItem?.model;
+    const promises = [updateMutation.mutateAsync({ id: receiptId, data: receiptPayload })];
+
+    if (itItemId && (brandChanged || modelChanged)) {
+      promises.push(updateItItemMutation.mutateAsync({ id: itItemId, data: { brand, model } }));
+    }
+    if (itItemId && monitorDetailsChanged(itItemId, editedMonitorDetails)) {
+      promises.push(updateItItemMonitorMutation.mutateAsync({ id: itItemId, data: { monitorDetails: normalizeMonitorDetails(editedMonitorDetails) || null } }));
+    }
+
+    Promise.all(promises)
+      .then(() => {
+        toast.success("Receipt updated successfully!");
+        setViewRecord(null);
+        editForm.resetFields();
+        queryClient.invalidateQueries({ queryKey: ["stores"] });
+        queryClient.invalidateQueries({ queryKey: ["stockLevels"] });
+        queryClient.invalidateQueries({ queryKey: ["itItems"] });
+      })
+      .catch(() => {});
   };
 
   // ── items table columns ──
@@ -261,6 +411,19 @@ const StoresPage = () => {
           ? "Serials (comma-separated)"
           : "Serial number";
         return <Input size="small" placeholder={placeholder} value={record.serialNumber} onChange={(e) => updateItem(record.key, "serialNumber", e.target.value)} />;
+      },
+    },
+    {
+      title: "Monitor", width: 180,
+      render: (_, record) => {
+        const monitorDetails = getRowMonitorDetails(record);
+        if (!monitorDetails) return <span className="text-xs text-[#9E9E9E]">—</span>;
+        return (
+          <div className="text-xs leading-5 text-[#424242]">
+            <p className="font-semibold">{monitorDetails.brand || "—"} {monitorDetails.model || ""}</p>
+            <p className="text-[#757575]">{monitorDetails.serialNumber || "No serial"}</p>
+          </div>
+        );
       },
     },
     {
@@ -307,6 +470,20 @@ const StoresPage = () => {
     { title: "Voucher No", dataIndex: "voucherNumber", key: "voucherNumber" },
     { title: "Quantity", dataIndex: "quantityReceived", key: "quantityReceived" },
     { title: "Serial No", dataIndex: "serialNumber", key: "serialNumber", render: (v) => v || "—" },
+    {
+      title: "Monitor",
+      key: "monitorDetails",
+      render: (_, record) => {
+        const monitorDetails = getReceiptMonitorDetails(record);
+        if (!monitorDetails) return "—";
+        return (
+          <div className="text-xs leading-5">
+            <p className="font-semibold text-[#212121]">{monitorDetails.brand || "—"} {monitorDetails.model || ""}</p>
+            <p className="text-[#757575]">{monitorDetails.serialNumber || "No serial"}</p>
+          </div>
+        );
+      },
+    },
     { title: "Warranty (mo)", dataIndex: "warrantyPeriod", key: "warrantyPeriod", render: (v) => v || "—" },
     { title: "Brand", dataIndex: ["itItem", "brand"], key: "brand" },
     { title: "Model", dataIndex: ["itItem", "model"], key: "model" },
@@ -483,28 +660,7 @@ const StoresPage = () => {
           <Form
             form={editForm}
             layout="vertical"
-            onFinish={(values) => {
-              const receiptPayload = {
-                lpoReference: values.lpoReference || undefined,
-                lpoDate: values.lpoDate ? formatDateValue(values.lpoDate) : undefined,
-                voucherNumber: values.voucherNumber || undefined,
-                dateReceived: values.dateReceived ? formatDateValue(values.dateReceived) : undefined,
-                serialNumber: values.serialNumber || undefined,
-                warrantyPeriod: values.warrantyPeriod ?? undefined,
-                warrantyDate: values.warrantyDate ? formatDateValue(values.warrantyDate) : undefined,
-                remarks: values.remarks || undefined,
-              };
-              const itItemId = viewRecord.itItem?.id ?? viewRecord.itItemId;
-              const brandChanged = values.brand !== viewRecord.itItem?.brand;
-              const modelChanged = values.model !== viewRecord.itItem?.model;
-              const promises = [updateMutation.mutateAsync({ id: viewRecord.id, data: receiptPayload })];
-              if (itItemId && (brandChanged || modelChanged)) {
-                promises.push(updateItItemMutation.mutateAsync({ id: itItemId, data: { brand: values.brand, model: values.model } }));
-              }
-              Promise.all(promises)
-                .then(() => { toast.success("Receipt updated successfully!"); setViewRecord(null); queryClient.invalidateQueries(["stores"]); })
-                .catch(() => {});
-            }}
+            onFinish={handleEditSubmit}
           >
             {/* Item */}
             <div className="mb-4 rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-4">
@@ -531,6 +687,28 @@ const StoresPage = () => {
                 </Form.Item>
               </div>
             </div>
+
+            {(() => {
+              const monitorDetails = getReceiptMonitorDetails(viewRecord);
+              if (!monitorDetails || typeof monitorDetails !== "object") return null;
+              return (
+                <div className="mb-4 rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-4">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[#D32F2F]">Monitor Details</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {MONITOR_FIELDS.map((field) => (
+                      <Form.Item
+                        key={field.key}
+                        name={["monitorDetails", field.key]}
+                        label={field.label}
+                        className="mb-0"
+                      >
+                        <Input placeholder={field.placeholder} />
+                      </Form.Item>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Procurement */}
             <div className="mb-4 rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-4">
@@ -582,11 +760,11 @@ const StoresPage = () => {
             </div>
 
             {/* Device Details (read-only) */}
-            {viewRecord.deviceDetails && Object.keys(viewRecord.deviceDetails).length > 0 && (
+            {viewRecord.deviceDetails && Object.keys(viewRecord.deviceDetails).filter((key) => key !== "monitorDetails").length > 0 && (
               <div className="mb-4 rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-4">
                 <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[#D32F2F]">Device Details</p>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  {Object.entries(viewRecord.deviceDetails).map(([k, v]) => (
+                  {Object.entries(viewRecord.deviceDetails).filter(([k]) => k !== "monitorDetails").map(([k, v]) => (
                     <div key={k}>
                       <span className="text-[#9E9E9E] capitalize">{k.replace(/_/g, " ")}</span>
                       <p className="font-medium text-[#212121]">{String(v) || "—"}</p>
@@ -598,7 +776,7 @@ const StoresPage = () => {
 
             <div className="flex gap-2">
               <Button onClick={() => { setViewRecord(null); editForm.resetFields(); }} className="flex-1">Cancel</Button>
-              <Button type="primary" htmlType="submit" loading={updateMutation.isPending || updateItItemMutation.isPending} className="flex-1">Save Changes</Button>
+              <Button type="primary" htmlType="submit" loading={updateMutation.isPending || updateItItemMutation.isPending || updateItItemMonitorMutation.isPending} className="flex-1">Save Changes</Button>
             </div>
           </Form>
         </Modal>
@@ -658,6 +836,29 @@ const StoresPage = () => {
               </div>
             </div>
 
+            {(() => {
+              const monitorDetails = getRowMonitorDetails(record);
+              if (!monitorDetails) return null;
+              return (
+                <div className="mb-4 rounded-xl border border-[#E0E0E0] bg-[#F9FAFB] p-4">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[#D32F2F]">Monitor Details</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {MONITOR_FIELDS.map((field) => (
+                      <div key={field.key}>
+                        <label className="mb-1 block text-xs font-medium text-[#424242]">{field.label}</label>
+                        <Input
+                          size="small"
+                          placeholder={field.placeholder}
+                          value={record.deviceDetails?.monitorDetails?.[field.key] ?? monitorDetails[field.key]}
+                          onChange={(e) => updateMonitorDetail(record.key, field.key, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {!defs.length ? (
               <p className="py-2 text-sm text-[#9E9E9E]">No device attribute fields defined for this sub-category.</p>
             ) : (
@@ -683,4 +884,3 @@ const StoresPage = () => {
 };
 
 export default StoresPage;
-

@@ -41,7 +41,6 @@ const AddDivision = () => {
     try {
       mutate(values);
     } catch (err) {
-      console.error(err);
     }
   };
 

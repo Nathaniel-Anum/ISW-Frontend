@@ -19,7 +19,6 @@ const InventoryReport = () => {
       return api.get("reports/inventory/device-details");
     },
   });
-  console.log(devices?.data?.summary?.totalAssets);
 
   const exportSummary = () => {
     const summaryRows = [

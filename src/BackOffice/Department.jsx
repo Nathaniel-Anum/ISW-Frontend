@@ -52,9 +52,14 @@ const Department = () => {
       form.resetFields();
       setIsModalOpen(false);
     },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to create department"),
   });
 
   const handleDelete = (id) => {
+    if (!id) {
+      toast.error("Unable to delete department: missing department ID");
+      return;
+    }
     api
       .delete(`/admin/departments/${id}/delete`)
       .then(() => {
@@ -64,6 +69,16 @@ const Department = () => {
       .catch(() => {
         toast.error("Failed to delete department");
       });
+  };
+
+  const handleCreateDepartment = (values) => {
+    const name = values.name?.trim();
+    const location = values.location?.trim();
+    if (!name || !location) {
+      toast.error("Department name and location are required");
+      return;
+    }
+    createDepartment.mutate({ name, location });
   };
 
   const columns = [
@@ -158,7 +173,7 @@ const Department = () => {
         width={640}
         destroyOnClose
       >
-        <Form form={form} layout="vertical" onFinish={(values) => createDepartment.mutate(values)}>
+        <Form form={form} layout="vertical" onFinish={handleCreateDepartment}>
           <Form.Item
             name="name"
             label="Department Name"
@@ -176,7 +191,7 @@ const Department = () => {
           </Form.Item>
 
           <Form.Item className="mb-0">
-            <Button type="primary" htmlType="submit" block className="!h-11 !rounded-2xl">
+            <Button type="primary" htmlType="submit" loading={createDepartment.isPending} block className="!h-11 !rounded-2xl">
               Submit
             </Button>
           </Form.Item>

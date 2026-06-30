@@ -40,6 +40,8 @@ export const logout = async () => {
   await api.post("/auth/logout", { refresh_token }).catch(() => {});
   localStorage.removeItem("access_token");
   localStorage.removeItem("refresh_token");
+  localStorage.removeItem("mustResetPassword");
+  localStorage.removeItem("user");
 };
 
 export const refreshToken = async (): Promise<string> => {

@@ -43,7 +43,6 @@ const EditDepartment = () => {
 
       // !isLoading && toggleDepartmentEditModal();
     } catch (err) {
-      console.log(err);
     }
   };
 

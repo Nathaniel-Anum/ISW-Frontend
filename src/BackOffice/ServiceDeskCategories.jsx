@@ -48,10 +48,11 @@ const ServiceDeskCategories = () => {
       setOpen(false);
       form.resetFields();
     },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to create category"),
   });
 
   const updateCategory = useMutation({
-    mutationFn: (values) => api.patch(`/service-desk/admin/categories/${editingRecord.id}`, values),
+    mutationFn: ({ id, ...values }) => api.patch(`/service-desk/admin/categories/${id}`, values),
     onSuccess: () => {
       toast.success("Category updated");
       refreshCategories();
@@ -59,6 +60,7 @@ const ServiceDeskCategories = () => {
       setEditingRecord(null);
       form.resetFields();
     },
+    onError: (err) => toast.error(err?.response?.data?.message || "Failed to update category"),
   });
 
   const openCreateModal = () => {
@@ -76,6 +78,30 @@ const ServiceDeskCategories = () => {
       isActive: record.isActive,
     });
     setOpen(true);
+  };
+
+  const handleSubmit = (values) => {
+    const payload = {
+      name: values.name?.trim(),
+      description: values.description?.trim() || undefined,
+      isActive: values.isActive,
+    };
+
+    if (!payload.name) {
+      toast.error("Category name is required");
+      return;
+    }
+
+    if (editingRecord) {
+      if (!editingRecord.id) {
+        toast.error("Unable to update category: missing category ID");
+        return;
+      }
+      updateCategory.mutate({ id: editingRecord.id, ...payload });
+      return;
+    }
+
+    createCategory.mutate(payload);
   };
 
   const columns = [
@@ -168,14 +194,7 @@ const ServiceDeskCategories = () => {
         <Form
           layout="vertical"
           form={form}
-          onFinish={(values) => {
-            if (editingRecord) {
-              updateCategory.mutate(values);
-              return;
-            }
-
-            createCategory.mutate(values);
-          }}
+          onFinish={handleSubmit}
         >
           <Form.Item name="name" label="Category Name" rules={[{ required: true, message: "Please enter a category name" }]}>
             <Input prefix={<LuHeadset size={16} className="text-[#616161]" />} placeholder="Enter category name" />

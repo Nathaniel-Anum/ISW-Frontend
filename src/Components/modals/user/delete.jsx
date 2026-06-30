@@ -18,7 +18,7 @@ const DeleteUser = () => {
     'deleteUser',
     () => deleteUser(selectedRecord?.id),
     {
-      onSuccess: () => console.log('User deleted successfully'),
+      onSuccess: () => {},
     }
   );
   // const queryClient = useQueryClient();
@@ -43,7 +43,6 @@ const DeleteUser = () => {
       mutate(selectedRecord.id);
       toggleUsersDeleteModal();
     } catch (err) {
-      console.error(err.message);
     }
   };
 

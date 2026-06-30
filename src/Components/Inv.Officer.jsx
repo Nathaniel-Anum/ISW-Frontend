@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Steps, Switch, Table, Tabs, Tag, Divider } from "antd";
+import { Button, Checkbox, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Steps, Switch, Table, Tabs, Tag, Divider } from "antd";
 import { MoreOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
 import { LuQrCode } from "react-icons/lu";
 import { toast } from "react-toastify";
@@ -36,6 +36,51 @@ const PRIORITY_STYLES = {
   HIGH: "bg-[#FEE2E2] text-[#B91C1C]",
   MEDIUM: "bg-[#FEF3C7] text-[#92400E]",
   LOW: "bg-[#ECFDF3] text-[#166534]",
+};
+
+const MONITOR_FIELDS = [
+  { key: "brand", label: "Monitor Brand" },
+  { key: "model", label: "Monitor Model" },
+  { key: "serialNumber", label: "Monitor Serial Number" },
+];
+
+const normalizeMonitorDetails = (details) => {
+  if (!details || typeof details !== "object") return null;
+  const normalized = {
+    brand: String(details.brand || details.desktopMonitorBrand || "").trim(),
+    model: String(details.model || details.desktopMonitorModel || "").trim(),
+    serialNumber: String(details.serialNumber || details.desktopMonitorSerialNumber || "").trim(),
+  };
+  return Object.values(normalized).some(Boolean) ? normalized : null;
+};
+
+const getInventoryMonitorDetails = (record) =>
+  normalizeMonitorDetails(record?.desktopDetails) ||
+  normalizeMonitorDetails(record?.assetAttributes?.monitorDetails) ||
+  normalizeMonitorDetails(record?.itItem?.specifications?.monitorDetails);
+
+const monitorDetailsEqual = (first, second) => {
+  const a = normalizeMonitorDetails(first) || {};
+  const b = normalizeMonitorDetails(second) || {};
+  return MONITOR_FIELDS.every((field) => (a[field.key] || "") === (b[field.key] || ""));
+};
+
+const isDesktopAsset = (record) => {
+  const categoryName = String(record?.itItem?.category?.name || "").toLowerCase();
+  const formFactor = String(record?.assetAttributes?.formFactor || record?.itItem?.specifications?.formFactor || record?.itItem?.deviceType || "").toLowerCase();
+  return record?.itItem?.deviceType === "DESKTOP" || (categoryName.includes("computer") && formFactor.includes("desktop"));
+};
+
+const MonitorSummary = ({ details }) => {
+  const monitorDetails = normalizeMonitorDetails(details);
+  if (!monitorDetails) return <span className="text-[#9CA3AF]">N/A</span>;
+
+  return (
+    <div className="leading-5">
+      <p className="font-semibold text-[#212121]">{monitorDetails.brand || "Unknown"} {monitorDetails.model || ""}</p>
+      <p className="text-xs text-[#6B7280]">{monitorDetails.serialNumber || "No serial number"}</p>
+    </div>
+  );
 };
 
 const getQuickCreateFormFactorOptions = (category) => {
@@ -206,6 +251,7 @@ const InvOfficer = () => {
   const quickCreateFormFactor = Form.useWatch("formFactor", quickCreateForm);
   const createWarrantyPeriod = Form.useWatch("warrantyPeriod", createForm);
   const createPurchaseDate = Form.useWatch("purchaseDate", createForm);
+  const monitorChanged = Form.useWatch("monitorChanged", form);
 
   const { data: inventoryResponse, isLoading: inventoryLoading } = useQuery({
     queryKey: ["inventory", deferredSearch],
@@ -365,25 +411,38 @@ const InvOfficer = () => {
       title: "User",
       dataIndex: ["user", "name"],
       key: "user",
+      width: 180,
+      ellipsis: true,
     },
-    { title: "Brand", dataIndex: ["itItem", "brand"], key: "brand" },
-    { title: "Model", dataIndex: ["itItem", "model"], key: "model" },
+    { title: "Brand", dataIndex: ["itItem", "brand"], key: "brand", width: 130, ellipsis: true },
+    { title: "Model", dataIndex: ["itItem", "model"], key: "model", width: 150, ellipsis: true },
     {
       title: "Category",
       key: "category",
+      width: 150,
+      ellipsis: true,
       render: (_, record) => record.itItem?.category?.name || formatCapitalizedLabel(record.itItem?.deviceType),
     },
-    { title: "Department", dataIndex: ["department", "name"], key: "department" },
+    {
+      title: "Monitor",
+      key: "monitor",
+      width: 190,
+      render: (_, record) => <MonitorSummary details={getInventoryMonitorDetails(record)} />,
+    },
+    { title: "Department", dataIndex: ["department", "name"], key: "department", width: 150, ellipsis: true },
     {
       title: "Location",
       dataIndex: "departmentLocation",
+      width: 150,
+      ellipsis: true,
       render: (text) => text || "N/A",
     },
-    { title: "Warranty Period", dataIndex: "warrantyPeriod", key: "warrantyPeriod" },
+    { title: "Warranty Period", dataIndex: "warrantyPeriod", key: "warrantyPeriod", width: 120 },
     {
       title: "Status",
       dataIndex: "status",
       key: "status",
+      width: 150,
       render: (status) => (
         <Tag
           className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${
@@ -398,17 +457,22 @@ const InvOfficer = () => {
       title: "Purchase Date",
       dataIndex: "purchaseDate",
       key: "purchaseDate",
+      width: 150,
       render: (purchaseDate) => formatDateTime(purchaseDate),
     },
     {
       title: "Date Created",
       dataIndex: "createdAt",
       key: "createdAt",
+      width: 150,
       render: (createdAt) => formatDateTime(createdAt),
     },
     {
       title: "Action",
       key: "action",
+      fixed: "right",
+      width: 86,
+      align: "center",
       render: (_, record) => {
         const items = [
           {
@@ -562,6 +626,11 @@ const InvOfficer = () => {
         };
       }),
     ];
+    const monitorDetails = getInventoryMonitorDetails(selectedRecord);
+    const monitorItems = MONITOR_FIELDS.map((field) => ({
+      label: field.label,
+      value: monitorDetails?.[field.key],
+    }));
 
     return [
       {
@@ -588,6 +657,16 @@ const InvOfficer = () => {
         description: "Detailed hardware metadata for the selected inventory record.",
         items: deviceItems,
       },
+      ...(monitorDetails || isDesktopAsset(selectedRecord)
+        ? [
+            {
+              key: "monitor",
+              title: "Monitor Details",
+              description: "Monitor paired with this desktop asset.",
+              items: monitorItems,
+            },
+          ]
+        : []),
     ];
   }, [selectedDeviceDetails, selectedDeviceFields, selectedRecord]);
 
@@ -612,6 +691,9 @@ const InvOfficer = () => {
         deviceType,
         categoryName: selectedRecord?.itItem?.category?.name || "",
         attributes: {},
+        monitorDetails: getInventoryMonitorDetails(selectedRecord) || undefined,
+        monitorChanged: false,
+        monitorChangeRemarks: "",
       };
 
       if (categoryDefinitions?.length) {
@@ -627,23 +709,27 @@ const InvOfficer = () => {
 
       fields.forEach((field) => {
         if (field.name.endsWith("Brand")) {
-          formValues[field.name] = selectedRecord?.itItem?.brand || "";
+          formValues[field.name] = selectedDeviceDetails?.[field.name] || selectedRecord?.itItem?.brand || "";
         } else if (field.name.endsWith("Model")) {
-          formValues[field.name] = selectedRecord?.itItem?.model || "";
+          formValues[field.name] = selectedDeviceDetails?.[field.name] || selectedRecord?.itItem?.model || "";
         } else {
-          formValues[field.name] = selectedRecord?.itItem?.[field.name] || "";
+          formValues[field.name] = selectedDeviceDetails?.[field.name] || "";
         }
       });
 
       form.setFieldsValue(formValues);
     }
-  }, [selectedRecord, form, DEVICE_FIELDS]);
+  }, [selectedRecord, form, DEVICE_FIELDS, selectedDeviceDetails]);
 
   const { mutate: quickCreateITItem, isPending: isQuickCreating } = useMutation({
     mutationKey: ["quickCreateITItem"],
     mutationFn: (payload) => api.post("/inventory/it-items/quick-create", payload),
     onSuccess: (res) => {
       const item = res.data.item;
+      if (!item?.id) {
+        toast.error("Item registration succeeded but no item ID was returned.");
+        return;
+      }
       const wasExisting = res.data.existing;
       queryClient.invalidateQueries({ queryKey: ["itItemsForCreate"] });
       setSelectedITItem(item);
@@ -674,40 +760,66 @@ const InvOfficer = () => {
 
   const { mutate: updateInventory } = useMutation({
     mutationKey: ["updateInventory"],
-    mutationFn: (payload) => api.patch(`/inventory/update/${selectedRecord?.id}`, payload),
+    mutationFn: ({ inventoryId, ...payload }) => api.patch(`/inventory/update/${inventoryId}`, payload),
     onSuccess: () => {
       handleCancel();
       toast.success("Updated successfully");
-      queryClient.invalidateQueries(["inventory"]);
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
     },
     onError: (error) => {
-      console.error("Error updating inventory:", error);
-      toast.error("Failed to update inventory");
+      toast.error(error?.response?.data?.message || "Failed to update inventory");
     },
   });
 
   const { mutate: updateDevice } = useMutation({
     mutationKey: ["updateDevice"],
-    mutationFn: (payload) =>
-      api.patch(`/inventory/update/${selectedRecord?.id}/device-details`, payload),
+    mutationFn: ({ inventoryId, ...payload }) =>
+      api.patch(`/inventory/update/${inventoryId}/device-details`, payload),
     onSuccess: () => {
       handleCancel();
       toast.success("Device details updated");
-      queryClient.invalidateQueries(["inventory"]);
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to update device details");
     },
   });
 
   const handleSubmit = (values) => {
+    const inventoryId = selectedRecord?.id;
+    if (!inventoryId) {
+      toast.error("Unable to update inventory. Missing inventory ID.");
+      return;
+    }
+
+    if (values.monitorChanged && !values.monitorChangeRemarks?.trim()) {
+      toast.error("Add a monitor change remark before saving.");
+      return;
+    }
+
     updateInventory({
+      inventoryId,
       userId: values.userId,
       departmentId: values.departmentId,
       unitId: values.unitIdHidden,
       status: values.status,
       remarks: values.remarks,
+      ...(values.monitorChanged
+        ? {
+            monitorChanged: true,
+            monitorDetails: normalizeMonitorDetails(values.monitorDetails) || {},
+            monitorChangeRemarks: values.monitorChangeRemarks?.trim(),
+          }
+        : {}),
     });
   };
 
   const handleCreateSubmit = (values) => {
+    if (!values.itItemId || !values.userId) {
+      toast.error("Select an item and assigned user before creating inventory.");
+      return;
+    }
+
     // If we're showing category-style attribute definitions (whether the item has its own
     // category or we're using a matching built-in category for a legacy item), always
     // store the result in assetAttributes so it's consistent and searchable.
@@ -729,33 +841,112 @@ const InvOfficer = () => {
       warrantyPeriod: values.warrantyPeriod || undefined,
       purchaseDate: values.purchaseDate ? values.purchaseDate.toISOString() : undefined,
       status: values.status || undefined,
-      lpoReference: values.lpoReference || undefined,
+      lpoReference: values.lpoReference?.trim() || undefined,
       supplierId: values.supplierId || undefined,
-      remarks: values.remarks || undefined,
+      remarks: values.remarks?.trim() || undefined,
       assetAttributes,
       deviceDetails,
     };
     createInventory(payload);
   };
 
-  const handleDeviceForm = (values) => {
-    if (selectedCategoryDefinitions.length) {
-      updateDevice({
-        attributes: values.attributes || {},
-      });
+  const handleQuickCreateSubmit = (values) => {
+    quickCreateITItem({
+      ...values,
+      brand: values.brand?.trim(),
+      model: values.model?.trim(),
+      description: values.description?.trim() || undefined,
+      monitorDetails: values.monitorDetails
+        ? Object.fromEntries(
+            Object.entries(values.monitorDetails)
+              .map(([key, value]) => [key, typeof value === "string" ? value.trim() : value])
+              .filter(([, value]) => value)
+          )
+        : undefined,
+    });
+  };
+
+  const handleDeviceForm = async (values) => {
+    const inventoryId = selectedRecord?.id;
+    if (!inventoryId) {
+      toast.error("Unable to update device details. Missing inventory ID.");
       return;
     }
 
-    const deviceType = selectedRecord?.itItem?.deviceType || "LAPTOP";
-    const fields = DEVICE_FIELDS[deviceType] || DEVICE_FIELDS.LAPTOP || [];
-    const payload = { deviceType };
+    if (values.monitorChanged && !values.monitorChangeRemarks?.trim()) {
+      toast.error("Add a monitor change remark before saving.");
+      return;
+    }
 
-    fields.forEach((field) => {
-      payload[field.name] = values[field.name];
-    });
+    try {
+      if (selectedCategoryDefinitions.length) {
+        await api.patch(`/inventory/update/${inventoryId}/device-details`, {
+          attributes: values.attributes || {},
+        });
+      } else {
+        const deviceType = selectedRecord?.itItem?.deviceType || "LAPTOP";
+        const fields = DEVICE_FIELDS[deviceType] || DEVICE_FIELDS.LAPTOP || [];
+        const payload = { deviceType };
 
-    updateDevice(payload);
+        fields.forEach((field) => {
+          payload[field.name] = values[field.name];
+        });
+
+        await api.patch(`/inventory/update/${inventoryId}/device-details`, payload);
+      }
+
+      if (values.monitorChanged) {
+        await api.patch(`/inventory/update/${inventoryId}`, {
+          monitorChanged: true,
+          monitorDetails: normalizeMonitorDetails(values.monitorDetails) || {},
+          monitorChangeRemarks: values.monitorChangeRemarks?.trim(),
+        });
+      }
+
+      handleCancel();
+      toast.success("Device details updated");
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["assignmentHistory", inventoryId] });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to update device details");
+    }
   };
+
+  const shouldShowMonitorPanel = Boolean(selectedRecord && (isDesktopAsset(selectedRecord) || getInventoryMonitorDetails(selectedRecord)));
+  const renderMonitorChangePanel = () => shouldShowMonitorPanel ? (
+    <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+      <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-bold text-[#111827]">Monitor Details</p>
+          <p className="text-xs text-[#6B7280]">The monitor is assigned together with this desktop asset.</p>
+        </div>
+        <Form.Item name="monitorChanged" valuePropName="checked" className="mb-0">
+          <Checkbox>Monitor details changed</Checkbox>
+        </Form.Item>
+      </div>
+      <div className="grid grid-cols-1 gap-x-3 md:grid-cols-3">
+        {MONITOR_FIELDS.map((field) => (
+          <Form.Item key={field.key} name={["monitorDetails", field.key]} label={field.label}>
+            <Input disabled={!monitorChanged} placeholder={field.label} />
+          </Form.Item>
+        ))}
+      </div>
+      {monitorChanged ? (
+        <Form.Item
+          name="monitorChangeRemarks"
+          label="Monitor Change Remarks"
+          rules={[{ required: true, message: "Explain why the monitor changed and where the old one is" }]}
+          className="mb-0"
+        >
+          <Input.TextArea rows={3} placeholder="Why is the monitor changing, and where is the old monitor?" />
+        </Form.Item>
+      ) : (
+        <p className="mb-0 text-xs text-[#6B7280]">
+          Check the box only when the monitor paired with this desktop has changed.
+        </p>
+      )}
+    </div>
+  ) : null;
 
   if (isDeviceFieldsLoading) {
     return <div>Loading device fields...</div>;
@@ -802,7 +993,8 @@ const InvOfficer = () => {
           dataSource={inventoryData}
           loading={inventoryLoading}
           rowKey="id"
-          scroll={{ x: 1400 }}
+          size="middle"
+          scroll={{ x: 1536 }}
         />
 
         <Modal
@@ -1011,6 +1203,25 @@ const InvOfficer = () => {
                       { title: "Staff ID", dataIndex: ["assignedTo", "staffId"], render: (v) => v || "—" },
                       { title: "From", dataIndex: "fromDate", render: (v) => formatDateTime(v) },
                       { title: "To", dataIndex: "toDate", render: (v) => (v ? formatDateTime(v) : <Tag className="rounded-full border-0 bg-[#ECFDF3] text-xs font-semibold text-[#166534]">Current</Tag>) },
+                      {
+                        title: "Monitor Change",
+                        key: "monitorChange",
+                        render: (_, history) => history.monitorChanged ? (
+                          <div className="min-w-[220px] space-y-2 text-xs">
+                            <div>
+                              <p className="font-semibold text-[#6B7280]">Old Monitor</p>
+                              <MonitorSummary details={history.oldMonitorDetails} />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-[#6B7280]">New Monitor</p>
+                              <MonitorSummary details={history.newMonitorDetails} />
+                            </div>
+                            <p className="rounded-lg bg-[#FFF7ED] px-2 py-1 text-[#9A3412]">
+                              {history.monitorChangeRemarks || "No remarks"}
+                            </p>
+                          </div>
+                        ) : "—",
+                      },
                       { title: "Changed By", dataIndex: ["reassignedBy", "name"], render: (v) => v || "—" },
                     ]}
                   />
@@ -1087,117 +1298,133 @@ const InvOfficer = () => {
           onCancel={handleCancel}
           footer={null}
           title="Edit Inventory Record"
+          width={820}
         >
           <Tabs activeKey={activeForm} onChange={(key) => setActiveForm(key)} items={tabItems} />
 
           {activeForm === "user" ? (
-            <Form form={form} layout="vertical" onFinish={handleSubmit}>
-              <Form.Item name="userId" label="Assigned User">
-                <Select
-                  showSearch
-                  placeholder="Select a user"
-                  optionFilterProp="children"
-                  filterOption={(input, option) =>
-                    String(option?.children || "")
-                      .toLowerCase()
-                      .includes(input.toLowerCase())
-                  }
-                  onChange={(value) => {
-                    const selectedUser = invuser?.data?.find((user) => user.id === value);
-                    if (selectedUser) {
-                      form.setFieldsValue({
-                        department: selectedUser.department?.name || "",
-                        unit: selectedUser.unit?.name || "",
-                        departmentId: selectedUser.departmentId,
-                        unitIdHidden: selectedUser.unitId,
-                      });
+            <Form form={form} layout="vertical" onFinish={handleSubmit} className="space-y-4">
+              <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+                <p className="mb-3 text-sm font-bold text-[#111827]">Assignment</p>
+                <Form.Item name="userId" label="Assigned User">
+                  <Select
+                    showSearch
+                    placeholder="Select a user"
+                    optionFilterProp="children"
+                    filterOption={(input, option) =>
+                      String(option?.children || "")
+                        .toLowerCase()
+                        .includes(input.toLowerCase())
                     }
-                  }}
-                >
-                  {invuser?.data?.map((user) => (
-                    <Select.Option key={user.id} value={user.id}>
-                      {user.name}
-                    </Select.Option>
-                  ))}
-                </Select>
-              </Form.Item>
+                    onChange={(value) => {
+                      const selectedUser = invuser?.data?.find((user) => user.id === value);
+                      if (selectedUser) {
+                        form.setFieldsValue({
+                          department: selectedUser.department?.name || "",
+                          unit: selectedUser.unit?.name || "",
+                          departmentId: selectedUser.departmentId,
+                          unitIdHidden: selectedUser.unitId,
+                        });
+                      }
+                    }}
+                  >
+                    {invuser?.data?.map((user) => (
+                      <Select.Option key={user.id} value={user.id}>
+                        {user.name}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+                <div className="grid grid-cols-1 gap-x-3 md:grid-cols-2">
+                  <Form.Item name="department" label="Department">
+                    <Input disabled />
+                  </Form.Item>
+                  <Form.Item name="unit" label="Unit">
+                    <Input disabled />
+                  </Form.Item>
+                </div>
+                <Form.Item name="departmentId" hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="unitIdHidden" hidden>
+                  <Input />
+                </Form.Item>
+              </div>
 
-              <Form.Item name="department" label="Department">
-                <Input disabled />
-              </Form.Item>
+              {renderMonitorChangePanel()}
 
-              <Form.Item name="unit" label="Unit">
-                <Input disabled />
-              </Form.Item>
+              <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+                <p className="mb-3 text-sm font-bold text-[#111827]">Lifecycle & Notes</p>
+                <Form.Item name="status" label="Status">
+                  <Select>
+                    <Select.Option value="ACTIVE">Active</Select.Option>
+                    <Select.Option value="INACTIVE">Inactive</Select.Option>
+                    <Select.Option value="NON_FUNCTIONAL">Non Functional</Select.Option>
+                    <Select.Option value="UNDER_REPAIR">Under Repair</Select.Option>
+                    <Select.Option value="LOANED">Loaned</Select.Option>
+                    <Select.Option value="OBSOLETE">Obsolete</Select.Option>
+                    <Select.Option value="DISPOSED">Disposed</Select.Option>
+                  </Select>
+                </Form.Item>
 
-              <Form.Item name="departmentId" hidden>
-                <Input />
-              </Form.Item>
-
-              <Form.Item name="unitIdHidden" hidden>
-                <Input />
-              </Form.Item>
-
-              <Form.Item name="status" label="Status">
-                <Select>
-                  <Select.Option value="ACTIVE">Active</Select.Option>
-                  <Select.Option value="INACTIVE">Inactive</Select.Option>
-                  <Select.Option value="NON_FUNCTIONAL">Non Functional</Select.Option>
-                  <Select.Option value="UNDER_REPAIR">Under Repair</Select.Option>
-                  <Select.Option value="LOANED">Loaned</Select.Option>
-                  <Select.Option value="OBSOLETE">Obsolete</Select.Option>
-                  <Select.Option value="DISPOSED">Disposed</Select.Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item name="remarks" label="Remarks">
-                <Input.TextArea rows={4} />
-              </Form.Item>
+                <Form.Item name="remarks" label="Remarks" className="mb-0">
+                  <Input.TextArea rows={3} />
+                </Form.Item>
+              </div>
 
               <Button type="primary" htmlType="submit" block>
                 Submit
               </Button>
             </Form>
           ) : (
-            <Form form={form} layout="vertical" onFinish={handleDeviceForm}>
+            <Form form={form} layout="vertical" onFinish={handleDeviceForm} className="space-y-4">
               {selectedCategoryDefinitions.length ? (
-                <>
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+                  <p className="mb-3 text-sm font-bold text-[#111827]">Asset Attributes</p>
                   <Form.Item name="categoryName" label="Item Category">
                     <Input disabled />
                   </Form.Item>
-                  {selectedCategoryDefinitions.map((definition) => (
-                    <Form.Item
-                      key={definition.id}
-                      name={["attributes", definition.key]}
-                      label={definition.label}
-                      rules={definition.isRequired ? [{ required: true, message: `${definition.label} is required` }] : undefined}
-                      valuePropName={getDefinitionInputType(definition) === "switch" ? "checked" : "value"}
-                    >
-                      {renderCategoryFieldInput(definition)}
-                    </Form.Item>
-                  ))}
-                </>
+                  <div className="grid grid-cols-1 gap-x-3 md:grid-cols-2">
+                    {selectedCategoryDefinitions.map((definition) => (
+                      <Form.Item
+                        key={definition.id}
+                        name={["attributes", definition.key]}
+                        label={definition.label}
+                        rules={definition.isRequired ? [{ required: true, message: `${definition.label} is required` }] : undefined}
+                        valuePropName={getDefinitionInputType(definition) === "switch" ? "checked" : "value"}
+                      >
+                        {renderCategoryFieldInput(definition)}
+                      </Form.Item>
+                    ))}
+                  </div>
+                </div>
               ) : (
-                <>
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+                  <p className="mb-3 text-sm font-bold text-[#111827]">Device Attributes</p>
                   <Form.Item name="deviceType" label="Device Type">
                     <Input disabled />
                   </Form.Item>
-                  {(DEVICE_FIELDS[selectedRecord?.itItem?.deviceType || "LAPTOP"] || []).map((field) => (
-                    <Form.Item
-                      key={field.name}
-                      name={field.name}
-                      label={field.label}
-                      valuePropName={field.type === "switch" ? "checked" : "value"}
-                    >
-                      {field.type === "switch" ? (
-                        <Switch disabled={field.disabled} />
-                      ) : (
-                        <Input disabled={field.disabled} />
-                      )}
-                    </Form.Item>
-                  ))}
-                </>
+                  <div className="grid grid-cols-1 gap-x-3 md:grid-cols-2">
+                    {(DEVICE_FIELDS[selectedRecord?.itItem?.deviceType || "LAPTOP"] || []).map((field) => (
+                      <Form.Item
+                        key={field.name}
+                        name={field.name}
+                        label={field.label}
+                        valuePropName={field.type === "switch" ? "checked" : "value"}
+                      >
+                        {field.type === "switch" ? (
+                          <Switch disabled={field.disabled} />
+                        ) : (
+                          <Input disabled={field.disabled} />
+                        )}
+                      </Form.Item>
+                    ))}
+                  </div>
+                </div>
               )}
+
+              {renderMonitorChangePanel()}
+
               <Button type="primary" htmlType="submit" block>
                 Save Attribute Details
               </Button>
@@ -1312,7 +1539,7 @@ const InvOfficer = () => {
             {quickCreateOpen && (
               <div className="mb-3 rounded-xl border border-dashed border-[#D32F2F] bg-[#FFF5F5] p-4">
                 <p className="mb-3 text-sm font-bold text-[#D32F2F]">Register New Item</p>
-                <Form form={quickCreateForm} layout="vertical" component={false} onFinish={(values) => quickCreateITItem(values)}>
+                <Form form={quickCreateForm} layout="vertical" component={false} onFinish={handleQuickCreateSubmit}>
                   <div className="grid grid-cols-2 gap-x-4">
                     <Form.Item name="brand" label="Brand" rules={[{ required: true, message: "Required" }]}>
                       <Input placeholder="e.g. Dell" />

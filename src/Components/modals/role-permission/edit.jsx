@@ -58,7 +58,6 @@ const EditRoleManagement = () => {
       };
       mutate(_values);
     } catch (err) {
-      console.error(err);
     }
   };
 

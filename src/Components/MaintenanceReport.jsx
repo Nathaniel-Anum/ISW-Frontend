@@ -18,12 +18,10 @@ const MaintenanceReport = () => {
  
 
   const resolved = data?.data?.tickets.filter((ticket) => ticket.dateResolved);
-  console.log("Resolved tickets are: ", resolved);
 
   const unresolved = data?.data?.tickets.filter(
     (ticket) => !ticket.dateResolved
   );
-  console.log("Unresolved tickets are: ", unresolved);
 
   const exportSummary = () => {
     const summaryRows = [

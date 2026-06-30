@@ -118,7 +118,12 @@ const ServiceDesk = () => {
       toast.success("Service desk ticket created");
       queryClient.invalidateQueries({ queryKey: ["serviceDeskTickets"] });
       setIsCreateOpen(false);
+      setSubjectInput("");
+      setCategoryInput(null);
       createForm.resetFields();
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to create service desk ticket");
     },
   });
 
@@ -127,6 +132,9 @@ const ServiceDesk = () => {
     onSuccess: () => {
       toast.success("Resolution confirmed");
       queryClient.invalidateQueries({ queryKey: ["serviceDeskTickets"] });
+    },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to confirm resolution");
     },
   });
 
@@ -139,7 +147,46 @@ const ServiceDesk = () => {
       setSelectedTicket(null);
       ratingForm.resetFields();
     },
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to submit feedback");
+    },
   });
+
+  const handleCreateTicket = (values) => {
+    const subject = values.subject?.trim();
+    const description = values.description?.trim();
+    if (!subject || !description) {
+      toast.error("Subject and description are required.");
+      return;
+    }
+
+    createTicket.mutate({
+      ...values,
+      subject,
+      description,
+    });
+  };
+
+  const handleConfirmResolution = (record) => {
+    if (!record?.id) {
+      toast.error("Unable to confirm this ticket. Missing ticket ID.");
+      return;
+    }
+
+    confirmResolution.mutate(record.id);
+  };
+
+  const handleSubmitSatisfaction = (values) => {
+    if (!selectedTicket?.id) {
+      toast.error("Unable to submit feedback. Missing ticket ID.");
+      return;
+    }
+
+    submitSatisfaction.mutate({
+      ticketId: selectedTicket.id,
+      values: { ...values, feedback: values.feedback?.trim() || undefined },
+    });
+  };
 
   const getLatestMaintenanceRequisition = (ticket) =>
     ticket?.maintenanceTicket?.requisitions?.[0] || null;
@@ -250,7 +297,7 @@ const ServiceDesk = () => {
             View
           </Button>
           {record.status === "RESOLVED" ? (
-            <Button size="small" onClick={() => confirmResolution.mutate(record.id)} loading={confirmResolution.isPending}>
+            <Button size="small" onClick={() => handleConfirmResolution(record)} loading={confirmResolution.isPending}>
               Confirm Fixed
             </Button>
           ) : null}
@@ -351,7 +398,7 @@ const ServiceDesk = () => {
         />
       </section>
 
-      <Modal title="Report an Issue" open={isCreateOpen} onCancel={() => { setIsCreateOpen(false); setSubjectInput(""); setCategoryInput(null); }} footer={null} width={600} destroyOnClose>
+      <Modal title="Report an Issue" open={isCreateOpen} onCancel={() => { setIsCreateOpen(false); setSubjectInput(""); setCategoryInput(null); createForm.resetFields(); }} footer={null} width={600} destroyOnClose>
         <Form
           form={createForm}
           layout="vertical"
@@ -359,7 +406,7 @@ const ServiceDesk = () => {
           onValuesChange={(changedValues) => {
             if (changedValues.subject !== undefined) setSubjectInput(changedValues.subject);
           }}
-          onFinish={(values) => { createTicket.mutate(values); setSubjectInput(""); setCategoryInput(null); }}
+          onFinish={handleCreateTicket}
         >
           <Form.Item name="subject" label="Subject" rules={[{ required: true, message: "Please enter a subject" }]}>
             <Input placeholder="Short issue summary" />
@@ -419,16 +466,14 @@ const ServiceDesk = () => {
       <Modal
         title={`Rate Support${selectedTicket ? ` - ${selectedTicket.ticketNo}` : ""}`}
         open={isRateOpen}
-        onCancel={() => setIsRateOpen(false)}
+          onCancel={() => { setIsRateOpen(false); setSelectedTicket(null); ratingForm.resetFields(); }}
         footer={null}
         destroyOnClose
       >
         <Form
           form={ratingForm}
           layout="vertical"
-          onFinish={(values) =>
-            submitSatisfaction.mutate({ ticketId: selectedTicket.id, values })
-          }
+          onFinish={handleSubmitSatisfaction}
         >
           <Form.Item name="rating" label="Rating" rules={[{ required: true, message: "Please select a rating" }]}>
             <Rate count={5} />

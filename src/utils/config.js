@@ -1,8 +1,32 @@
 import axios from 'axios';
 
+const resolveBaseURL = () => {
+  const configuredBaseURL = import.meta.env.VITE_BASE_URL;
+
+  if (import.meta.env.DEV && configuredBaseURL && typeof window !== 'undefined') {
+    try {
+      const url = new URL(configuredBaseURL);
+      const browserHost = window.location.hostname;
+      const isLocalBrowser = browserHost === 'localhost' || browserHost === '127.0.0.1';
+
+      if (isLocalBrowser && url.hostname !== browserHost) {
+        url.hostname = browserHost;
+        return url.toString().replace(/\/$/, '');
+      }
+    } catch {
+      return configuredBaseURL;
+    }
+  }
+
+  return configuredBaseURL;
+};
+
+const API_BASE_URL = resolveBaseURL();
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_BASE_URL,
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
+  timeout: 20000,
 });
 
 // Add token to requests
@@ -30,7 +54,7 @@ const clearSession = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('refresh_token');
   localStorage.removeItem('mustResetPassword');
-  window.location.href = '/';
+  globalThis.dispatchEvent(new CustomEvent('auth:session-expired'));
 };
 
 api.interceptors.response.use(
@@ -65,8 +89,9 @@ api.interceptors.response.use(
         if (!refresh_token) throw new Error('No refresh token');
 
         const { data } = await axios.post(
-          `${import.meta.env.VITE_BASE_URL}/auth/refresh`,
+          `${API_BASE_URL}/auth/refresh`,
           { refresh_token },
+          { timeout: 20000 },
         );
 
         localStorage.setItem('access_token', data.access_token);
@@ -86,10 +111,8 @@ api.interceptors.response.use(
       }
     }
 
-    console.error('API Error:', error.response?.data, error.response?.status);
     return Promise.reject(error);
   },
 );
 
 export default api;
-

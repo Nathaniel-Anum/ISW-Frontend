@@ -45,7 +45,6 @@ const EditDivision = () => {
     try {
       mutate(values);
     } catch (e) {
-      console.error(e.message);
     }
   };
 

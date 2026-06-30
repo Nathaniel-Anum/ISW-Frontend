@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Dropdown, Form, Input, Modal, Select, Spin, Table, Tabs, Tag } from "antd";
+import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Spin, Table, Tabs, Tag } from "antd";
 import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { LuArrowRight, LuChartBar, LuHistory, LuPackagePlus, LuPlus, LuUserCheck } from "react-icons/lu";
@@ -98,7 +98,7 @@ const Maintenance = () => {
     queryKey: ["devices", debouncedSearch],
     queryFn: () =>
       api
-        .get(`/hardware/devices/search?q=${debouncedSearch}`)
+        .get("/hardware/devices/search", { params: { q: debouncedSearch } })
         .then((res) => res.data),
     enabled: !!debouncedSearch,
   });
@@ -161,6 +161,7 @@ const Maintenance = () => {
   const techHistory = techHistoryResponse?.data || [];
 
   const tickets = ticketsResponse?.data || [];
+  const invalidateTickets = () => queryClient.invalidateQueries({ queryKey: ["tickets"] });
 
   const stats = useMemo(() => {
     const searchMatches = searchText
@@ -356,22 +357,32 @@ const Maintenance = () => {
       toast.success("Ticket created successfully");
       createForm.resetFields();
       setSelectedDevice(null);
-      queryClient.invalidateQueries(["tickets"]);
+      invalidateTickets();
       setOpen(false);
     },
     onError: (error) => {
-      toast.error("Failed to create ticket");
-      console.error("Create Ticket Error:", error);
+      toast.error(error?.response?.data?.message || "Failed to create ticket");
     },
   });
 
   const onFinish = (values) => {
+    if (!selectedDevice?.inventoryId || !selectedDevice?.userId) {
+      toast.error("Select a valid device before creating a job card");
+      return;
+    }
+
+    const description = values.description?.trim();
+    if (!description) {
+      toast.error("Please enter a description");
+      return;
+    }
+
     const payload = {
       assetId: selectedDevice.inventoryId,
       userId: selectedDevice.userId,
       departmentId: selectedDevice.departmentId,
       unitId: selectedDevice.unitId,
-      description: values.description,
+      description,
       issueType: values.issueType,
       priority: "MEDIUM",
     };
@@ -380,32 +391,43 @@ const Maintenance = () => {
   };
 
   const { mutate: resolveTicket, isPending: isResolving } = useMutation({
-    mutationFn: (payload) => api.patch(`/hardware/tickets/${record?.id}/update`, payload),
+    mutationFn: ({ ticketId, ...payload }) => api.patch(`/hardware/tickets/${ticketId}/update`, payload),
     onSuccess: () => {
       toast.success("Job updated successfully");
       resolveForm.resetFields();
-      queryClient.invalidateQueries(["tickets"]);
+      invalidateTickets();
       setRecord(null);
       setIsModalOpen(false);
     },
-    onError: () => {
-      toast.error("Failed to update job");
+    onError: (error) => {
+      toast.error(error?.response?.data?.message || "Failed to update job");
     },
   });
 
   const handleResolve = (values) => {
-    resolveTicket(values);
+    if (!record?.id) {
+      toast.error("Unable to update job: missing ticket ID");
+      return;
+    }
+
+    resolveTicket({
+      ticketId: record.id,
+      status: values.status,
+      actionTaken: values.actionTaken?.trim() || undefined,
+      technicianReturnedById: values.technicianReturnedById,
+      remarks: values.remarks?.trim() || undefined,
+    });
   };
 
   const { mutate: createMaintenanceRequisition, isPending: isCreatingRequisition } = useMutation({
-    mutationFn: (payload) =>
-      api.post(`/hardware/tickets/${requisitionRecord?.id}/requisitions`, payload),
+    mutationFn: ({ ticketId, ...payload }) =>
+      api.post(`/hardware/tickets/${ticketId}/requisitions`, payload),
     onSuccess: (response) => {
       toast.success(response?.data?.message || "Maintenance requisition created successfully");
       requisitionForm.resetFields();
       setRequisitionRecord(null);
       setIsRequisitionModalOpen(false);
-      queryClient.invalidateQueries(["tickets"]);
+      invalidateTickets();
     },
     onError: (error) => {
       toast.error(
@@ -415,11 +437,11 @@ const Maintenance = () => {
   });
 
   const { mutate: assignJob, isPending: isAssigning } = useMutation({
-    mutationFn: (payload) => api.patch(`/hardware/tickets/${assignRecord?.id}/assign`, payload),
+    mutationFn: ({ ticketId, ...payload }) => api.patch(`/hardware/tickets/${ticketId}/assign`, payload),
     onSuccess: () => {
       toast.success("Technician reassigned successfully");
       assignForm.resetFields();
-      queryClient.invalidateQueries(["tickets"]);
+      invalidateTickets();
       setAssignRecord(null);
       setIsAssignOpen(false);
     },
@@ -429,10 +451,40 @@ const Maintenance = () => {
   });
 
   const handleRequisitionSubmit = (values) => {
+    if (!requisitionRecord?.id) {
+      toast.error("Unable to create requisition: missing ticket ID");
+      return;
+    }
+
+    const quantity = Number(values.quantity);
+    if (!Number.isFinite(quantity) || quantity < 1) {
+      toast.error("Enter a valid quantity");
+      return;
+    }
+
+    const itemDescription = values.itemDescription?.trim();
+    const purpose = values.purpose?.trim();
+    if (!itemDescription || !purpose) {
+      toast.error("Requested item and purpose are required");
+      return;
+    }
+
     createMaintenanceRequisition({
-      ...values,
-      quantity: Number(values.quantity),
+      ticketId: requisitionRecord.id,
+      itemDescription,
+      quantity,
+      urgency: values.urgency,
+      purpose,
+      remarks: values.remarks?.trim() || undefined,
     });
+  };
+
+  const handleAssignSubmit = (values) => {
+    if (!assignRecord?.id) {
+      toast.error("Unable to assign job: missing ticket ID");
+      return;
+    }
+    assignJob({ ticketId: assignRecord.id, technicianReceivedById: values.technicianReceivedById });
   };
 
   return (
@@ -820,7 +872,7 @@ const Maintenance = () => {
               label="Quantity"
               rules={[{ required: true, message: "Please enter the quantity" }]}
             >
-              <Input type="number" min={1} />
+              <InputNumber min={1} precision={0} className="w-full" />
             </Form.Item>
           </div>
 
@@ -864,7 +916,7 @@ const Maintenance = () => {
           <p className="mt-1">Device: {assignRecord?.brand} {assignRecord?.model}</p>
           <p className="mt-1">Current technician: {assignRecord?.technicianReceivedName || "—"}</p>
         </div>
-        <Form form={assignForm} layout="vertical" onFinish={(values) => assignJob(values)}>
+        <Form form={assignForm} layout="vertical" onFinish={handleAssignSubmit}>
           <Form.Item
             name="technicianReceivedById"
             label="Assign To"

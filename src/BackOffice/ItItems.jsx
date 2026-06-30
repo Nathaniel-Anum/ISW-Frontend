@@ -317,6 +317,10 @@ const ItItems = () => {
   };
 
   const confirmDelete = (record) => {
+    if (!record?.id) {
+      toast.error("Unable to delete item: missing item ID");
+      return;
+    }
     Modal.confirm({
       title: "Delete item",
       content: "This removes the item template from future use while preserving linked records.",
@@ -450,11 +454,11 @@ const ItItems = () => {
     const payload = {
       categoryId: values.categoryId,
       itemClass: values.itemClass,
-      brand: values.brand,
-      model: values.model,
+      brand: values.brand?.trim(),
+      model: values.model?.trim(),
       formFactor: values.formFactor,
-      description: values.description,
-      unitOfMeasure: values.itemClass === "CONSUMABLE" ? values.unitOfMeasure : undefined,
+      description: values.description?.trim() || undefined,
+      unitOfMeasure: values.itemClass === "CONSUMABLE" ? values.unitOfMeasure?.trim() : undefined,
       reorderLevel: values.itemClass === "CONSUMABLE" ? toOptionalNumber(values.reorderLevel) : undefined,
       minimumLevel: values.itemClass === "CONSUMABLE" ? toOptionalNumber(values.minimumLevel) : undefined,
       maximumLevel: values.itemClass === "CONSUMABLE" ? toOptionalNumber(values.maximumLevel) : undefined,
@@ -463,7 +467,16 @@ const ItItems = () => {
       monitorDetails: showMonitorDetails ? values.monitorDetails : undefined,
     };
 
+    if (!payload.categoryId || !payload.itemClass || !payload.brand || !payload.model) {
+      toast.error("Category, item class, brand, and model are required");
+      return;
+    }
+
     if (editingItem) {
+      if (!editingItem.id) {
+        toast.error("Unable to update item: missing item ID");
+        return;
+      }
       updateItem.mutate({ id: editingItem.id, values: payload });
     } else {
       addItem.mutate(payload);

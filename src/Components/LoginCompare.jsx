@@ -11,21 +11,17 @@ const Login = () => {
   const navigate = useNavigate();
 
   const handleSubmit = (values) => {
-    console.log(values);
     api
       .post("/auth/login", values)
       .then((res) => {
-        console.log(res.data);
         const { access_token } = res.data;
         if (access_token) {
           localStorage.setItem("access_token", access_token);
-          console.log("Token successfully set!");
           navigate("/dashboard");
         }
       })
       .catch((error) => {
-        console.log(error.response.data?.message);
-        toast.error(error.response.data?.message);
+        toast.error(error.response?.data?.message || "Login failed");
       });
   };
 

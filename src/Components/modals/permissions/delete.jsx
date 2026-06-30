@@ -51,7 +51,6 @@ const DeletePermission = () => {
         mutate(id);
       }
     } catch (err) {
-      console.log(err);
     }
   };
 

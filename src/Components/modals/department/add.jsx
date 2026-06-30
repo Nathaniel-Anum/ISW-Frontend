@@ -50,7 +50,6 @@ const AddDepartment = () => {
     try {
       mutate(values);
     } catch (err) {
-      console.log(err);
     }
   };
 
