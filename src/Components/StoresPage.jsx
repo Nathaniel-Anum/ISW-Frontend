@@ -12,6 +12,7 @@ import {
   Switch,
   Table,
   Tag,
+  Tooltip,
 } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { LuPlus, LuTrash2 } from "react-icons/lu";
@@ -387,8 +388,33 @@ const StoresPage = () => {
       title: "IT Item", width: 260,
       render: (_, record) => {
         return (
-          <Select size="small" className="w-full" placeholder="Select IT item" value={record.itItemId} showSearch optionFilterProp="children" onChange={(v) => updateItem(record.key, "itItemId", v)}>
-            {itItemsList.map((it) => <Select.Option key={it.id} value={it.id}>{it.brand} {it.model}</Select.Option>)}
+          <Select
+            size="small"
+            className="w-full"
+            placeholder="Select IT item"
+            value={record.itItemId}
+            showSearch
+            optionFilterProp="searchText"
+            filterOption={(input, option) =>
+              String(option?.searchText || "").toLowerCase().includes(input.trim().toLowerCase())
+            }
+            onChange={(v) => updateItem(record.key, "itItemId", v)}
+          >
+            {itItemsList.map((it) => {
+              const label = `${it.brand || ""} ${it.model || ""}`.trim();
+              const description = it.description?.trim();
+              return (
+                <Select.Option
+                  key={it.id}
+                  value={it.id}
+                  searchText={`${label} ${description || ""}`}
+                >
+                  <Tooltip title={description || "No description"} placement="right">
+                    <span className="block truncate">{label}</span>
+                  </Tooltip>
+                </Select.Option>
+              );
+            })}
           </Select>
         );
       },
