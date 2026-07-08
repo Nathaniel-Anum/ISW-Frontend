@@ -294,15 +294,21 @@ const Stock = () => {
 
   const stockColumns = [
     {
-      title: "Brand",
-      dataIndex: "brand",
-      key: "brand",
+      title: "Item",
+      key: "item",
       filteredValue: [deferredStockSearch],
       onFilter: (value, record) =>
-        [record.brand, record.model, String(record.quantityInStock), record.deviceType]
+        [record.brand, record.model, record.description, String(record.quantityInStock), record.deviceType]
           .some((field) => field?.toLowerCase().includes(value.toLowerCase())),
+      render: (_, record) => (
+        <div className="leading-5">
+          <p className="m-0 font-semibold text-[#212121]">{record.brand} {record.model}</p>
+          <p className={`m-0 text-xs ${record.description ? "font-semibold text-[#D32F2F]" : "text-[#BDBDBD]"}`}>
+            {record.description || "No description available"}
+          </p>
+        </div>
+      ),
     },
-    { title: "Model", dataIndex: "model", key: "model" },
     { title: "Device Type", dataIndex: "deviceType", key: "deviceType", render: formatCapitalizedLabel },
     { title: "Item Class", dataIndex: "itemClass", key: "itemClass", render: formatCapitalizedLabel },
     { title: "Qty In Stock", dataIndex: "quantityInStock", key: "quantityInStock" },

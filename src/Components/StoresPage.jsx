@@ -12,7 +12,6 @@ import {
   Switch,
   Table,
   Tag,
-  Tooltip,
 } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { LuPlus, LuTrash2 } from "react-icons/lu";
@@ -65,7 +64,7 @@ const MONITOR_FIELDS = [
 ];
 
 const newKey = () => `row_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-const emptyItem = () => ({ key: newKey(), categoryId: null, itItemId: null, quantity: 1, serialNumber: "", stockType: null, deviceDetails: {}, warrantyPeriod: null, warrantyDate: null });
+const emptyItem = () => ({ key: newKey(), categoryId: null, itItemId: null, quantity: 1, serialNumber: "", serialNumbers: [], stockType: null, deviceDetails: {}, warrantyPeriod: null, warrantyDate: null });
 const parseSerialTokens = (value) => String(value || "").split(/[\n,]+/).map((v) => v.trim()).filter(Boolean);
 
 // ─── component ──────────────────────────────────────────────────────────────
@@ -80,6 +79,7 @@ const StoresPage = () => {
   const watchedWarrantyPeriod = Form.useWatch("warrantyPeriod", editForm);
   const watchedWarrantyDate = Form.useWatch("warrantyDate", editForm);
   const [detailsItemKey, setDetailsItemKey] = useState(null);
+  const [serialModalKey, setSerialModalKey] = useState(null);
   const [isProjectChecked, setIsProjectChecked] = useState(null);
   const [viewRecord, setViewRecord] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 20 });
@@ -122,22 +122,47 @@ const StoresPage = () => {
   ];
 
   // ── item state helpers ──
+  const getSelectedItItem = (itItemId) => itItemsList.find((x) => x.id === itItemId);
   const addItemRow = () => setItems((prev) => [...prev, emptyItem()]);
-  const removeItemRow = (key) => { setItems((prev) => prev.filter((i) => i.key !== key)); if (detailsItemKey === key) setDetailsItemKey(null); };
+  const removeItemRow = (key) => {
+    setItems((prev) => prev.filter((i) => i.key !== key));
+    if (detailsItemKey === key) setDetailsItemKey(null);
+    if (serialModalKey === key) setSerialModalKey(null);
+  };
   const updateItem = (key, field, value) => {
     setItems((prev) => prev.map((item) => {
       if (item.key !== key) return item;
       const next = { ...item, [field]: field === "quantity" ? Math.max(1, Number(value || 1)) : value };
+      if (field === "quantity") {
+        const quantity = Math.max(1, Number(value || 1));
+        next.serialNumbers = Array.from({ length: quantity }, (_, index) => item.serialNumbers?.[index] || "");
+        next.serialNumber = quantity > 1 ? next.serialNumbers.filter(Boolean).join(", ") : item.serialNumber;
+      }
       if (field === "itItemId") {
         const found = itItemsList.find((x) => x.id === value);
         const monitorDetails = found?.specifications?.monitorDetails;
         next.stockType = found?.itemClass ?? null;
         next.categoryId = found?.categoryId ?? null;
+        next.serialNumber = "";
+        next.serialNumbers = [];
         next.deviceDetails = monitorDetails && typeof monitorDetails === "object"
           ? { monitorDetails: { ...monitorDetails } }
           : {};
       }
       return next;
+    }));
+  };
+  const updateSerialNumberAt = (key, index, value) => {
+    setItems((prev) => prev.map((item) => {
+      if (item.key !== key) return item;
+      const quantity = Math.max(1, Number(item.quantity || 1));
+      const serialNumbers = Array.from({ length: quantity }, (_, idx) => item.serialNumbers?.[idx] || "");
+      serialNumbers[index] = value;
+      return {
+        ...item,
+        serialNumbers,
+        serialNumber: quantity > 1 ? serialNumbers.filter(Boolean).join(", ") : value,
+      };
     }));
   };
   const updateDeviceDetail = (key, defKey, value) => setItems((prev) => prev.map((i) => i.key !== key ? i : { ...i, deviceDetails: { ...i.deviceDetails, [defKey]: value } }));
@@ -267,16 +292,25 @@ const StoresPage = () => {
         if (monitorDetailsChanged(item.itItemId, monitorDetails)) {
           await api.patch(`/admin/it-items/${item.itItemId}`, { monitorDetails: monitorDetails || null });
         }
-        await api.post("/stores/stock-received/create", {
-          ...shared,
-          categoryId: item.categoryId,
-          itItemId: item.itItemId,
-          quantityReceived: Number(item.quantity || 1),
-          serialNumber: item.serialNumber?.trim() || undefined,
-          warrantyPeriod: item.warrantyPeriod || undefined,
-          warrantyDate: formatDateValue(item.warrantyDate),
-          deviceDetails: Object.keys(dd).length ? dd : undefined,
-        });
+        const quantity = Number(item.quantity || 1);
+        const serialNumbers = (item.serialNumbers || []).map((serial) => String(serial || "").trim()).filter(Boolean);
+        const shouldCreateIndividualReceipts = quantity > 1 && serialNumbers.length === quantity;
+        const receiptEntries = shouldCreateIndividualReceipts
+          ? serialNumbers.map((serialNumber) => ({ quantityReceived: 1, serialNumber }))
+          : [{ quantityReceived: quantity, serialNumber: item.serialNumber?.trim() || undefined }];
+
+        for (const receiptEntry of receiptEntries) {
+          await api.post("/stores/stock-received/create", {
+            ...shared,
+            categoryId: item.categoryId,
+            itItemId: item.itItemId,
+            quantityReceived: receiptEntry.quantityReceived,
+            serialNumber: receiptEntry.serialNumber,
+            warrantyPeriod: item.warrantyPeriod || undefined,
+            warrantyDate: formatDateValue(item.warrantyDate),
+            deviceDetails: Object.keys(dd).length ? dd : undefined,
+          });
+        }
       }
     },
     onSuccess: () => {
@@ -296,11 +330,12 @@ const StoresPage = () => {
     const invalidFixedSerial = items.find((i) => {
       const qty = Number(i.quantity || 1);
       if (i.stockType !== "FIXED_ASSET" || qty <= 1) return false;
-      const serials = parseSerialTokens(i.serialNumber);
+      const serials = (i.serialNumbers || []).filter((serial) => String(serial || "").trim());
       return serials.length > 0 && serials.length !== qty;
     });
     if (invalidFixedSerial) {
-      toast.error("For fixed assets with qty above 1, provide one serial per unit (comma-separated) or leave serial blank.");
+      toast.error("For fixed assets with qty above 1, provide one serial per unit or leave serials blank.");
+      setSerialModalKey(invalidFixedSerial.key);
       return;
     }
     const incompleteMonitorDetails = items.find((item) => {
@@ -387,35 +422,47 @@ const StoresPage = () => {
     {
       title: "IT Item", width: 260,
       render: (_, record) => {
+        const selectedItem = getSelectedItItem(record.itItemId);
+        const description = selectedItem?.description?.trim();
         return (
-          <Select
-            size="small"
-            className="w-full"
-            placeholder="Select IT item"
-            value={record.itItemId}
-            showSearch
-            optionFilterProp="searchText"
-            filterOption={(input, option) =>
-              String(option?.searchText || "").toLowerCase().includes(input.trim().toLowerCase())
-            }
-            onChange={(v) => updateItem(record.key, "itItemId", v)}
-          >
-            {itItemsList.map((it) => {
-              const label = `${it.brand || ""} ${it.model || ""}`.trim();
-              const description = it.description?.trim();
-              return (
-                <Select.Option
-                  key={it.id}
-                  value={it.id}
-                  searchText={`${label} ${description || ""}`}
+          <div>
+            <Select
+              size="small"
+              className="w-full"
+              placeholder="Select IT item"
+              value={record.itItemId}
+              showSearch
+              optionFilterProp="searchText"
+              filterOption={(input, option) =>
+                String(option?.searchText || "").toLowerCase().includes(input.trim().toLowerCase())
+              }
+              onChange={(v) => updateItem(record.key, "itItemId", v)}
+            >
+              {itItemsList.map((it) => {
+                const label = `${it.brand || ""} ${it.model || ""}`.trim();
+                const itemDescription = it.description?.trim();
+                return (
+                  <Select.Option
+                    key={it.id}
+                    value={it.id}
+                    searchText={`${label} ${itemDescription || ""}`}
                 >
-                  <Tooltip title={description || "No description"} placement="right">
-                    <span className="block truncate">{label}</span>
-                  </Tooltip>
+                  <div className="py-1 leading-5">
+                    <p className="m-0 truncate font-medium text-[#212121]">{label}</p>
+                    <p className={`m-0 truncate text-xs ${itemDescription ? "font-semibold text-[#D32F2F]" : "text-[#BDBDBD]"}`}>
+                      {itemDescription || "No description available"}
+                    </p>
+                  </div>
                 </Select.Option>
               );
             })}
-          </Select>
+            </Select>
+            {record.itItemId ? (
+              <p className={`mt-1 line-clamp-2 text-xs ${description ? "text-[#616161]" : "text-[#BDBDBD]"}`}>
+                {description || "No description available"}
+              </p>
+            ) : null}
+          </div>
         );
       },
     },
@@ -430,13 +477,18 @@ const StoresPage = () => {
       ),
     },
     {
-      title: "Serial No", width: 140,
+      title: "Serial No", width: 160,
       render: (_, record) => {
         const qty = Number(record.quantity || 1);
-        const placeholder = record.stockType === "FIXED_ASSET" && qty > 1
-          ? "Serials (comma-separated)"
-          : "Serial number";
-        return <Input size="small" placeholder={placeholder} value={record.serialNumber} onChange={(e) => updateItem(record.key, "serialNumber", e.target.value)} />;
+        if (qty > 1) {
+          const entered = (record.serialNumbers || []).filter((serial) => String(serial || "").trim()).length;
+          return (
+            <Button size="small" className="w-full" onClick={() => setSerialModalKey(record.key)}>
+              Serials {entered}/{qty}
+            </Button>
+          );
+        }
+        return <Input size="small" placeholder="Serial number" value={record.serialNumber} onChange={(e) => updateItem(record.key, "serialNumber", e.target.value)} />;
       },
     },
     {
@@ -474,7 +526,7 @@ const StoresPage = () => {
       <div className="px-4 py-3">
         <div className={`mb-3 rounded-xl px-3 py-2 text-xs ${isFixed ? "bg-[#FFF3E0] text-[#E65100]" : "bg-[#F3F4F6] text-[#616161]"}`}>
           {isFixed
-            ? "Fixed Asset — qty is allowed; if qty is above 1, you can enter comma-separated serials."
+            ? "Fixed Asset — when qty is above 1, use the serials button to enter one serial per unit."
             : "Optional device fields for this consumable item."}
         </div>
         <div className="grid grid-cols-3 gap-3">
@@ -529,6 +581,12 @@ const StoresPage = () => {
       ),
     },
   ];
+
+  const serialModalItem = items.find((item) => item.key === serialModalKey);
+  const serialModalQuantity = Math.max(1, Number(serialModalItem?.quantity || 1));
+  const serialModalLabel = serialModalItem
+    ? `${getSelectedItItem(serialModalItem.itItemId)?.brand || ""} ${getSelectedItItem(serialModalItem.itItemId)?.model || ""}`.trim()
+    : "";
 
   return (
     <PageShell
@@ -665,6 +723,44 @@ const StoresPage = () => {
           </Button>
         </Form>
       </Modal>
+
+      <Modal
+        title={`Serial Numbers${serialModalLabel ? ` — ${serialModalLabel}` : ""}`}
+        open={!!serialModalItem}
+        onCancel={() => setSerialModalKey(null)}
+        onOk={() => setSerialModalKey(null)}
+        okText="Done"
+        width={620}
+        destroyOnClose
+      >
+        {serialModalItem ? (
+          <div>
+            <div className="mb-4 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-4 py-3">
+              <p className="text-sm font-semibold text-[#212121]">
+                Quantity: {serialModalQuantity}
+              </p>
+              <p className="mt-1 text-xs text-[#616161]">
+                Enter one serial number per unit. If every unit has a serial, each unit will be saved as an individual stock record for easier tracking and search.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {Array.from({ length: serialModalQuantity }, (_, index) => (
+                <div key={index}>
+                  <label className="mb-1 block text-xs font-semibold text-[#424242]">
+                    Unit {index + 1} Serial Number
+                  </label>
+                  <Input
+                    value={serialModalItem.serialNumbers?.[index] || ""}
+                    placeholder={`Serial number ${index + 1}`}
+                    onChange={(event) => updateSerialNumberAt(serialModalItem.key, index, event.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
       {/* ── View / Edit Receipt Modal ── */}
       {viewRecord && (
         <Modal
