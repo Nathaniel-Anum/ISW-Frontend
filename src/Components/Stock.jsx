@@ -353,7 +353,18 @@ const Stock = () => {
   ];
 
   const adjColumns = [
-    { title: "Item", key: "item", render: (_, r) => `${r.itItem?.brand} ${r.itItem?.model}` },
+    {
+      title: "Item",
+      key: "item",
+      render: (_, r) => (
+        <div className="leading-5">
+          <p className="m-0 font-semibold text-[#212121]">{r.itItem?.brand} {r.itItem?.model}</p>
+          <p className={`m-0 text-xs ${r.itItem?.description ? "font-semibold text-[#D32F2F]" : "text-[#BDBDBD]"}`}>
+            {r.itItem?.description || "No description available"}
+          </p>
+        </div>
+      ),
+    },
     { title: "Delta", dataIndex: "quantityDelta", key: "quantityDelta", render: (v) => <span className={`font-semibold ${v > 0 ? "text-[#166534]" : "text-[#D32F2F]"}`}>{v > 0 ? `+${v}` : v}</span> },
     { title: "Reason", dataIndex: "reason", key: "reason", render: formatCapitalizedLabel },
     { title: "Justification", dataIndex: "justification", key: "justification" },
@@ -621,10 +632,24 @@ const Stock = () => {
           onFinish={handleAdjustmentSubmit}
         >
           <Form.Item name="itItemId" label="IT Item" rules={[{ required: true }]}>
-            <Select placeholder="Select item" showSearch optionFilterProp="children">
+            <Select
+              placeholder="Select item"
+              showSearch
+              optionFilterProp="label"
+              optionLabelProp="label"
+            >
               {itItemsList.map((item) => (
-                <Select.Option key={item.id} value={item.id}>
-                  {`${item.brand} — ${item.model}`}
+                <Select.Option
+                  key={item.id}
+                  value={item.id}
+                  label={`${item.brand} — ${item.model}`}
+                >
+                  <div className="leading-5 py-0.5">
+                    <p className="m-0 font-semibold text-[#212121]">{item.brand} — {item.model}</p>
+                    {item.description && (
+                      <p className="m-0 text-xs font-semibold text-[#D32F2F]">{item.description}</p>
+                    )}
+                  </div>
                 </Select.Option>
               ))}
             </Select>
