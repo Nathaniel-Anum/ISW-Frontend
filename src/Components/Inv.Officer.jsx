@@ -67,7 +67,12 @@ const monitorDetailsEqual = (first, second) => {
 
 const isDesktopAsset = (record) => {
   const categoryName = String(record?.itItem?.category?.name || "").toLowerCase();
-  const formFactor = String(record?.assetAttributes?.formFactor || record?.itItem?.specifications?.formFactor || record?.itItem?.deviceType || "").toLowerCase();
+  const formFactor = String(
+    record?.assetAttributes?.formFactor ||
+    record?.itItem?.formFactor ||
+    record?.itItem?.specifications?.formFactor ||
+    record?.itItem?.deviceType || ""
+  ).toLowerCase();
   return record?.itItem?.deviceType === "DESKTOP" || (categoryName.includes("computer") && formFactor.includes("desktop"));
 };
 
@@ -300,6 +305,17 @@ const InvOfficer = () => {
   const showQuickCreateMonitorDetails =
     quickCreateCategory?.name?.toLowerCase().includes("computer") &&
     String(quickCreateFormFactor || "").toLowerCase() === "desktop";
+
+  const isSelectedItemDesktop = useMemo(() => {
+    if (!selectedITItem) return false;
+    if (selectedITItem.deviceType === "DESKTOP") return true;
+    const categoryName = String(selectedITItem.category?.name || "").toLowerCase();
+    const formFactor = String(
+      selectedITItem.formFactor ||
+      selectedITItem.specifications?.formFactor || ""
+    ).toLowerCase();
+    return categoryName.includes("computer") && formFactor.includes("desktop");
+  }, [selectedITItem]);
   const warrantyExpiryDate = useMemo(() => {
     if (!createPurchaseDate || createWarrantyPeriod === undefined || createWarrantyPeriod === null) {
       return null;
@@ -792,11 +808,14 @@ const InvOfficer = () => {
       return;
     }
 
-    if (values.monitorChanged && !values.monitorChangeRemarks?.trim()) {
+    const existingMonitor = getInventoryMonitorDetails(selectedRecord);
+    const isAddingMonitor = !existingMonitor;
+    if (values.monitorChanged && !isAddingMonitor && !values.monitorChangeRemarks?.trim()) {
       toast.error("Add a monitor change remark before saving.");
       return;
     }
 
+    const existingMonitor2 = getInventoryMonitorDetails(selectedRecord);
     updateInventory({
       inventoryId,
       userId: values.userId,
@@ -808,13 +827,18 @@ const InvOfficer = () => {
         ? {
             monitorChanged: true,
             monitorDetails: normalizeMonitorDetails(values.monitorDetails) || {},
-            monitorChangeRemarks: values.monitorChangeRemarks?.trim(),
+            monitorChangeRemarks: values.monitorChangeRemarks?.trim() || (!existingMonitor2 ? "Monitor details added" : ""),
           }
         : {}),
     });
   };
 
-  const handleCreateSubmit = (values) => {
+  const handleCreateSubmit = () => {
+    // Use getFieldsValue(true) to include values from unmounted steps (conditional rendering
+    // removes fields from the DOM when navigating steps, but their values are preserved in
+    // the form store — onFinish only passes mounted-field values, so we read directly).
+    const values = createForm.getFieldsValue(true);
+
     if (!values.itItemId || !values.userId) {
       toast.error("Select an item and assigned user before creating inventory.");
       return;
@@ -833,6 +857,8 @@ const InvOfficer = () => {
       deviceDetails = { ...values.deviceFields };
     }
 
+    const monitorDetails = normalizeMonitorDetails(values.monitorDetails) || undefined;
+
     const payload = {
       itItemId: values.itItemId,
       userId: values.userId,
@@ -846,6 +872,7 @@ const InvOfficer = () => {
       remarks: values.remarks?.trim() || undefined,
       assetAttributes,
       deviceDetails,
+      monitorDetails,
     };
     createInventory(payload);
   };
@@ -873,7 +900,8 @@ const InvOfficer = () => {
       return;
     }
 
-    if (values.monitorChanged && !values.monitorChangeRemarks?.trim()) {
+    const existingMonitorDev = getInventoryMonitorDetails(selectedRecord);
+    if (values.monitorChanged && existingMonitorDev && !values.monitorChangeRemarks?.trim()) {
       toast.error("Add a monitor change remark before saving.");
       return;
     }
@@ -896,10 +924,11 @@ const InvOfficer = () => {
       }
 
       if (values.monitorChanged) {
+        const existingMon = getInventoryMonitorDetails(selectedRecord);
         await api.patch(`/inventory/update/${inventoryId}`, {
           monitorChanged: true,
           monitorDetails: normalizeMonitorDetails(values.monitorDetails) || {},
-          monitorChangeRemarks: values.monitorChangeRemarks?.trim(),
+          monitorChangeRemarks: values.monitorChangeRemarks?.trim() || (!existingMon ? "Monitor details added" : ""),
         });
       }
 
@@ -913,40 +942,53 @@ const InvOfficer = () => {
   };
 
   const shouldShowMonitorPanel = Boolean(selectedRecord && (isDesktopAsset(selectedRecord) || getInventoryMonitorDetails(selectedRecord)));
-  const renderMonitorChangePanel = () => shouldShowMonitorPanel ? (
-    <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
-      <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm font-bold text-[#111827]">Monitor Details</p>
-          <p className="text-xs text-[#6B7280]">The monitor is assigned together with this desktop asset.</p>
-        </div>
-        <Form.Item name="monitorChanged" valuePropName="checked" className="mb-0">
-          <Checkbox>Monitor details changed</Checkbox>
-        </Form.Item>
-      </div>
-      <div className="grid grid-cols-1 gap-x-3 md:grid-cols-3">
-        {MONITOR_FIELDS.map((field) => (
-          <Form.Item key={field.key} name={["monitorDetails", field.key]} label={field.label}>
-            <Input disabled={!monitorChanged} placeholder={field.label} />
+  const renderMonitorChangePanel = () => {
+    if (!shouldShowMonitorPanel) return null;
+    const existingMonitor = getInventoryMonitorDetails(selectedRecord);
+    const isAdding = !existingMonitor;
+    return (
+      <div className="rounded-2xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="text-sm font-bold text-[#111827]">Monitor Details</p>
+            <p className="text-xs text-[#6B7280]">
+              {isAdding ? "No monitor linked yet. Check the box to add one." : "The monitor is assigned together with this desktop asset."}
+            </p>
+          </div>
+          <Form.Item name="monitorChanged" valuePropName="checked" className="mb-0">
+            <Checkbox>{isAdding ? "Add monitor details" : "Monitor details changed"}</Checkbox>
           </Form.Item>
-        ))}
+        </div>
+        <div className="grid grid-cols-1 gap-x-3 md:grid-cols-3">
+          {MONITOR_FIELDS.map((field) => (
+            <Form.Item key={field.key} name={["monitorDetails", field.key]} label={field.label}>
+              <Input disabled={!monitorChanged} placeholder={field.label} />
+            </Form.Item>
+          ))}
+        </div>
+        {monitorChanged ? (
+          isAdding ? (
+            <p className="mb-0 text-xs text-[#9CA3AF]">Fill in the monitor details above and save.</p>
+          ) : (
+            <Form.Item
+              name="monitorChangeRemarks"
+              label="Monitor Change Remarks"
+              rules={[{ required: true, message: "Explain why the monitor changed and where the old one is" }]}
+              className="mb-0"
+            >
+              <Input.TextArea rows={3} placeholder="Why is the monitor changing, and where is the old monitor?" />
+            </Form.Item>
+          )
+        ) : (
+          <p className="mb-0 text-xs text-[#6B7280]">
+            {isAdding
+              ? "Check the box to link a monitor to this desktop."
+              : "Check the box only when the monitor paired with this desktop has changed."}
+          </p>
+        )}
       </div>
-      {monitorChanged ? (
-        <Form.Item
-          name="monitorChangeRemarks"
-          label="Monitor Change Remarks"
-          rules={[{ required: true, message: "Explain why the monitor changed and where the old one is" }]}
-          className="mb-0"
-        >
-          <Input.TextArea rows={3} placeholder="Why is the monitor changing, and where is the old monitor?" />
-        </Form.Item>
-      ) : (
-        <p className="mb-0 text-xs text-[#6B7280]">
-          Check the box only when the monitor paired with this desktop has changed.
-        </p>
-      )}
-    </div>
-  ) : null;
+    );
+  };
 
   if (isDeviceFieldsLoading) {
     return <div>Loading device fields...</div>;
@@ -1461,7 +1503,7 @@ const InvOfficer = () => {
           />
         </div>
 
-        <Form form={createForm} layout="vertical" onFinish={handleCreateSubmit} className="px-6 pt-5 pb-6 space-y-6">
+        <Form form={createForm} layout="vertical" className="px-6 pt-5 pb-6 space-y-6">
 
           {/* ── Section 1: Item ── */}
           {createStep === 0 && (
@@ -1662,6 +1704,23 @@ const InvOfficer = () => {
                 </div>
               </div>
             )}
+
+            {/* Monitor Details for desktop items not already covered by legacy device fields */}
+            {isSelectedItemDesktop && createLegacyDeviceFields.length === 0 && (
+              <div className="mt-3 rounded-xl border border-[#E5E7EB] bg-white p-3">
+                <p className="mb-1 text-[11px] font-bold uppercase tracking-widest text-[#9CA3AF]">
+                  Monitor Details <span className="normal-case font-normal text-[#D1D5DB]">— optional</span>
+                </p>
+                <p className="mb-3 text-xs text-[#6B7280]">Attach the monitor paired with this desktop.</p>
+                <div className="grid grid-cols-1 gap-x-3 md:grid-cols-3">
+                  {MONITOR_FIELDS.map((field) => (
+                    <Form.Item key={field.key} name={["monitorDetails", field.key]} label={field.label}>
+                      <Input placeholder={field.label} />
+                    </Form.Item>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           )}
 
@@ -1758,7 +1817,7 @@ const InvOfficer = () => {
             {createStep < 2 ? (
               <Button type="primary" onClick={advanceCreateStep} className="!bg-[#D32F2F] !border-[#D32F2F] hover:!bg-[#B71C1C]">Continue</Button>
             ) : (
-              <Button type="primary" htmlType="submit" loading={isCreating}
+              <Button type="primary" onClick={handleCreateSubmit} loading={isCreating}
                 className="!bg-[#D32F2F] !border-[#D32F2F] hover:!bg-[#B71C1C]">
                 Create Inventory Asset
               </Button>
