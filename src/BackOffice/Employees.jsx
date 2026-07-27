@@ -170,8 +170,7 @@ const Employees = () => {
         toast.error("Unable to update staff: missing staff ID");
         return;
       }
-      const { staffId: _staffId, ...updateValues } = payload;
-      editStaff.mutate({ staffId: editingRecord.staffId, values: updateValues });
+      editStaff.mutate({ staffId: editingRecord.staffId, values: payload });
       return;
     }
 

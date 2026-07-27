@@ -979,7 +979,7 @@ const ServiceDeskQueue = () => {
                 disabled={!createBehalfAssets.length}
                 options={createBehalfAssets.map((a) => ({
                   value: a.id,
-                  label: `${a.assetId} — ${a.itItem?.brand ?? ""} ${a.itItem?.model ?? ""}`.trim(),
+                  label: `${a.brand ?? ""} ${a.model ?? ""}`.trim() || a.assetId,
                 }))}
               />
             </Form.Item>
