@@ -178,6 +178,21 @@ const ServiceDeskReport = () => {
       render: (_, record) => record.category?.name || "General",
     },
     {
+      title: "Device",
+      key: "device",
+      ellipsis: true,
+      render: (_, record) => {
+        if (!record.inventory) return <span className="text-[#9E9E9E]">—</span>;
+        const label = [
+          record.inventory.assetId,
+          [record.inventory.itItem?.brand, record.inventory.itItem?.model].filter(Boolean).join(" "),
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return label || "—";
+      },
+    },
+    {
       title: "Priority",
       dataIndex: "priority",
       key: "priority",
@@ -234,6 +249,11 @@ const ServiceDeskReport = () => {
       Subject: ticket.subject,
       Reporter: ticket.reporter?.name || ticket.reporter?.email || "Unknown",
       Category: ticket.category?.name || "General",
+      AssetId: ticket.inventory?.assetId || "-",
+      Device: ticket.inventory
+        ? `${ticket.inventory.itItem?.brand || ""} ${ticket.inventory.itItem?.model || ""}`.trim() || "-"
+        : "-",
+      DeviceType: ticket.inventory?.itItem?.deviceType || "-",
       Priority: formatLabel(ticket.priority),
       Status: formatLabel(ticket.status),
       AssignedTechnician: ticket.assignedTo?.name || ticket.assignedTo?.email || "Unassigned",

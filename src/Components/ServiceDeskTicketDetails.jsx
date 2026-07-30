@@ -642,6 +642,14 @@ const SupportView = ({ ticket, ticketId, isLoading, refreshQueries, user }) => {
     user?.roles?.includes("workshop_supervisor") ||
     user?.roles?.includes("admin");
 
+  const { data: reporterAssetsResponse } = useQuery({
+    queryKey: ["reporterAssets", ticket?.reporter?.id],
+    queryFn: () => api.get(`/service-desk/user-assets/${ticket.reporter.id}`),
+    enabled: !!canUpdateTickets && !!ticket?.reporter?.id && statusOpen,
+    staleTime: 2 * 60 * 1000,
+  });
+  const reporterAssets = reporterAssetsResponse?.data || [];
+
   // Which statuses this user can move to from the current ticket state
   const allowedNextStatuses = ticket
     ? isManager
@@ -799,7 +807,14 @@ const SupportView = ({ ticket, ticketId, isLoading, refreshQueries, user }) => {
             </Button>
           ) : null}
           {canOpenStatusUpdate ? (
-            <Button type="primary" icon={<LuRefreshCcw size={15} />} onClick={() => { statusForm.setFieldsValue({ status: ticket?.status, resolutionNotes: ticket?.resolutionNotes }); setStatusOpen(true); }}>
+            <Button type="primary" icon={<LuRefreshCcw size={15} />} onClick={() => {
+              statusForm.setFieldsValue({
+                status: ticket?.status,
+                resolutionNotes: ticket?.resolutionNotes,
+                inventoryId: ticket?.inventoryId || ticket?.inventory?.id || undefined,
+              });
+              setStatusOpen(true);
+            }}>
               Update Status
             </Button>
           ) : null}
@@ -973,6 +988,35 @@ const SupportView = ({ ticket, ticketId, isLoading, refreshQueries, user }) => {
               <Select.Option value="HIGH">High</Select.Option>
               <Select.Option value="CRITICAL">Critical</Select.Option>
             </Select>
+          </Form.Item>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, curr) => prev.status !== curr.status}
+          >
+            {({ getFieldValue }) => (
+              <Form.Item
+                name="inventoryId"
+                label="Affected Device"
+                rules={
+                  getFieldValue("status") === "RESOLVED"
+                    ? [{ required: true, message: "Select the reporter's affected device before resolving" }]
+                    : []
+                }
+                extra="Choose from devices assigned to the ticket reporter"
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder={reporterAssets.length ? "Select the affected device" : "No assigned devices found"}
+                  optionFilterProp="label"
+                  options={reporterAssets.map((asset) => ({
+                    value: asset.id,
+                    label: `${asset.assetId} - ${asset.brand} ${asset.model} (${asset.deviceType})`,
+                  }))}
+                  notFoundContent="No assigned devices available for this user"
+                />
+              </Form.Item>
+            )}
           </Form.Item>
           <Form.Item noStyle shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}>
             {({ getFieldValue }) => (

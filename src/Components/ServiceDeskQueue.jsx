@@ -89,6 +89,7 @@ const ServiceDeskQueue = () => {
   const [commentForm] = Form.useForm();
   const [escalateForm] = Form.useForm();
   const [maintenanceForm] = Form.useForm();
+  const [closeForm] = Form.useForm();
   const [reporterHistoryOpen, setReporterHistoryOpen] = useState(false);
   const [historyReporterId, setHistoryReporterId] = useState(null);
   const [closeTicketOpen, setCloseTicketOpen] = useState(false);
@@ -133,10 +134,22 @@ const ServiceDeskQueue = () => {
   });
   const reporterHistory = reporterHistoryResponse?.data;
 
+  const canUpdateTickets =
+    user?.roles?.includes("hardware_technician") ||
+    user?.roles?.includes("service_desk_manager") ||
+    user?.roles?.includes("supervisor") ||
+    user?.roles?.includes("admin");
+
   const { data: reporterAssetsResponse } = useQuery({
-    queryKey: ["reporterAssets", selectedTicket?.reporter?.id],
-    queryFn: () => api.get(`/service-desk/user-assets/${selectedTicket.reporter.id}`),
-    enabled: !!isManager && !!selectedTicket?.reporter?.id && statusOpen,
+    queryKey: ["reporterAssets", selectedTicket?.reporter?.id || closeTicketRecord?.reporter?.id],
+    queryFn: () =>
+      api.get(
+        `/service-desk/user-assets/${selectedTicket?.reporter?.id || closeTicketRecord?.reporter?.id}`,
+      ),
+    enabled:
+      !!canUpdateTickets &&
+      !!(selectedTicket?.reporter?.id || closeTicketRecord?.reporter?.id) &&
+      (statusOpen || closeTicketOpen),
     staleTime: 2 * 60 * 1000,
   });
   const reporterAssets = reporterAssetsResponse?.data || [];
@@ -156,11 +169,6 @@ const ServiceDeskQueue = () => {
   );
   const supportStaff = staffResponse?.data || [];
   const canAssignTickets = user?.roles?.includes("service_desk_manager") || user?.roles?.includes("admin");
-  const canUpdateTickets =
-    user?.roles?.includes("hardware_technician") ||
-    user?.roles?.includes("service_desk_manager") ||
-    user?.roles?.includes("supervisor") ||
-    user?.roles?.includes("admin");
   const canAcceptTickets =
     user?.roles?.includes("hardware_technician") ||
     user?.roles?.includes("supervisor") ||
@@ -264,12 +272,16 @@ const ServiceDeskQueue = () => {
   });
 
   const closeTicketMutation = useMutation({
-    mutationFn: (ticketId) => api.post(`/service-desk/tickets/${ticketId}/close`),
+    mutationFn: ({ ticketId, inventoryId }) =>
+      api.post(`/service-desk/tickets/${ticketId}/close`, {
+        ...(inventoryId ? { inventoryId } : {}),
+      }),
     onSuccess: () => {
       toast.success("Ticket closed");
       refreshQueries();
       setCloseTicketOpen(false);
       setCloseTicketRecord(null);
+      closeForm.resetFields();
     },
     onError: (err) => toast.error(err?.response?.data?.message || "Failed to close ticket"),
   });
@@ -404,9 +416,12 @@ const ServiceDeskQueue = () => {
     acceptTicket.mutate(record.id);
   };
 
-  const handleCloseTicket = () => {
+  const handleCloseTicket = (values) => {
     if (!closeTicketRecord?.id) return toast.error("Unable to close ticket. Missing ticket ID.");
-    closeTicketMutation.mutate(closeTicketRecord.id);
+    closeTicketMutation.mutate({
+      ticketId: closeTicketRecord.id,
+      inventoryId: values?.inventoryId,
+    });
   };
 
   const openAssignModal = (ticket) => {
@@ -422,7 +437,7 @@ const ServiceDeskQueue = () => {
       resolutionNotes: ticket.resolutionNotes,
       categoryId: ticket.category?.id ?? undefined,
       issueType: ticket.issueType ?? undefined,
-      inventoryId: ticket.inventoryId ?? undefined,
+      inventoryId: ticket.inventoryId || ticket.inventory?.id || undefined,
     });
     setStatusOpen(true);
   };
@@ -470,6 +485,22 @@ const ServiceDeskQueue = () => {
       },
     },
     { title: "Work Type", dataIndex: ["category", "name"], key: "category", width: 130, ellipsis: true, render: (value) => value || "-" },
+    {
+      title: "Device",
+      key: "device",
+      width: 180,
+      ellipsis: true,
+      render: (_, record) => {
+        if (!record.inventory) return <span className="text-xs text-[#9E9E9E]">—</span>;
+        const label = [
+          record.inventory.assetId,
+          [record.inventory.itItem?.brand, record.inventory.itItem?.model].filter(Boolean).join(" "),
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return <span className="text-sm text-[#212121]">{label || "—"}</span>;
+      },
+    },
     { title: "Priority", dataIndex: "priority", key: "priority", width: 86 },
     {
       title: "SLA",
@@ -559,7 +590,13 @@ const ServiceDeskQueue = () => {
                 key: "close",
                 label: "Close ticket",
                 icon: <LuCheckCheck size={14} />,
-                onClick: () => { setCloseTicketRecord(record); setCloseTicketOpen(true); },
+                onClick: () => {
+                  setCloseTicketRecord(record);
+                  closeForm.setFieldsValue({
+                    inventoryId: record.inventoryId || record.inventory?.id || undefined,
+                  });
+                  setCloseTicketOpen(true);
+                },
               }]
             : []),
           ...(isSupportStaff && record.reporter?.id
@@ -725,29 +762,35 @@ const ServiceDeskQueue = () => {
               </Form.Item>
             </div>
           )}
-          {isManager && (
-            <Form.Item
-              noStyle
-              shouldUpdate={(prev, curr) => prev.issueType !== curr.issueType}
-            >
-              {({ getFieldValue }) =>
-                getFieldValue("issueType") === "HARDWARE" ? (
-                  <Form.Item name="inventoryId" label="Affected Asset">
-                    <Select
-                      allowClear
-                      placeholder={reporterAssets.length ? "Select the affected device" : "No assigned assets found"}
-                      optionFilterProp="label"
-                      options={reporterAssets.map((asset) => ({
-                        value: asset.id,
-                        label: `${asset.assetId} - ${asset.brand} ${asset.model} (${asset.deviceType})`,
-                      }))}
-                      notFoundContent="No assigned hardware assets available"
-                    />
-                  </Form.Item>
-                ) : null
-              }
-            </Form.Item>
-          )}
+          <Form.Item
+            noStyle
+            shouldUpdate={(prev, curr) => prev.status !== curr.status}
+          >
+            {({ getFieldValue }) => (
+              <Form.Item
+                name="inventoryId"
+                label="Affected Device"
+                rules={
+                  getFieldValue("status") === "RESOLVED"
+                    ? [{ required: true, message: "Select the reporter's affected device before resolving" }]
+                    : []
+                }
+                extra="Choose from devices assigned to the ticket reporter"
+              >
+                <Select
+                  allowClear
+                  showSearch
+                  placeholder={reporterAssets.length ? "Select the affected device" : "No assigned devices found"}
+                  optionFilterProp="label"
+                  options={reporterAssets.map((asset) => ({
+                    value: asset.id,
+                    label: `${asset.assetId} - ${asset.brand} ${asset.model} (${asset.deviceType})`,
+                  }))}
+                  notFoundContent="No assigned devices available for this user"
+                />
+              </Form.Item>
+            )}
+          </Form.Item>
           <Form.Item
             noStyle
             shouldUpdate={(prevValues, currentValues) => prevValues.status !== currentValues.status}
@@ -1033,16 +1076,58 @@ const ServiceDeskQueue = () => {
       <Modal
         title="Close this ticket?"
         open={closeTicketOpen}
-        onCancel={() => { setCloseTicketOpen(false); setCloseTicketRecord(null); }}
-        onOk={handleCloseTicket}
-        okText="Yes, close it"
-        cancelText="Cancel"
-        confirmLoading={closeTicketMutation.isPending}
+        onCancel={() => {
+          setCloseTicketOpen(false);
+          setCloseTicketRecord(null);
+          closeForm.resetFields();
+        }}
+        footer={null}
         destroyOnClose
       >
-        <p className="text-sm text-[#616161]">
+        <p className="mb-4 text-sm text-[#616161]">
           This confirms the issue is fully resolved. The ticket status will change to <strong>Closed</strong> and cannot be reopened.
         </p>
+        <Form form={closeForm} layout="vertical" onFinish={handleCloseTicket}>
+          <Form.Item
+            name="inventoryId"
+            label="Affected Device"
+            rules={
+              closeTicketRecord?.inventoryId || closeTicketRecord?.inventory?.id
+                ? []
+                : [{ required: true, message: "Select the reporter's affected device before closing" }]
+            }
+            extra="Choose from devices assigned to the ticket reporter"
+          >
+            <Select
+              allowClear
+              showSearch
+              placeholder={reporterAssets.length ? "Select the affected device" : "No assigned devices found"}
+              optionFilterProp="label"
+              options={reporterAssets.map((asset) => ({
+                value: asset.id,
+                label: `${asset.assetId} - ${asset.brand} ${asset.model} (${asset.deviceType})`,
+              }))}
+              notFoundContent="No assigned devices available for this user"
+            />
+          </Form.Item>
+          <Form.Item className="mb-0">
+            <div className="flex gap-2">
+              <Button
+                block
+                onClick={() => {
+                  setCloseTicketOpen(false);
+                  setCloseTicketRecord(null);
+                  closeForm.resetFields();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit" block loading={closeTicketMutation.isPending}>
+                Yes, close it
+              </Button>
+            </div>
+          </Form.Item>
+        </Form>
       </Modal>
 
       {/* ── Reporter History Modal ── */}
