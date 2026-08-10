@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button, Dropdown, Form, Input, Modal, Select, Table, Tag } from "antd";
 import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
 import React, { useDeferredValue, useMemo, useState } from "react";
-import { LuArrowUpRight, LuCheckCheck, LuHistory, LuMessageSquarePlus, LuPlay, LuPlus, LuRefreshCcw, LuTriangleAlert, LuUserRoundPlus, LuWrench } from "react-icons/lu";
+import { LuArrowUpRight, LuCheckCheck, LuHistory, LuMessageSquarePlus, LuPencil, LuPlay, LuPlus, LuRefreshCcw, LuTriangleAlert, LuUserRoundPlus, LuWrench } from "react-icons/lu";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import api from "../utils/config";
@@ -75,6 +75,7 @@ const ServiceDeskQueue = () => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [assignOpen, setAssignOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [escalateOpen, setEscalateOpen] = useState(false);
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
@@ -84,6 +85,7 @@ const ServiceDeskQueue = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [bulkAssignForm] = Form.useForm();
   const [assignForm] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [createForm] = Form.useForm();
   const [statusForm] = Form.useForm();
   const [commentForm] = Form.useForm();
@@ -123,7 +125,7 @@ const ServiceDeskQueue = () => {
   const { data: categoriesResponse } = useQuery({
     queryKey: ["serviceDeskCategories"],
     queryFn: () => api.get("/service-desk/categories"),
-    enabled: !!isManager,
+    enabled: !!user,
   });
 
   const { data: reporterHistoryResponse, isLoading: historyLoading } = useQuery({
@@ -149,7 +151,7 @@ const ServiceDeskQueue = () => {
     enabled:
       !!canUpdateTickets &&
       !!(selectedTicket?.reporter?.id || closeTicketRecord?.reporter?.id) &&
-      (statusOpen || closeTicketOpen),
+      (statusOpen || editOpen || closeTicketOpen),
     staleTime: 2 * 60 * 1000,
   });
   const reporterAssets = reporterAssetsResponse?.data || [];
@@ -189,6 +191,10 @@ const ServiceDeskQueue = () => {
     canUpdateTickets &&
     (isManager || ticket.assignedToId === user?.id) &&
     getAllowedStatuses(ticket).length > 0;
+
+  const canEditTicket = (ticket) =>
+    canUpdateTickets &&
+    (isManager || ticket.assignedToId === user?.id);
 
   const canEscalateTicket = (ticket) =>
     canUpdateTickets &&
@@ -269,6 +275,17 @@ const ServiceDeskQueue = () => {
       statusForm.resetFields();
     },
     onError: (error) => toast.error(error?.response?.data?.message || "Failed to update ticket"),
+  });
+
+  const editTicket = useMutation({
+    mutationFn: ({ ticketId, values }) => api.patch(`/service-desk/tickets/${ticketId}`, values),
+    onSuccess: () => {
+      toast.success("Ticket details updated");
+      refreshQueries();
+      setEditOpen(false);
+      editForm.resetFields();
+    },
+    onError: (error) => toast.error(error?.response?.data?.message || "Failed to edit ticket"),
   });
 
   const closeTicketMutation = useMutation({
@@ -364,6 +381,28 @@ const ServiceDeskQueue = () => {
     });
   };
 
+  const handleEditSubmit = (values) => {
+    const ticketId = getSelectedTicketId();
+    if (!ticketId) return toast.error("Unable to edit ticket. Missing ticket ID.");
+
+    const subject = values.subject?.trim();
+    const description = values.description?.trim();
+    if (!subject || !description) {
+      return toast.error("Subject and description are required.");
+    }
+
+    const payload = {
+      subject,
+      description,
+      priority: values.priority,
+      issueType: values.issueType,
+      categoryId: values.categoryId ?? null,
+      inventoryId: values.issueType === "HARDWARE" ? (values.inventoryId ?? null) : null,
+    };
+
+    editTicket.mutate({ ticketId, values: payload });
+  };
+
   const handleCommentSubmit = (values) => {
     const ticketId = getSelectedTicketId();
     const body = values.body?.trim();
@@ -442,6 +481,19 @@ const ServiceDeskQueue = () => {
     setStatusOpen(true);
   };
 
+  const openEditModal = (ticket) => {
+    setSelectedTicket(ticket);
+    editForm.setFieldsValue({
+      subject: ticket.subject,
+      description: ticket.description,
+      priority: ticket.priority,
+      categoryId: ticket.category?.id ?? undefined,
+      issueType: ticket.issueType ?? undefined,
+      inventoryId: ticket.inventoryId || ticket.inventory?.id || undefined,
+    });
+    setEditOpen(true);
+  };
+
   const openCommentModal = (ticket) => {
     setSelectedTicket(ticket);
     commentForm.resetFields();
@@ -492,12 +544,9 @@ const ServiceDeskQueue = () => {
       ellipsis: true,
       render: (_, record) => {
         if (!record.inventory) return <span className="text-xs text-[#9E9E9E]">—</span>;
-        const label = [
-          record.inventory.assetId,
-          [record.inventory.itItem?.brand, record.inventory.itItem?.model].filter(Boolean).join(" "),
-        ]
+        const label = [record.inventory.itItem?.brand, record.inventory.itItem?.model]
           .filter(Boolean)
-          .join(" · ");
+          .join(" ");
         return <span className="text-sm text-[#212121]">{label || "—"}</span>;
       },
     },
@@ -562,6 +611,9 @@ const ServiceDeskQueue = () => {
             label: "View ticket",
             onClick: () => navigate(`/dashboard/service-desk/tickets/${record.id}`),
           },
+          ...(!isTerminal && canEditTicket(record)
+            ? [{ key: "edit", label: "Edit ticket", icon: <LuPencil size={14} />, onClick: () => openEditModal(record) }]
+            : []),
           ...(!isTerminal && canAcceptTicket(record)
             ? [{ key: "accept", label: getAcceptLabel(record), icon: <LuPlay size={14} />, onClick: () => handleAcceptTicket(record) }]
             : []),
@@ -730,6 +782,95 @@ const ServiceDeskQueue = () => {
         </Form>
       </Modal>
 
+      <Modal
+        title={`Edit Ticket${selectedTicket ? ` - ${selectedTicket.ticketNo}` : ""}`}
+        open={editOpen}
+        onCancel={() => {
+          setEditOpen(false);
+          editForm.resetFields();
+        }}
+        footer={null}
+        destroyOnClose
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleEditSubmit}>
+          <Form.Item
+            name="subject"
+            label="Subject"
+            rules={[{ required: true, message: "Please enter a subject" }]}
+          >
+            <Input placeholder="Brief description of the issue" />
+          </Form.Item>
+          <Form.Item
+            name="priority"
+            label="Priority"
+            rules={[{ required: true, message: "Please select a priority" }]}
+          >
+            <Select placeholder="Select priority">
+              <Select.Option value="LOW">Low</Select.Option>
+              <Select.Option value="MEDIUM">Medium</Select.Option>
+              <Select.Option value="HIGH">High</Select.Option>
+              <Select.Option value="CRITICAL">Critical</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Form.Item name="categoryId" label="Category">
+              <Select allowClear placeholder="Select category">
+                {(categoriesResponse?.data || []).map((cat) => (
+                  <Select.Option key={cat.id} value={cat.id}>{cat.name}</Select.Option>
+                ))}
+              </Select>
+            </Form.Item>
+            <Form.Item name="issueType" label="Issue Type">
+              <Select placeholder="Select issue type">
+                <Select.Option value="HARDWARE">Hardware</Select.Option>
+                <Select.Option value="SOFTWARE">Software</Select.Option>
+              </Select>
+            </Form.Item>
+          </div>
+
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.issueType !== currentValues.issueType}
+          >
+            {({ getFieldValue }) => (
+              <Form.Item name="inventoryId" label="Affected Asset (optional)">
+                <Select
+                  allowClear
+                  disabled={getFieldValue("issueType") !== "HARDWARE" || !reporterAssets.length}
+                  placeholder={
+                    getFieldValue("issueType") !== "HARDWARE"
+                      ? "Only hardware tickets can have an asset"
+                      : reporterAssets.length
+                        ? "Select reporter's device"
+                        : "No assigned devices found"
+                  }
+                  optionFilterProp="label"
+                  options={reporterAssets.map((asset) => ({
+                    value: asset.id,
+                    label: `${asset.assetId} - ${asset.brand} ${asset.model} (${asset.deviceType})`,
+                  }))}
+                />
+              </Form.Item>
+            )}
+          </Form.Item>
+
+          <Form.Item
+            name="description"
+            label="Description"
+            rules={[{ required: true, message: "Please describe the issue" }]}
+          >
+            <Input.TextArea rows={4} placeholder="Provide details about the problem, error messages, or steps to reproduce" />
+          </Form.Item>
+
+          <Form.Item className="mb-0">
+            <Button type="primary" htmlType="submit" block loading={editTicket.isPending}>
+              Save Changes
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
       <Modal title={`Update Ticket${selectedTicket ? ` - ${selectedTicket.ticketNo}` : ""}`} open={statusOpen} onCancel={() => setStatusOpen(false)} footer={null} destroyOnClose>
         <Form
           form={statusForm}
@@ -770,11 +911,6 @@ const ServiceDeskQueue = () => {
               <Form.Item
                 name="inventoryId"
                 label="Affected Device"
-                rules={
-                  getFieldValue("status") === "RESOLVED"
-                    ? [{ required: true, message: "Select the reporter's affected device before resolving" }]
-                    : []
-                }
                 extra="Choose from devices assigned to the ticket reporter"
               >
                 <Select
@@ -1091,11 +1227,6 @@ const ServiceDeskQueue = () => {
           <Form.Item
             name="inventoryId"
             label="Affected Device"
-            rules={
-              closeTicketRecord?.inventoryId || closeTicketRecord?.inventory?.id
-                ? []
-                : [{ required: true, message: "Select the reporter's affected device before closing" }]
-            }
             extra="Choose from devices assigned to the ticket reporter"
           >
             <Select

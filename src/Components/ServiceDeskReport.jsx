@@ -55,6 +55,13 @@ const formatDateTime = (value) => {
   }).format(new Date(value));
 };
 
+const getDeviceName = (ticket) => {
+  const brand = ticket?.inventory?.itItem?.brand || "";
+  const model = ticket?.inventory?.itItem?.model || "";
+  const label = `${brand} ${model}`.trim();
+  return label || "-";
+};
+
 const ServiceDeskReport = () => {
   const { user } = useUser();
   const queryClient = useQueryClient();
@@ -106,14 +113,16 @@ const ServiceDeskReport = () => {
 
   const { data: ticketsResponse, isFetching } = useQuery({
     queryKey: ["serviceDeskReport", submittedFilters, deferredSearch],
-    queryFn: () =>
-      api.get("/service-desk/tickets", {
+    queryFn: () => {
+      const { month, ...apiFilters } = submittedFilters;
+      return api.get("/service-desk/tickets", {
         params: {
           scope: "all",
-          ...submittedFilters,
+          ...apiFilters,
           ...(deferredSearch ? { search: deferredSearch } : {}),
         },
-      }),
+      });
+    },
     enabled: canAccessReport,
   });
 
@@ -159,43 +168,89 @@ const ServiceDeskReport = () => {
     return tickets;
   }, [tickets, cardFilter]);
 
+  const filterFormInitialValues = useMemo(() => {
+    const dateFrom = submittedFilters?.dateFrom ? dayjs(submittedFilters.dateFrom) : null;
+    const dateTo = submittedFilters?.dateTo ? dayjs(submittedFilters.dateTo) : null;
+    const month = submittedFilters?.month ? dayjs(submittedFilters.month, "YYYY-MM") : null;
+
+    return {
+      ...submittedFilters,
+      month: month?.isValid() ? month : undefined,
+      dateRange: dateFrom && dateTo ? [dateFrom, dateTo] : undefined,
+    };
+  }, [submittedFilters]);
+
+  const resetFilters = () => {
+    setSubmittedFilters({ scope: "all" });
+    setCardFilter(null);
+    form.resetFields();
+    setOpen(false);
+  };
+
   const columns = [
     {
       title: "Ticket",
       dataIndex: "ticketNo",
       key: "ticketNo",
+      width: 120,
       render: (value) => <span className="font-semibold text-[#212121]">{value}</span>,
     },
-    { title: "Subject", dataIndex: "subject", key: "subject", ellipsis: true },
+    {
+      title: "Subject",
+      dataIndex: "subject",
+      key: "subject",
+      width: 260,
+      ellipsis: { showTitle: false },
+      render: (value) => (
+        <Tooltip title={value || "-"}>
+          <span className="block max-w-[240px] truncate">{value || "-"}</span>
+        </Tooltip>
+      ),
+    },
     {
       title: "Reporter",
       key: "reporter",
+      width: 180,
       render: (_, record) => record.reporter?.name || record.reporter?.email || "Unknown",
     },
     {
       title: "Category",
       key: "category",
+      width: 160,
       render: (_, record) => record.category?.name || "General",
     },
     {
       title: "Device",
       key: "device",
-      ellipsis: true,
+      width: 220,
+      ellipsis: { showTitle: false },
       render: (_, record) => {
-        if (!record.inventory) return <span className="text-[#9E9E9E]">—</span>;
-        const label = [
-          record.inventory.assetId,
-          [record.inventory.itItem?.brand, record.inventory.itItem?.model].filter(Boolean).join(" "),
-        ]
-          .filter(Boolean)
-          .join(" · ");
-        return label || "—";
+        const deviceName = getDeviceName(record);
+        if (deviceName === "-") return <span className="text-[#9E9E9E]">—</span>;
+        return (
+          <Tooltip title={deviceName}>
+            <span className="block max-w-[200px] truncate">{deviceName}</span>
+          </Tooltip>
+        );
       },
+    },
+    {
+      title: "Description",
+      dataIndex: "description",
+      key: "description",
+      width: 280,
+      ellipsis: { showTitle: false },
+      render: (value) => (
+        <Tooltip title={value || "-"}>
+          <span className="block max-w-[260px] truncate text-[#424242]">{value || "-"}</span>
+        </Tooltip>
+      ),
     },
     {
       title: "Priority",
       dataIndex: "priority",
       key: "priority",
+      width: 120,
       render: (priority) => (
         <Tag className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${PRIORITY_STYLES[priority] || "bg-[#F3F4F6] text-[#374151]"}`}>
           {formatLabel(priority)}
@@ -206,6 +261,7 @@ const ServiceDeskReport = () => {
       title: "Status",
       dataIndex: "status",
       key: "status",
+      width: 140,
       render: (status) => (
         <Tag className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${STATUS_STYLES[status] || "bg-[#F3F4F6] text-[#374151]"}`}>
           {formatLabel(status)}
@@ -215,18 +271,21 @@ const ServiceDeskReport = () => {
     {
       title: "Assigned Technician",
       key: "assignedTo",
+      width: 190,
       render: (_, record) => record.assignedTo?.name || record.assignedTo?.email || "Unassigned",
     },
     {
       title: "Updated",
       dataIndex: "updatedAt",
       key: "updatedAt",
+      width: 170,
       render: formatDateTime,
     },
     {
       title: "SLA Due",
       dataIndex: "dueAt",
       key: "dueAt",
+      width: 170,
       render: (val, record) => {
         if (!val) return <span className="text-[#9E9E9E]">—</span>;
         const TERMINAL = ["RESOLVED", "CLOSED", "CANCELLED"];
@@ -244,25 +303,33 @@ const ServiceDeskReport = () => {
   const downloadExcel = () => {
     if (!tickets.length) return;
 
+    const TERMINAL_STATUSES = ["RESOLVED", "CLOSED", "CANCELLED"];
+    const getUrgencyCheck = (ticket) => {
+      const now = Date.now();
+      const dueAtTime = ticket?.dueAt ? new Date(ticket.dueAt).getTime() : null;
+      const isTerminal = TERMINAL_STATUSES.includes(ticket.status);
+
+      if (!isTerminal && dueAtTime && dueAtTime < now) return "Overdue (SLA Breach)";
+      if (!isTerminal && dueAtTime) {
+        const hoursLeft = (dueAtTime - now) / (1000 * 60 * 60);
+        if (hoursLeft <= 4) return "At Risk (<=4h to SLA)";
+      }
+
+      return formatLabel(ticket.priority);
+    };
+
     const exportRows = tickets.map((ticket) => ({
-      Ticket: ticket.ticketNo,
-      Subject: ticket.subject,
-      Reporter: ticket.reporter?.name || ticket.reporter?.email || "Unknown",
-      Category: ticket.category?.name || "General",
-      AssetId: ticket.inventory?.assetId || "-",
-      Device: ticket.inventory
-        ? `${ticket.inventory.itItem?.brand || ""} ${ticket.inventory.itItem?.model || ""}`.trim() || "-"
-        : "-",
-      DeviceType: ticket.inventory?.itItem?.deviceType || "-",
-      Priority: formatLabel(ticket.priority),
+      ID: ticket.ticketNo || ticket.id,
+      "Title / Subject": ticket.subject || "-",
       Status: formatLabel(ticket.status),
-      AssignedTechnician: ticket.assignedTo?.name || ticket.assignedTo?.email || "Unassigned",
-      Department: ticket.department?.name || "-",
-      Unit: ticket.unit?.name || "-",
-      CreatedAt: formatDateTime(ticket.createdAt),
-      UpdatedAt: formatDateTime(ticket.updatedAt),
-      ResolvedAt: formatDateTime(ticket.resolvedAt),
-      ClosedAt: formatDateTime(ticket.closedAt),
+      "Opening Date": formatDateTime(ticket.createdAt),
+      "Last Updated": formatDateTime(ticket.updatedAt),
+      Requester: ticket.reporter?.name || ticket.reporter?.email || "Unknown",
+      "Assigned To - Technician": ticket.assignedTo?.name || ticket.assignedTo?.email || "Unassigned",
+      Category: ticket.category?.name || "General",
+      Description: ticket.description || "-",
+      "Resolution Date": formatDateTime(ticket.resolvedAt || ticket.closedAt),
+      "Urgency Check": getUrgencyCheck(ticket),
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
@@ -272,15 +339,27 @@ const ServiceDeskReport = () => {
   };
 
   const onFinish = (values) => {
+    const selectedMonth = values.month;
     const [dateFrom, dateTo] = values.dateRange ?? [];
+    const monthStart = selectedMonth ? selectedMonth.startOf("month") : null;
+    const monthEnd = selectedMonth ? selectedMonth.endOf("month") : null;
+
     setSubmittedFilters({
       scope: "all",
+      ...(selectedMonth ? { month: selectedMonth.format("YYYY-MM") } : {}),
       ...(values.status ? { status: values.status } : {}),
       ...(values.priority ? { priority: values.priority } : {}),
       ...(values.categoryId ? { categoryId: values.categoryId } : {}),
       ...(values.assignedToId ? { assignedToId: values.assignedToId } : {}),
-      ...(dateFrom ? { dateFrom: dateFrom.startOf("day").toISOString() } : {}),
-      ...(dateTo ? { dateTo: dateTo.endOf("day").toISOString() } : {}),
+      ...(selectedMonth
+        ? {
+            dateFrom: monthStart.toISOString(),
+            dateTo: monthEnd.toISOString(),
+          }
+        : {
+            ...(dateFrom ? { dateFrom: dateFrom.startOf("day").toISOString() } : {}),
+            ...(dateTo ? { dateTo: dateTo.endOf("day").toISOString() } : {}),
+          }),
     });
     setOpen(false);
   };
@@ -338,6 +417,11 @@ const ServiceDeskReport = () => {
             <h3 className="text-xl font-bold text-[#212121]">Service desk performance snapshot</h3>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {submittedFilters.month && (
+              <span className="rounded-full bg-[#E8F5E9] px-3 py-1 text-xs font-semibold text-[#166534]">
+                Month: {dayjs(submittedFilters.month, "YYYY-MM").format("MMMM YYYY")}
+              </span>
+            )}
             {submittedFilters.dateFrom && submittedFilters.dateTo && (
               <span className="rounded-full bg-[#FEF3C7] px-3 py-1 text-xs font-semibold text-[#92400E]">
                 {dayjs(submittedFilters.dateFrom).format("DD MMM YYYY")} — {dayjs(submittedFilters.dateTo).format("DD MMM YYYY")}
@@ -350,14 +434,31 @@ const ServiceDeskReport = () => {
         </div>
 
         {tableData.length ? (
-          <Table columns={columns} dataSource={tableData} rowKey="id" loading={isFetching} scroll={{ x: 1200 }} />
+          <Table
+            columns={columns}
+            dataSource={tableData}
+            rowKey="id"
+            loading={isFetching}
+            scroll={{ x: 1850 }}
+            tableLayout="fixed"
+            pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ["10", "20", "50"] }}
+          />
         ) : (
           <Empty description="No tickets match the current report filters" />
         )}
       </section>
 
       <Modal title="Filter Service Desk Report" open={open} onCancel={() => setOpen(false)} footer={null} destroyOnClose>
-        <Form form={form} layout="vertical" onFinish={onFinish} initialValues={submittedFilters}>
+        <Form form={form} layout="vertical" onFinish={onFinish} initialValues={filterFormInitialValues}>
+          <Form.Item name="month" label="Month">
+            <DatePicker
+              picker="month"
+              className="w-full"
+              allowClear
+              format="MMMM YYYY"
+              disabledDate={(current) => current && current.isAfter(dayjs().endOf("month"))}
+            />
+          </Form.Item>
           <Form.Item name="dateRange" label="Date Range (Created At)">
             <DatePicker.RangePicker
               className="w-full"
@@ -365,6 +466,9 @@ const ServiceDeskReport = () => {
               format="DD MMM YYYY"
             />
           </Form.Item>
+          <p className="-mt-3 mb-3 text-xs text-[#757575]">
+            If Month is selected, it takes priority over Date Range.
+          </p>
           <Form.Item name="status" label="Status">
             <Select allowClear placeholder="All statuses">
               {Object.keys(STATUS_STYLES).map((status) => (
@@ -402,9 +506,14 @@ const ServiceDeskReport = () => {
             </Select>
           </Form.Item>
           <Form.Item className="mb-0">
-            <Button type="primary" htmlType="submit" block>
-              Apply Filters
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={resetFilters} block>
+                Reset
+              </Button>
+              <Button type="primary" htmlType="submit" block>
+                Apply Filters
+              </Button>
+            </div>
           </Form.Item>
         </Form>
       </Modal>
