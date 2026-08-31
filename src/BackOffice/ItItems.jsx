@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, Checkbox, Dropdown, Form, Input, Modal, Select, Table, Tag, Tooltip } from "antd";
+import { Button, Checkbox, Dropdown, Form, Input, Modal, Popconfirm, Select, Table, Tag, Tooltip } from "antd";
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { LuBoxes, LuEye, LuPencil, LuPlus, LuTrash2 } from "react-icons/lu";
 import { toast } from "react-toastify";
@@ -321,13 +321,8 @@ const ItItems = () => {
       toast.error("Unable to delete item: missing item ID");
       return;
     }
-    Modal.confirm({
-      title: "Delete item",
-      content: "This removes the item template from future use while preserving linked records.",
-      okText: "Delete",
-      okButtonProps: { danger: true },
-      onOk: () => deleteItem.mutateAsync(record.id),
-    });
+
+    deleteItem.mutateAsync(record.id);
   };
 
   const columns = [
@@ -400,25 +395,56 @@ const ItItems = () => {
       title: "Action",
       key: "action",
       align: "center",
-      width: 72,
-      render: (_, record) => (
-        <Dropdown
-          trigger={["click"]}
-          placement="bottomRight"
-          menu={{
-            items: [
-              { key: "view", label: "View", icon: <LuEye size={15} />, onClick: () => openViewModal(record) },
-              { key: "edit", label: "Edit", icon: <LuPencil size={15} />, onClick: () => openEditModal(record) },
-              { type: "divider" },
-              { key: "delete", label: "Delete", icon: <LuTrash2 size={15} />, danger: true, onClick: () => confirmDelete(record) },
-            ],
-          }}
-        >
-          <Tooltip title="Actions">
-            <Button type="text" shape="circle" icon={<MoreOutlined />} aria-label={`Actions for ${record.brand} ${record.model}`} />
-          </Tooltip>
-        </Dropdown>
-      ),
+      width: 124,
+      render: (_, record) => {
+        const items = [
+          { key: "view", label: "View", icon: <LuEye size={15} /> },
+          { key: "edit", label: "Edit", icon: <LuPencil size={15} /> },
+        ];
+
+        return (
+          <div className="flex items-center justify-center gap-2">
+            <Dropdown
+              trigger={["click"]}
+              placement="bottomRight"
+              menu={{
+                items,
+                onClick: ({ key }) => {
+                  if (key === "view") {
+                    openViewModal(record);
+                  }
+
+                  if (key === "edit") {
+                    openEditModal(record);
+                  }
+                },
+              }}
+            >
+              <Tooltip title="Actions">
+                <Button type="text" shape="circle" icon={<MoreOutlined />} aria-label={`Actions for ${record.brand} ${record.model}`} />
+              </Tooltip>
+            </Dropdown>
+            <Popconfirm
+              title="Delete item"
+              description="This removes the item template from future use while preserving linked records."
+              okText="Delete"
+              cancelText="Cancel"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => confirmDelete(record)}
+            >
+              <Tooltip title="Delete item">
+                <Button
+                  type="text"
+                  danger
+                  shape="circle"
+                  icon={<LuTrash2 size={15} />}
+                  aria-label={`Delete ${record.brand} ${record.model}`}
+                />
+              </Tooltip>
+            </Popconfirm>
+          </div>
+        );
+      },
     },
   ];
 
