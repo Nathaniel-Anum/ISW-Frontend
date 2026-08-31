@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { Button, Checkbox, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Steps, Switch, Table, Tabs, Tag, Divider } from "antd";
+import { Button, Checkbox, DatePicker, Drawer, Dropdown, Form, Input, InputNumber, Modal, Popconfirm, Select, Steps, Switch, Table, Tabs, Tag, Divider } from "antd";
 import { MoreOutlined, PlusOutlined, SearchOutlined } from "@ant-design/icons";
-import { LuQrCode } from "react-icons/lu";
+import { LuBoxes, LuQrCode, LuTrash2 } from "react-icons/lu";
 import { toast } from "react-toastify";
 import api from "../utils/config";
 import { formatCapitalizedLabel } from "../utils/formatText";
@@ -241,6 +241,8 @@ const InvOfficer = () => {
   const [modalMode, setModalMode] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [activeForm, setActiveForm] = useState("user");
+  const [inventoryView, setInventoryView] = useState("active");
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createStep, setCreateStep] = useState(0);
@@ -259,10 +261,13 @@ const InvOfficer = () => {
   const monitorChanged = Form.useWatch("monitorChanged", form);
 
   const { data: inventoryResponse, isLoading: inventoryLoading } = useQuery({
-    queryKey: ["inventory", deferredSearch],
+    queryKey: ["inventory", deferredSearch, inventoryView],
     queryFn: () =>
       api.get("/inventory/all", {
-        params: deferredSearch ? { search: deferredSearch } : undefined,
+        params: {
+          ...(deferredSearch ? { search: deferredSearch } : {}),
+          ...(inventoryView === "deleted" ? { includeDeleted: "true" } : {}),
+        },
       }),
   });
 
@@ -294,6 +299,74 @@ const InvOfficer = () => {
 
   const itItemsList = itItemsResponse?.data || [];  const DEVICE_FIELDS = deviceFieldsData?.data || {};
   const inventoryData = inventoryResponse?.data || [];
+  const activeInventoryData = inventoryData.filter((record) => !record.deletedAt);
+  const deletedInventoryData = inventoryData.filter((record) => record.deletedAt);
+  const currentSummarySource = inventoryView === "deleted" ? deletedInventoryData : activeInventoryData;
+
+  const inventorySummary = useMemo(() => {
+    const total = currentSummarySource.length;
+    const categoryCounts = new Map();
+    const deviceCounts = new Map();
+
+    const getDeviceFamily = (record) => {
+      const categoryName = String(record.itItem?.category?.name || "").toLowerCase();
+      const deviceType = String(record.itItem?.deviceType || "").toUpperCase();
+      const formFactor = String(
+        record.itItem?.formFactor ||
+        record.itItem?.specifications?.formFactor ||
+        record.assetAttributes?.formFactor ||
+        ""
+      ).toLowerCase();
+
+      if (deviceType === "LAPTOP" || formFactor.includes("laptop") || categoryName.includes("laptop")) {
+        return "Laptop";
+      }
+
+      if (deviceType === "DESKTOP" || formFactor.includes("desktop") || categoryName.includes("desktop")) {
+        return "Desktop";
+      }
+
+      if (deviceType === "PRINTER" || categoryName.includes("printer")) {
+        return "Printer";
+      }
+
+      return formatCapitalizedLabel(record.itItem?.deviceType || "Unknown");
+    };
+
+    currentSummarySource.forEach((record) => {
+      const categoryLabel = record.itItem?.category?.name || formatCapitalizedLabel(record.itItem?.deviceType) || "Uncategorized";
+      const deviceLabel = getDeviceFamily(record);
+
+      categoryCounts.set(categoryLabel, (categoryCounts.get(categoryLabel) || 0) + 1);
+      deviceCounts.set(deviceLabel, (deviceCounts.get(deviceLabel) || 0) + 1);
+    });
+
+    const topCategories = [...categoryCounts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((first, second) => second.count - first.count || first.label.localeCompare(second.label));
+
+    const deviceBreakdown = [...deviceCounts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((first, second) => second.count - first.count || first.label.localeCompare(second.label));
+
+    const laptopCount = deviceCounts.get("Laptop") || 0;
+    const desktopCount = deviceCounts.get("Desktop") || 0;
+    const printerCount = deviceCounts.get("Printer") || 0;
+
+    const familyMap = {
+      computers: laptopCount + desktopCount,
+      laptops: laptopCount,
+      desktops: desktopCount,
+      printers: printerCount,
+    };
+
+    return {
+      total,
+      familyMap,
+      topCategories,
+      deviceBreakdown,
+    };
+  }, [currentSummarySource]);
   const quickCreateCategory = useMemo(
     () => (deviceFieldsData?.data?.categories || []).find((category) => category.id === quickCreateCategoryId) || null,
     [deviceFieldsData, quickCreateCategoryId]
@@ -325,18 +398,35 @@ const InvOfficer = () => {
   }, [createPurchaseDate, createWarrantyPeriod]);
 
   const stats = [
-    { label: "Inventory Assets", value: inventoryData.length, caption: "Tracked devices" },
+    { label: "Inventory Assets", value: activeInventoryData.length, caption: "Tracked devices" },
     {
       label: "Active Assets",
-      value: inventoryData.filter((item) => item.status === "ACTIVE").length,
+      value: activeInventoryData.filter((item) => item.status === "ACTIVE").length,
       caption: "Operational devices",
     },
     {
       label: "Attention Needed",
-      value: inventoryData.filter((item) => ["INACTIVE", "NON_FUNCTIONAL", "OBSOLETE", "DISPOSED"].includes(item.status)).length,
+      value: activeInventoryData.filter((item) => ["INACTIVE", "NON_FUNCTIONAL", "OBSOLETE", "DISPOSED"].includes(item.status)).length,
       caption: "Assets requiring review",
     },
   ];
+
+  const handleDeleteInventory = async (inventoryId) => {
+    if (!inventoryId) {
+      toast.error("Unable to delete inventory: missing inventory ID.");
+      return;
+    }
+
+    try {
+      await api.delete("/inventory/bulk", {
+        data: { inventoryIds: [inventoryId] },
+      });
+      toast.success("Inventory record deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to delete inventory record");
+    }
+  };
 
   const openViewModal = (record) => {
     setActiveForm("user");
@@ -515,6 +605,90 @@ const InvOfficer = () => {
       },
     },
   ];
+
+  const tableColumns = useMemo(() => {
+    if (inventoryView === "deleted") {
+      return [
+        ...columns.slice(0, -1),
+        {
+          title: "Deleted At",
+          dataIndex: "deletedAt",
+          key: "deletedAt",
+          width: 160,
+          render: (deletedAt) => formatDateTime(deletedAt),
+        },
+        {
+          title: "Action",
+          key: "action",
+          fixed: "right",
+          width: 86,
+          align: "center",
+          render: (_, record) => (
+            <Button
+              type="text"
+              icon={<MoreOutlined />}
+              className="flex items-center justify-center rounded-full border border-[#E5E7EB] text-[#616161] hover:!border-[#D32F2F] hover:!text-[#D32F2F]"
+              onClick={() => openViewModal(record)}
+              aria-label={`View deleted inventory record ${record.assetId}`}
+            />
+          ),
+        },
+      ];
+    }
+
+    return [
+      ...columns.slice(0, -1),
+      {
+        title: "Action",
+        key: "action",
+        fixed: "right",
+        width: 148,
+        align: "center",
+        render: (_, record) => {
+          const items = [
+            {
+              key: "view",
+              label: "View Details",
+              onClick: () => openViewModal(record),
+            },
+            {
+              key: "edit",
+              label: "Edit Record",
+              onClick: () => openEditModal(record),
+            },
+          ];
+
+          return (
+            <div className="flex items-center justify-center gap-2">
+              <Dropdown menu={{ items }} trigger={["click"]} placement="bottomRight">
+                <Button
+                  type="text"
+                  icon={<MoreOutlined />}
+                  className="flex items-center justify-center rounded-full border border-[#E5E7EB] text-[#616161] hover:!border-[#D32F2F] hover:!text-[#D32F2F]"
+                />
+              </Dropdown>
+              <Popconfirm
+                title="Delete inventory record"
+                description="This removes the inventory record from active use and keeps a deleted history entry."
+                okText="Delete"
+                cancelText="Cancel"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => handleDeleteInventory(record.id)}
+              >
+                <Button
+                  type="text"
+                  danger
+                  icon={<LuTrash2 />}
+                  className="flex items-center justify-center rounded-full border border-[#FECACA] text-[#B91C1C] hover:!border-[#B91C1C] hover:!text-[#B91C1C]"
+                  aria-label={`Delete inventory record ${record.assetId}`}
+                />
+              </Popconfirm>
+            </div>
+          );
+        },
+      },
+    ];
+  }, [columns, inventoryView]);
 
   const selectedCategoryDefinitions = useMemo(() => {
     if (!selectedRecord?.itItem?.category?.attributeDefinitions?.length) {
@@ -994,6 +1168,14 @@ const InvOfficer = () => {
     return <div>Loading device fields...</div>;
   }
 
+  const summaryCards = [
+    { label: "Total", value: inventorySummary.total, caption: inventoryView === "deleted" ? "Deleted records" : "Visible inventory" },
+    { label: "Computer total", value: inventorySummary.familyMap.computers, caption: "Laptops + desktops combined" },
+    { label: "Laptop devices", value: inventorySummary.familyMap.laptops, caption: "Portable computers" },
+    { label: "Desktop devices", value: inventorySummary.familyMap.desktops, caption: "Stationary computers" },
+    { label: "Printers", value: inventorySummary.familyMap.printers, caption: "Print devices" },
+  ];
+
   return (
     <PageShell
       eyebrow="Inventory Control"
@@ -1010,6 +1192,12 @@ const InvOfficer = () => {
             className="w-full md:w-[260px]"
           />
           <Button
+            icon={<LuBoxes size={16} />}
+            onClick={() => setSummaryOpen(true)}
+          >
+            View summary
+          </Button>
+          <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => { setCreateStep(0); setCreateModalOpen(true); }}
@@ -1023,21 +1211,95 @@ const InvOfficer = () => {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-[#616161]">Asset Register</p>
-            <h3 className="text-xl font-bold text-[#212121]">All inventory records</h3>
+            <h3 className="text-xl font-bold text-[#212121]">
+              {inventoryView === "deleted" ? "Deleted inventory history" : "All inventory records"}
+            </h3>
           </div>
-          <span className="rounded-full bg-[#FFEBEE] px-3 py-1 text-xs font-semibold text-[#D32F2F]">
-            Device details editable
-          </span>
+          <Tabs
+            activeKey={inventoryView}
+            onChange={(key) => setInventoryView(key)}
+            items={[
+              { key: "active", label: "Active" },
+              { key: "deleted", label: "Deleted History" },
+            ]}
+          />
         </div>
 
         <Table
-          columns={columns}
-          dataSource={inventoryData}
+          columns={tableColumns}
+          dataSource={inventoryView === "deleted" ? deletedInventoryData : activeInventoryData}
           loading={inventoryLoading}
           rowKey="id"
           size="middle"
           scroll={{ x: 1536 }}
         />
+
+        <Drawer
+          open={summaryOpen}
+          onClose={() => setSummaryOpen(false)}
+          width={520}
+          title={inventoryView === "deleted" ? "Deleted inventory summary" : "Inventory summary"}
+          styles={{ body: { paddingTop: 12 } }}
+        >
+          <div className="space-y-5">
+            <div className="rounded-3xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Summary scope</p>
+              <p className="mt-1 text-sm text-[#616161]">
+                {inventoryView === "deleted"
+                  ? "Showing deleted inventory history currently stored for audit and traceability."
+                  : "Showing active inventory records currently available for assignments and updates."}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {summaryCards.map((card) => (
+                <div key={card.label} className="rounded-3xl border border-[#E5E7EB] bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">{card.label}</p>
+                  <p className="mt-2 text-3xl font-bold text-[#212121]">{card.value}</p>
+                  <p className="mt-1 text-sm text-[#616161]">{card.caption}</p>
+                </div>
+              ))}
+            </div>
+
+            <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4">
+              <div className="mb-3">
+                <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-[#111827]">Category Breakdown</h4>
+                <p className="mt-1 text-sm text-[#616161]">Inventory grouped by item category or device type.</p>
+              </div>
+              <div className="space-y-2">
+                {inventorySummary.topCategories.length ? (
+                  inventorySummary.topCategories.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between rounded-2xl bg-[#FAFAFA] px-4 py-3">
+                      <span className="font-medium text-[#212121]">{item.label}</span>
+                      <span className="rounded-full bg-[#FFF7F7] px-3 py-1 text-sm font-semibold text-[#D32F2F]">{item.count}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-[#6B7280]">No inventory records available.</p>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-[#E5E7EB] bg-white p-4">
+              <div className="mb-3">
+                <h4 className="text-sm font-bold uppercase tracking-[0.14em] text-[#111827]">Device Types</h4>
+                <p className="mt-1 text-sm text-[#616161]">Quick breakdown by the actual inventory device type.</p>
+              </div>
+              <div className="space-y-2">
+                {inventorySummary.deviceBreakdown.length ? (
+                  inventorySummary.deviceBreakdown.map((item) => (
+                    <div key={item.label} className="flex items-center justify-between rounded-2xl border border-[#F3F4F6] px-4 py-3">
+                      <span className="text-sm font-medium text-[#212121]">{item.label}</span>
+                      <span className="text-sm font-semibold text-[#111827]">{item.count}</span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-[#6B7280]">No inventory records available.</p>
+                )}
+              </div>
+            </section>
+          </div>
+        </Drawer>
 
         <Modal
           open={modalMode === "view"}
