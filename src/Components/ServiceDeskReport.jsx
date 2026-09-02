@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
   DatePicker,
+  Drawer,
   Empty,
   Form,
   Input,
@@ -15,7 +16,7 @@ import {
 import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
 import { useDeferredValue, useMemo, useState } from "react";
 import dayjs from "dayjs";
-import { LuPencil, LuShieldAlert, LuStar } from "react-icons/lu";
+import { LuLayoutGrid, LuPencil, LuShieldAlert, LuStar } from "react-icons/lu";
 import { toast } from "react-toastify";
 import * as XLSX from "xlsx";
 import PageShell from "./ui/page-shell";
@@ -44,6 +45,14 @@ const PRIORITY_STYLES = {
 
 const REPORT_ROLES = ["service_desk_manager", "supervisor", "admin"];
 const ACTIVE_STATUSES = ["NEW", "TRIAGED", "ASSIGNED", "IN_PROGRESS", "WAITING_FOR_USER", "ESCALATED", "REOPENED"];
+const HIDDEN_REPORT_STATUSES = ["CANCELLED"];
+const CATEGORY_CARD_PREFIX = "category:";
+const DEFAULT_SLA_CONFIGS = [
+  { priority: "CRITICAL", firstResponseHours: 1, resolutionHours: 4 },
+  { priority: "HIGH", firstResponseHours: 2, resolutionHours: 8 },
+  { priority: "MEDIUM", firstResponseHours: 4, resolutionHours: 24 },
+  { priority: "LOW", firstResponseHours: 8, resolutionHours: 72 },
+];
 
 const formatLabel = (value) => value?.replaceAll("_", " ") || "-";
 
@@ -62,6 +71,29 @@ const getDeviceName = (ticket) => {
   return label || "-";
 };
 
+const getCommentAuthorName = (comment) =>
+  comment?.author?.name || comment?.author?.email || "Unknown";
+
+const formatTicketComments = (ticket) => {
+  const comments = ticket?.comments || [];
+  if (!comments.length) return "-";
+
+  const reporterId = ticket.reporterId || ticket.reporter?.id;
+
+  return comments
+    .map((comment, index) => {
+      const name = getCommentAuthorName(comment);
+      const authorId = comment.authorId || comment.author?.id;
+      const isUserComment = Boolean(reporterId) && authorId === reporterId;
+      const speaker = isUserComment
+        ? `User (${name})`
+        : `Service Desk: Technician (${name})`;
+
+      return `${index + 1}. ${speaker}: ${comment.body || ""}`.trim();
+    })
+    .join("\n");
+};
+
 const ServiceDeskReport = () => {
   const { user } = useUser();
   const queryClient = useQueryClient();
@@ -72,6 +104,7 @@ const ServiceDeskReport = () => {
   const [searchText, setSearchText] = useState("");
   const [submittedFilters, setSubmittedFilters] = useState({ scope: "all" });
   const [cardFilter, setCardFilter] = useState(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const [form] = Form.useForm();
   const deferredSearch = useDeferredValue(searchText.trim());
 
@@ -83,7 +116,9 @@ const ServiceDeskReport = () => {
     queryFn: () => api.get("/service-desk/sla-configs"),
     enabled: canAccessReport,
   });
-  const slaConfigs = slaConfigsResponse?.data || [];
+  const slaConfigs = slaConfigsResponse?.data?.length
+    ? slaConfigsResponse.data
+    : DEFAULT_SLA_CONFIGS;
 
   const updateSLAConfig = useMutation({
     mutationFn: ({ priority, values }) => api.patch(`/service-desk/sla-configs/${priority}`, values),
@@ -111,13 +146,20 @@ const ServiceDeskReport = () => {
     enabled: canAccessReport,
   });
 
-  const { data: ticketsResponse, isFetching } = useQuery({
+  const { data: departmentsResponse } = useQuery({
+    queryKey: ["serviceDeskDepartments"],
+    queryFn: () => api.get("/service-desk/departments"),
+    enabled: canAccessReport,
+  });
+
+  const { data: ticketsResponse, isLoading, isFetching } = useQuery({
     queryKey: ["serviceDeskReport", submittedFilters, deferredSearch],
     queryFn: () => {
       const { month, ...apiFilters } = submittedFilters;
       return api.get("/service-desk/tickets", {
         params: {
           scope: "all",
+          includeComments: true,
           ...apiFilters,
           ...(deferredSearch ? { search: deferredSearch } : {}),
         },
@@ -136,25 +178,56 @@ const ServiceDeskReport = () => {
 
   const categories = categoriesResponse?.data || [];
   const supportStaff = supportStaffResponse?.data || [];
+  const departments = departmentsResponse?.data || [];
   const tickets = ticketsResponse?.data || [];
+  const selectedDepartment = departments.find((dept) => dept.id === submittedFilters.departmentId);
 
-  const stats = useMemo(() => {
+  const { overviewCards, categoryCards, activeSummaryCard } = useMemo(() => {
     const now = new Date();
     const TERMINAL = ["RESOLVED", "CLOSED", "CANCELLED"];
     const activeTickets = tickets.filter((ticket) => ACTIVE_STATUSES.includes(ticket.status));
     const resolvedTickets = tickets.filter((ticket) => ticket.status === "RESOLVED" || ticket.status === "CLOSED");
     const escalatedTickets = tickets.filter((ticket) => ticket.status === "ESCALATED");
     const slaBreached = tickets.filter((ticket) => ticket.dueAt && !TERMINAL.includes(ticket.status) && new Date(ticket.dueAt) < now);
-    const toggleFilter = (key) => setCardFilter((prev) => (prev === key ? null : key));
-
-    return [
-      { label: "Total Tickets", value: tickets.length, caption: "Tickets in the current report", active: cardFilter === null, onClick: () => setCardFilter(null) },
-      { label: "Active", value: activeTickets.length, caption: "Open operational workload", active: cardFilter === "active", onClick: () => toggleFilter("active") },
-      { label: "Resolved / Closed", value: resolvedTickets.length, caption: "Tickets already completed", active: cardFilter === "resolved", onClick: () => toggleFilter("resolved") },
-      { label: "Escalated", value: escalatedTickets.length, caption: "Tickets needing higher-tier attention", active: cardFilter === "escalated", onClick: () => toggleFilter("escalated") },
-      { label: "SLA Breached", value: slaBreached.length, caption: "Open tickets past their resolution deadline", active: cardFilter === "slaBreached", onClick: () => toggleFilter("slaBreached") },
+    const ticketsByCategory = tickets.reduce((counts, ticket) => {
+      const categoryId = ticket.category?.id || "none";
+      counts[categoryId] = (counts[categoryId] || 0) + 1;
+      return counts;
+    }, {});
+    const uncategorizedCount = ticketsByCategory.none || 0;
+    const overview = [
+      { key: null, label: "Total Tickets", value: tickets.length, caption: "Tickets in the current report" },
+      { key: "active", label: "Active", value: activeTickets.length, caption: "Open operational workload" },
+      { key: "resolved", label: "Resolved / Closed", value: resolvedTickets.length, caption: "Tickets already completed" },
+      { key: "escalated", label: "Escalated", value: escalatedTickets.length, caption: "Tickets needing higher-tier attention" },
+      { key: "slaBreached", label: "SLA Breached", value: slaBreached.length, caption: "Open tickets past their resolution deadline" },
     ];
-  }, [tickets, cardFilter]);
+    const byCategory = [
+      ...categories.map((category) => ({
+        key: `${CATEGORY_CARD_PREFIX}${category.id}`,
+        label: category.name,
+        value: ticketsByCategory[category.id] || 0,
+        caption: "Tickets in this category",
+      })),
+      ...(uncategorizedCount
+        ? [{
+            key: `${CATEGORY_CARD_PREFIX}none`,
+            label: "Uncategorized",
+            value: uncategorizedCount,
+            caption: "Tickets with no category",
+          }]
+        : []),
+    ];
+    const allCards = [...overview, ...byCategory];
+
+    return {
+      overviewCards: overview,
+      categoryCards: byCategory,
+      activeSummaryCard: allCards.find((card) =>
+        card.key === null ? cardFilter === null : card.key === cardFilter,
+      ) || overview[0],
+    };
+  }, [tickets, categories, cardFilter]);
 
   const tableData = useMemo(() => {
     const now = new Date();
@@ -165,8 +238,18 @@ const ServiceDeskReport = () => {
     if (cardFilter === "slaBreached") {
       return tickets.filter((ticket) => ticket.dueAt && !TERMINAL.includes(ticket.status) && new Date(ticket.dueAt) < now);
     }
+    if (cardFilter?.startsWith(CATEGORY_CARD_PREFIX)) {
+      const categoryId = cardFilter.slice(CATEGORY_CARD_PREFIX.length);
+      if (categoryId === "none") return tickets.filter((ticket) => !ticket.category?.id);
+      return tickets.filter((ticket) => ticket.category?.id === categoryId);
+    }
     return tickets;
   }, [tickets, cardFilter]);
+
+  const applySummaryFilter = (key) => {
+    setCardFilter((prev) => (key == null || prev === key ? null : key));
+    setSummaryOpen(false);
+  };
 
   const filterFormInitialValues = useMemo(() => {
     const dateFrom = submittedFilters?.dateFrom ? dayjs(submittedFilters.dateFrom) : null;
@@ -328,11 +411,32 @@ const ServiceDeskReport = () => {
       "Assigned To - Technician": ticket.assignedTo?.name || ticket.assignedTo?.email || "Unassigned",
       Category: ticket.category?.name || "General",
       Description: ticket.description || "-",
+      Comments: formatTicketComments(ticket),
       "Resolution Date": formatDateTime(ticket.resolvedAt || ticket.closedAt),
       "Urgency Check": getUrgencyCheck(ticket),
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
+    worksheet["!cols"] = [
+      { wch: 14 },
+      { wch: 36 },
+      { wch: 16 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 24 },
+      { wch: 28 },
+      { wch: 18 },
+      { wch: 40 },
+      { wch: 55 },
+      { wch: 20 },
+      { wch: 22 },
+    ];
+    worksheet["!rows"] = [
+      { hpt: 22 },
+      ...exportRows.map((row) => ({
+        hpt: Math.min(120, Math.max(22, String(row.Comments || "-").split("\n").length * 18)),
+      })),
+    ];
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Service Desk Report");
     XLSX.writeFile(workbook, "service-desk-report.xlsx");
@@ -350,6 +454,7 @@ const ServiceDeskReport = () => {
       ...(values.status ? { status: values.status } : {}),
       ...(values.priority ? { priority: values.priority } : {}),
       ...(values.categoryId ? { categoryId: values.categoryId } : {}),
+      ...(values.departmentId ? { departmentId: values.departmentId } : {}),
       ...(values.assignedToId ? { assignedToId: values.assignedToId } : {}),
       ...(selectedMonth
         ? {
@@ -383,7 +488,7 @@ const ServiceDeskReport = () => {
       eyebrow="Reporting Workspace"
       title="Service Desk Report"
       description="Monitor ticket workload, escalations, and resolution progress across the support queue."
-      stats={stats}
+      loading={isLoading}
       actions={
         <>
           <Input
@@ -397,9 +502,15 @@ const ServiceDeskReport = () => {
           <Button icon={<FilterOutlined />} onClick={() => setOpen(true)}>
             Filters
           </Button>
+          <Button icon={<LuLayoutGrid size={16} />} onClick={() => setSummaryOpen(true)}>
+            View Summary
+          </Button>
           {canManageSLA && (
             <Tooltip title="Manage SLA thresholds">
-              <Button icon={<LuShieldAlert size={14} />} onClick={() => setSlaOpen(true)}>
+              <Button
+                icon={<LuShieldAlert size={14} />}
+                onClick={() => document.getElementById("sla-thresholds")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
                 SLA Thresholds
               </Button>
             </Tooltip>
@@ -425,6 +536,16 @@ const ServiceDeskReport = () => {
             {submittedFilters.dateFrom && submittedFilters.dateTo && (
               <span className="rounded-full bg-[#FEF3C7] px-3 py-1 text-xs font-semibold text-[#92400E]">
                 {dayjs(submittedFilters.dateFrom).format("DD MMM YYYY")} — {dayjs(submittedFilters.dateTo).format("DD MMM YYYY")}
+              </span>
+            )}
+            {selectedDepartment && (
+              <span className="rounded-full bg-[#F3E8FF] px-3 py-1 text-xs font-semibold text-[#7C3AED]">
+                Department: {selectedDepartment.name}
+              </span>
+            )}
+            {cardFilter && (
+              <span className="rounded-full bg-[#FFF7F7] px-3 py-1 text-xs font-semibold text-[#D32F2F]">
+                Summary: {activeSummaryCard?.label}
               </span>
             )}
             <span className="rounded-full bg-[#EFF6FF] px-3 py-1 text-xs font-semibold text-[#1D4ED8]">
@@ -471,7 +592,9 @@ const ServiceDeskReport = () => {
           </p>
           <Form.Item name="status" label="Status">
             <Select allowClear placeholder="All statuses">
-              {Object.keys(STATUS_STYLES).map((status) => (
+              {Object.keys(STATUS_STYLES)
+                .filter((status) => !HIDDEN_REPORT_STATUSES.includes(status))
+                .map((status) => (
                 <Select.Option key={status} value={status}>
                   {formatLabel(status)}
                 </Select.Option>
@@ -492,6 +615,20 @@ const ServiceDeskReport = () => {
               {categories.map((category) => (
                 <Select.Option key={category.id} value={category.id}>
                   {category.name}
+                </Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="departmentId" label="Department">
+            <Select
+              allowClear
+              showSearch
+              placeholder="All departments"
+              optionFilterProp="children"
+            >
+              {departments.map((department) => (
+                <Select.Option key={department.id} value={department.id}>
+                  {department.name}
                 </Select.Option>
               ))}
             </Select>
@@ -517,6 +654,68 @@ const ServiceDeskReport = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Drawer
+        open={summaryOpen}
+        onClose={() => setSummaryOpen(false)}
+        width={560}
+        title="Report summary"
+        styles={{ body: { paddingTop: 12 } }}
+      >
+        <div className="space-y-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">Workload</p>
+            <p className="mt-1 mb-3 text-sm text-[#616161]">Click a card to filter the report table.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {overviewCards.map((card) => {
+                const active = card.key == null ? cardFilter == null : cardFilter === card.key;
+                return (
+                  <button
+                    key={card.label}
+                    type="button"
+                    onClick={() => applySummaryFilter(card.key)}
+                    className={`rounded-3xl border p-4 text-left transition-all ${
+                      active
+                        ? "border-[#D32F2F] bg-[#FFF7F7] shadow-sm"
+                        : "border-[#E5E7EB] bg-white hover:border-[#D32F2F] hover:bg-[#FFF7F7]"
+                    }`}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">{card.label}</p>
+                    <p className="mt-2 text-3xl font-bold text-[#212121]">{card.value}</p>
+                    <p className="mt-1 text-sm text-[#616161]">{card.caption}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">By category</p>
+            <p className="mt-1 mb-3 text-sm text-[#616161]">Ticket counts for each service desk category.</p>
+            <div className="grid grid-cols-2 gap-3">
+              {categoryCards.map((card) => {
+                const active = cardFilter === card.key;
+                return (
+                  <button
+                    key={card.key}
+                    type="button"
+                    onClick={() => applySummaryFilter(card.key)}
+                    className={`rounded-3xl border p-4 text-left transition-all ${
+                      active
+                        ? "border-[#D32F2F] bg-[#FFF7F7] shadow-sm"
+                        : "border-[#E5E7EB] bg-white hover:border-[#D32F2F] hover:bg-[#FFF7F7]"
+                    }`}
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">{card.label}</p>
+                    <p className="mt-2 text-3xl font-bold text-[#212121]">{card.value}</p>
+                    <p className="mt-1 text-sm text-[#616161]">{card.caption}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Drawer>
 
       {satisfaction && (
         <section className="mt-6 rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
@@ -660,7 +859,10 @@ const ServiceDeskReport = () => {
 
       {/* SLA Thresholds inline section */}
       {canManageSLA && (
-        <section className="rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
+        <section
+          id="sla-thresholds"
+          className="mt-6 rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6"
+        >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[#616161]">SLA Management</p>

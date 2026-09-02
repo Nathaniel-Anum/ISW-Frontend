@@ -1,6 +1,5 @@
 import "./App.css";
 import { lazy, Suspense, useEffect } from "react";
-import { Spin } from "antd";
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,6 +8,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import ErrorBoundary from "./Components/ErrorBoundary";
+import PageSkeleton from "./Components/ui/page-skeleton";
 
 // Eagerly load auth/layout shells (tiny, needed immediately)
 import Login from "./Components/Login";
@@ -66,11 +66,7 @@ const SupportProfiles = lazy(() => import("./BackOffice/SupportProfiles"));
 const SkillTags = lazy(() => import("./BackOffice/SkillTags"));
 const RequisitionItems = lazy(() => import("./BackOffice/RequisitionItems"));
 
-const PageLoader = () => (
-  <div className="flex min-h-[60vh] items-center justify-center">
-    <Spin size="large" />
-  </div>
-);
+const PageLoader = () => <PageSkeleton />;
 
 function AppContent() {
   const navigate = useNavigate();

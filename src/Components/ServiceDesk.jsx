@@ -325,6 +325,7 @@ const ServiceDesk = () => {
       title="Service Desk"
       description="Report issues, track your active tickets, and review resolved cases from one workspace."
       stats={stats}
+      loading={isLoading}
       actions={
         <>
           <Input

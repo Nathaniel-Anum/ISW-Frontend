@@ -21,7 +21,7 @@ const Employees = () => {
   const queryClient = useQueryClient();
   const deferredSearch = useDeferredValue(searchText.trim());
 
-  const { data: usersData } = useQuery({
+  const { data: usersData, isLoading } = useQuery({
     queryKey: ["getAllUsers", deferredSearch],
     queryFn: () =>
       api.get("/admin/users", {
@@ -76,6 +76,8 @@ const Employees = () => {
     }
 
     if (editingRecord) {
+      const department = departments.find((item) => item.id === editingRecord.department?.id);
+      setSelectedUnits(department?.units || []);
       form.setFieldsValue({
         staffId: editingRecord.staffId,
         name: editingRecord.name,
@@ -89,7 +91,7 @@ const Employees = () => {
     }
 
     form.resetFields();
-  }, [editingRecord, form, open]);
+  }, [editingRecord, form, open, departments]);
 
   const createStaff = useMutation({
     mutationKey: ["createStaff"],
@@ -160,21 +162,27 @@ const Employees = () => {
   const handleSubmit = (values) => {
     const payload = normalizeStaffValues(values);
 
-    if (!payload.staffId || !payload.name || !payload.email || !payload.departmentId || !payload.roomNo || !payload.roleNames.length) {
-      toast.error("Staff ID, name, email, department, room, and role are required");
+    if (!payload.staffId || !payload.name || !payload.email || !payload.departmentId || !payload.roleNames.length) {
+      toast.error("Staff ID, name, email, department, and role are required");
       return;
     }
+
+    const staffPayload = {
+      ...payload,
+      unitId: payload.unitId || undefined,
+      roomNo: payload.roomNo || undefined,
+    };
 
     if (editingRecord) {
       if (!editingRecord.staffId) {
         toast.error("Unable to update staff: missing staff ID");
         return;
       }
-      editStaff.mutate({ staffId: editingRecord.staffId, values: payload });
+      editStaff.mutate({ staffId: editingRecord.staffId, values: staffPayload });
       return;
     }
 
-    createStaff.mutate(payload);
+    createStaff.mutate(staffPayload);
   };
 
   const handleDeleteStaff = (record) => {
@@ -280,6 +288,7 @@ const Employees = () => {
       title="Employee Directory"
       description="Provision staff records with the right department, unit, and role so requests, approvals, and reporting stay tied to the right owners."
       stats={stats}
+      loading={isLoading}
       actions={
         <>
           <Input
@@ -351,8 +360,8 @@ const Employees = () => {
               </Select>
             </Form.Item>
 
-            <Form.Item name="unitId" label="Unit" rules={editingRecord ? [{ required: true }] : []}>
-              <Select placeholder="Select unit" disabled={!selectedUnits.length}>
+            <Form.Item name="unitId" label="Unit">
+              <Select placeholder="Select unit" allowClear disabled={!selectedUnits.length}>
                 {selectedUnits.map((unit) => (
                   <Select.Option key={unit.id} value={unit.id}>
                     {unit.name}
@@ -361,7 +370,7 @@ const Employees = () => {
               </Select>
             </Form.Item>
 
-            <Form.Item name="roomNo" label="Room No" rules={[{ required: true }]}>
+            <Form.Item name="roomNo" label="Room No">
               <Input prefix={<LuBriefcaseBusiness size={16} className="text-[#616161]" />} placeholder="Enter room number" />
             </Form.Item>
 

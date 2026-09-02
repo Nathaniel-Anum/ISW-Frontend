@@ -43,17 +43,17 @@ const Login = () => {
   return (
     <AuthLayout
       title="Sign in"
-      description="Use your staff credentials to continue."
+      description="Use your email or staff ID and password to continue."
     >
       <Form form={form} name="login" layout="vertical" onFinish={onFinish}>
         <Form.Item
           name="staffId"
-          label="Staff ID"
-          rules={[{ required: true, message: "Please input your staff ID!" }]}
+          label="Email or Staff ID"
+          rules={[{ required: true, message: "Please enter your email or staff ID" }]}
         >
           <Input
             size="large"
-            placeholder="Enter your staff ID"
+            placeholder="Enter your email or staff ID"
             allowClear
             prefix={<LuIdCard className="text-[#9CA3AF]" />}
           />

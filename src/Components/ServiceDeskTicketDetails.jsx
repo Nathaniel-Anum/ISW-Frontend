@@ -103,6 +103,7 @@ const ALL_STATUSES = [
   "TRIAGED", "IN_PROGRESS", "WAITING_FOR_USER",
   "RESOLVED", "CANCELLED",
 ];
+const HIDDEN_UPDATE_STATUSES = ["CANCELLED"];
 
 const STATUS_LABELS = {
   TRIAGED: "Troubleshooting",
@@ -652,9 +653,9 @@ const SupportView = ({ ticket, ticketId, isLoading, refreshQueries, user }) => {
 
   // Which statuses this user can move to from the current ticket state
   const allowedNextStatuses = ticket
-    ? isManager
-      ? ALL_STATUSES
-      : (VALID_NEXT_STATUSES[ticket.status] || [])
+    ? (isManager ? ALL_STATUSES : VALID_NEXT_STATUSES[ticket.status] || []).filter(
+        (status) => !HIDDEN_UPDATE_STATUSES.includes(status),
+      )
     : [];
 
   // Whether the current user can "accept" (self-assign + start work) this ticket

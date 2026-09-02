@@ -1182,6 +1182,7 @@ const InvOfficer = () => {
       title="Inventory Registry"
       description="Review device assignments, inspect hardware metadata, and update lifecycle information in a cleaner inventory workspace."
       stats={stats}
+      loading={inventoryLoading}
       actions={
         <div className="flex items-center gap-3">
           <Input

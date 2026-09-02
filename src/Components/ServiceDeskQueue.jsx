@@ -52,6 +52,7 @@ const VALID_NEXT_STATUSES = {
   CANCELLED: [],
 };
 const ALL_MANUAL_STATUSES = ["TRIAGED", "IN_PROGRESS", "WAITING_FOR_USER", "RESOLVED", "CANCELLED"];
+const HIDDEN_UPDATE_STATUSES = ["CANCELLED"];
 const STATUS_LABELS = {
   TRIAGED: "Troubleshooting",
   IN_PROGRESS: "In Progress",
@@ -97,14 +98,16 @@ const ServiceDeskQueue = () => {
   const [closeTicketOpen, setCloseTicketOpen] = useState(false);
   const [closeTicketRecord, setCloseTicketRecord] = useState(null);
   const [cardFilter, setCardFilter] = useState(null);
+  const [lifecycle, setLifecycle] = useState("active");
   const deferredSearch = useDeferredValue(searchText.trim());
 
   const { data: ticketsResponse, isLoading } = useQuery({
-    queryKey: ["serviceDeskQueue", effectiveScope, deferredSearch],
+    queryKey: ["serviceDeskQueue", effectiveScope, deferredSearch, lifecycle],
     queryFn: () =>
       api.get("/service-desk/tickets", {
         params: {
           scope: effectiveScope,
+          lifecycle,
           ...(deferredSearch ? { search: deferredSearch } : {}),
         },
       }),
@@ -179,7 +182,8 @@ const ServiceDeskQueue = () => {
 
   const getAllowedStatuses = (ticket) => {
     if (!ticket) return [];
-    return isManager ? ALL_MANUAL_STATUSES : VALID_NEXT_STATUSES[ticket.status] || [];
+    const statuses = isManager ? ALL_MANUAL_STATUSES : VALID_NEXT_STATUSES[ticket.status] || [];
+    return statuses.filter((status) => !HIDDEN_UPDATE_STATUSES.includes(status));
   };
 
   const canAcceptTicket = (ticket) =>
@@ -690,6 +694,7 @@ const ServiceDeskQueue = () => {
       title={pageTitle}
       description={pageDescription}
       stats={stats}
+      loading={isLoading}
       actions={
         <>
           {isManager && (
@@ -710,6 +715,11 @@ const ServiceDeskQueue = () => {
               <Select.Option value="reported">Reported By Me</Select.Option>
             </Select>
           )}
+          <Select value={lifecycle} onChange={setLifecycle} className="w-full md:w-[180px]">
+            <Select.Option value="active">Active tickets</Select.Option>
+            <Select.Option value="closed">Closed tickets</Select.Option>
+            <Select.Option value="all">All tickets</Select.Option>
+          </Select>
           <Input
             value={searchText}
             onChange={(event) => setSearchText(event.target.value)}
@@ -732,7 +742,11 @@ const ServiceDeskQueue = () => {
                 ? "Tickets you are responsible for"
                 : isWorkshopSupervisor
                   ? "Service tickets with active maintenance workflows"
-                  : "Support tickets in progress"}
+                  : lifecycle === "closed"
+                    ? "Closed and resolved support tickets"
+                    : lifecycle === "all"
+                      ? "All support tickets"
+                      : "Support tickets in progress"}
             </h3>
           </div>
           <span className="rounded-full bg-[#FFEBEE] px-3 py-1 text-xs font-semibold text-[#D32F2F]">

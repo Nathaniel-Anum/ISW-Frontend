@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Badge, Dropdown, Empty, Spin, Tag, Typography } from "antd";
 import { LuBell, LuCheck, LuX } from "react-icons/lu";
 import { io } from "socket.io-client";
@@ -28,9 +29,62 @@ const TYPE_COLORS = {
   "maintenance:created": "red",
   "maintenance:resolved": "green",
   "maintenance:requisition_raised": "orange",
+  "maintenance:sla_breached": "red",
+  "kb:published": "purple",
+};
+
+const TICKET_TYPES = new Set([
+  "ticket:created",
+  "ticket:assigned",
+  "ticket:escalated",
+  "ticket:resolved",
+  "ticket:status_updated",
+  "ticket:new",
+  "ticket:work_started",
+]);
+
+const getNotificationPath = (type, meta = {}) => {
+  if (TICKET_TYPES.has(type) && meta.ticketId) {
+    return `/dashboard/service-desk/tickets/${meta.ticketId}`;
+  }
+
+  switch (type) {
+    case "maintenance:sla_breached":
+      return "/dashboard/maintenance";
+    case "maintenance:created":
+    case "maintenance:resolved":
+      return "/dashboard/service-desk";
+    case "maintenance:requisition_pending_itd":
+      return "/dashboard/itd-approval";
+    case "maintenance:requisition_raised":
+      return "/dashboard/requisition";
+    case "requisition:pending_itd_approval":
+      return "/dashboard/itd-approval";
+    case "requisition:ready_for_issuance":
+      return "/dashboard/stores-officer";
+    case "requisition:processed":
+      return "/dashboard/acknowledge";
+    case "requisition:dept_approved":
+    case "requisition:dept_declined":
+    case "requisition:itd_approved":
+    case "requisition:itd_declined":
+    case "requisition:pending_stock":
+      return "/dashboard/requisition";
+    case "stock:low":
+      return "/dashboard/stock";
+    case "kb:published":
+      return meta.articleId
+        ? `/dashboard/knowledge-base?article=${meta.articleId}`
+        : "/dashboard/knowledge-base";
+    default:
+      if (meta.ticketId) return `/dashboard/service-desk/tickets/${meta.ticketId}`;
+      if (meta.requisitionId) return "/dashboard/requisition";
+      return "/dashboard";
+  }
 };
 
 export default function NotificationBell() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -53,6 +107,7 @@ export default function NotificationBell() {
             type: n.type,
             title: n.title,
             message: n.message,
+            meta: n.meta || {},
             time: new Date(n.createdAt),
             read: n.isRead,
           }))
@@ -84,6 +139,7 @@ export default function NotificationBell() {
         type: payload.type,
         title: payload.title,
         message: payload.message,
+        meta: payload.meta || {},
         time: new Date(payload.createdAt ?? Date.now()),
         read: false,
       };
@@ -91,6 +147,9 @@ export default function NotificationBell() {
         [notif, ...prev].slice(0, MAX_NOTIFICATIONS)
       );
       setUnread((n) => n + 1);
+      if (payload.type === "kb:published") {
+        toast.info(payload.title || "New knowledge base article published");
+      }
     });
 
     return () => {
@@ -116,6 +175,14 @@ export default function NotificationBell() {
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to mark notification as read");
     }
+  };
+
+  const openNotification = (notification) => {
+    if (!notification?.read) {
+      markOneRead(notification.id);
+    }
+    setOpen(false);
+    navigate(getNotificationPath(notification.type, notification.meta));
   };
 
   const markAllRead = async (e) => {
@@ -195,10 +262,10 @@ export default function NotificationBell() {
           ]
         : notifications.slice(0, 15).map((n) => ({
             key: n.id,
+            onClick: () => openNotification(n),
             label: (
               <div
-                className={`flex flex-col gap-0.5 py-1 ${!n.read ? "opacity-100" : "opacity-60"}`}
-                onClick={() => { if (!n.read) markOneRead(n.id); }}
+                className={`flex cursor-pointer flex-col gap-0.5 py-1 ${!n.read ? "opacity-100" : "opacity-60"}`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <Tag

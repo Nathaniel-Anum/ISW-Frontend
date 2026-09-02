@@ -103,6 +103,11 @@ button {
   background: #fafafa !important;
 }
 
+.responsive-data-card .ant-table-wrapper .ant-table {
+  border: none;
+  border-radius: 0;
+}
+
 .ant-modal .ant-modal-content,
 .ant-dropdown .ant-dropdown-menu {
   border-radius: 20px;

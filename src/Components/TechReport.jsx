@@ -1,11 +1,22 @@
 import React, { useDeferredValue, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
-import { Button, DatePicker, Form, Input, Modal, Select, Spin, Table } from "antd";
-import * as XLSX from "xlsx";
+import { Button, DatePicker, Drawer, Form, Input, Modal, Select, Spin, Table, Tag } from "antd";
+import { toast } from "react-toastify";
 import api from "../utils/config";
+import { downloadApiFile } from "../utils/download";
+import PageShell from "./ui/page-shell";
 
 const { Option } = Select;
+
+const formatDate = (date) => (date ? new Date(date).toLocaleString() : "-");
+
+const DetailRow = ({ label, value }) => (
+  <div className="border-b border-[#F1F1F1] py-3 last:border-0">
+    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">{label}</p>
+    <p className="mt-1 text-sm text-[#212121] whitespace-pre-wrap">{value || "-"}</p>
+  </div>
+);
 
 const TechReport = () => {
   const [open, setOpen] = useState(false);
@@ -13,6 +24,8 @@ const TechReport = () => {
   const [submittedFilters, setSubmittedFilters] = useState({ reportType: "maintenance_tickets" });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const [form] = Form.useForm();
   const deferredSearch = useDeferredValue(searchText.trim());
 
@@ -25,7 +38,7 @@ const TechReport = () => {
     queryFn: () => api.get("/admin/departments?includeUnits=true"),
   });
 
-  const { data: reportResponse, isFetching: reportLoading } = useQuery({
+  const { data: reportResponse, isLoading, isFetching: reportLoading } = useQuery({
     queryKey: ["techReport", submittedFilters, deferredSearch],
     queryFn: () =>
       api.get("/hardware/reports", {
@@ -37,9 +50,8 @@ const TechReport = () => {
   });
 
   const reportRows = reportResponse?.data?.data || [];
-  const hasReport = true;
 
-  const formatDate = (date) => {
+  const toIsoDate = (date) => {
     if (!date) return null;
     return new Date(date.$d).toISOString().split("T")[0];
   };
@@ -52,87 +64,116 @@ const TechReport = () => {
       ...(values.deviceType ? { deviceType: values.deviceType } : {}),
       ...(values.issueType ? { issueType: values.issueType } : {}),
       ...(values.departmentId ? { departmentId: values.departmentId } : {}),
-      ...(values.startDate ? { startDate: formatDate(values.startDate) } : {}),
-      ...(values.endDate ? { endDate: formatDate(values.endDate) } : {}),
+      ...(values.startDate ? { startDate: toIsoDate(values.startDate) } : {}),
+      ...(values.endDate ? { endDate: toIsoDate(values.endDate) } : {}),
     });
     setOpen(false);
     form.resetFields();
   };
 
-  const handleDownload = () => {
-    if (!reportRows.length) return;
-
-    const cleanData = reportRows.map((item, index) => ({
-      No: index + 1,
-      UserName: item?.userName || "-",
-      UnitName: item?.unitName || "-",
-      Department: item?.departmentName || "-",
-      ActionTaken: item?.actionTaken || "-",
-      IssueType: item?.issueType || "-",
-      DeviceType: item?.deviceType || "-",
-      Brand: item?.brand || "-",
-      Model: item?.model || "-",
-      Remarks: item?.remarks || "-",
-      ReceivedBy: item?.technicianReceivedName || "-",
-      SentBy: item?.technicianReturnedName || "-",
-      DateLogged: item?.dateLogged ? new Date(item.dateLogged).toLocaleDateString() : "-",
-      DateResolved: item?.dateResolved ? new Date(item.dateResolved).toLocaleDateString() : "-",
-    }));
-
-    const worksheet = XLSX.utils.json_to_sheet(cleanData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-    XLSX.writeFile(workbook, "maintenance_tickets.xlsx");
+  const handleDownload = async () => {
+    try {
+      setExporting(true);
+      await downloadApiFile(
+        api,
+        "/hardware/reports/export",
+        {
+          ...submittedFilters,
+          ...(deferredSearch ? { search: deferredSearch } : {}),
+        },
+        "maintenance-report.csv"
+      );
+    } catch (error) {
+      toast.error(error?.message || "Failed to export report");
+    } finally {
+      setExporting(false);
+    }
   };
 
   const columns = [
-    { title: "No", key: "index", render: (_text, _record, index) => (currentPage - 1) * pageSize + index + 1 },
-    { title: "User Name", dataIndex: "userName", key: "userName" },
-    { title: "Unit Name", dataIndex: "unitName", key: "unitName" },
+    { title: "Ticket", dataIndex: "ticketId", key: "ticketId", render: (value) => <span className="font-semibold">{value}</span> },
+    { title: "User", dataIndex: "userName", key: "userName" },
+    {
+      title: "Device",
+      key: "device",
+      render: (_, record) => `${record.brand || "-"} ${record.model || ""}`.trim(),
+    },
     { title: "Department", dataIndex: "departmentName", key: "departmentName" },
-    { title: "Action Taken", dataIndex: "actionTaken", key: "actionTaken", render: (text) => text || "-" },
-    { title: "Issue Type", dataIndex: "issueType", key: "issueType" },
-    { title: "Device Type", dataIndex: "deviceType", key: "deviceType" },
-    { title: "Brand", dataIndex: "brand", key: "brand" },
-    { title: "Model", dataIndex: "model", key: "model" },
-    { title: "Remarks", dataIndex: "remarks", key: "remarks" },
-    { title: "Received By", dataIndex: "technicianReceivedName", key: "technicianReceivedName" },
-    { title: "Sent By", dataIndex: "technicianReturnedName", key: "technicianReturnedName" },
-    { title: "Date Logged", dataIndex: "dateLogged", key: "dateLogged", render: (date) => new Date(date).toLocaleDateString() },
-    { title: "Date Resolved", dataIndex: "dateResolved", key: "dateResolved", render: (date) => (date ? new Date(date).toLocaleDateString() : "-") },
+    {
+      title: "Status",
+      key: "status",
+      render: (_, record) =>
+        record.dateResolved ? (
+          <Tag className="rounded-full border-0 bg-[#ECFDF3] px-3 text-[#166534] font-semibold">Resolved</Tag>
+        ) : (
+          <Tag className="rounded-full border-0 bg-[#FFF7ED] px-3 text-[#C2410C] font-semibold">Open</Tag>
+        ),
+    },
+    { title: "Technician", dataIndex: "technicianReceivedName", key: "technicianReceivedName" },
+    {
+      title: "Logged",
+      dataIndex: "dateLogged",
+      key: "dateLogged",
+      render: (date) => (date ? new Date(date).toLocaleDateString() : "-"),
+    },
   ];
 
   return (
-    <div className="px-[3rem] py-[2rem]">
-      <div className="px-[7rem] flex gap-2">
-        <Button icon={<FilterOutlined />} onClick={() => setOpen(true)}>
-          Filter
-        </Button>
-        <Input
-          disabled={!hasReport}
-          placeholder="Search..."
-          value={searchText}
-          onChange={(event) => setSearchText(event.target.value)}
-          prefix={<SearchOutlined />}
-          style={{ width: "200px" }}
-        />
-        <Button type="primary" onClick={handleDownload} disabled={!reportRows.length}>
-          Download
-        </Button>
-      </div>
-      <div className="pl-[6rem] pt-6">
-        {reportLoading ? (
-          <div className="flex justify-center items-center h-[300px]">
+    <PageShell
+      eyebrow="Reporting Workspace"
+      title="Maintenance Report"
+      description="Review workshop jobs, resolution progress, and technician activity. Click a row for full details."
+      loading={isLoading}
+      actions={
+        <>
+          <Button icon={<FilterOutlined />} onClick={() => setOpen(true)}>
+            Filter
+          </Button>
+          <Input
+            placeholder="Search report"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            allowClear
+            prefix={<SearchOutlined />}
+            className="w-full md:w-[240px]"
+          />
+          <Button type="primary" onClick={handleDownload} loading={exporting} disabled={!reportRows.length}>
+            Download
+          </Button>
+        </>
+      }
+    >
+      <section className="responsive-data-card rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#616161]">Workshop Output</p>
+            <h3 className="text-xl font-bold text-[#212121]">Maintenance jobs</h3>
+          </div>
+          <span className="rounded-full bg-[#FFEBEE] px-3 py-1 text-xs font-semibold text-[#D32F2F]">
+            Click a row for details
+          </span>
+        </div>
+        {isLoading ? (
+          <div className="flex h-[300px] items-center justify-center">
             <Spin size="large" />
           </div>
         ) : (
           <Table
-            columns={hasReport ? columns : []}
+            columns={columns}
             dataSource={reportRows}
             rowKey={(record) => record.id || record.ticketId}
+            loading={reportLoading}
+            scroll={{ x: "max-content" }}
+            tableLayout="fixed"
+            onRow={(record) => ({
+              onClick: () => setSelectedRow(record),
+              className: "cursor-pointer",
+            })}
             pagination={{
               current: currentPage,
               pageSize,
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "20", "50"],
               onChange: (page, nextPageSize) => {
                 setCurrentPage(page);
                 setPageSize(nextPageSize);
@@ -140,7 +181,7 @@ const TechReport = () => {
             }}
           />
         )}
-      </div>
+      </section>
       <Modal title="Filter" open={open} onCancel={() => setOpen(false)} footer={null}>
         <div className="max-h-[39rem] overflow-y-auto pr-2 no-scrollbar">
           <Form form={form} onFinish={handleSubmit} layout="vertical">
@@ -186,7 +227,32 @@ const TechReport = () => {
           </Form>
         </div>
       </Modal>
-    </div>
+      <Drawer
+        open={!!selectedRow}
+        onClose={() => setSelectedRow(null)}
+        title={selectedRow ? selectedRow.ticketId : "Ticket details"}
+        width={480}
+      >
+        {selectedRow && (
+          <div>
+            <DetailRow label="User" value={selectedRow.userName} />
+            <DetailRow label="Department" value={`${selectedRow.departmentName || "-"} ${selectedRow.unitName ? `• ${selectedRow.unitName}` : ""}`} />
+            <DetailRow label="Device" value={`${selectedRow.brand || "-"} ${selectedRow.model || ""} (${selectedRow.deviceType || "-"})`} />
+            <DetailRow label="Issue type" value={selectedRow.issueType} />
+            <DetailRow label="Priority" value={selectedRow.priority} />
+            <DetailRow label="Description" value={selectedRow.description} />
+            <DetailRow label="Action taken" value={selectedRow.actionTaken} />
+            <DetailRow label="Remarks" value={selectedRow.remarks} />
+            <DetailRow label="Received by" value={selectedRow.technicianReceivedName} />
+            <DetailRow label="Returned by" value={selectedRow.technicianReturnedName} />
+            <DetailRow label="Date logged" value={formatDate(selectedRow.dateLogged)} />
+            <DetailRow label="Date resolved" value={formatDate(selectedRow.dateResolved)} />
+            <DetailRow label="LPO / Voucher" value={`${selectedRow.lpoReference || "-"} / ${selectedRow.voucherNumber || "-"}`} />
+            <DetailRow label="Supplier" value={selectedRow.supplier?.name} />
+          </div>
+        )}
+      </Drawer>
+    </PageShell>
   );
 };
 

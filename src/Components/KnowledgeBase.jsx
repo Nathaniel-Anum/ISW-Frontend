@@ -7,13 +7,15 @@ import {
   Input,
   Modal,
   Select,
+  Skeleton,
   Space,
   Switch,
   Tag,
   Tooltip,
   Typography,
 } from "antd";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   LuBookOpen,
   LuChevronRight,
@@ -42,6 +44,7 @@ const KB_AUTHOR_ROLES = [
 export default function KnowledgeBase() {
   const { user } = useUser();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // UI state
   const [createOpen, setCreateOpen] = useState(false);
@@ -55,7 +58,6 @@ export default function KnowledgeBase() {
   const [editForm] = Form.useForm();
 
   const canManage = user?.roles?.some((r) => KB_AUTHOR_ROLES.includes(r));
-  const canDelete = user?.roles?.some((r) => ["admin"].includes(r));
 
   // ── Queries ───────────────────────────────────────────────────────────
   const { data: articlesRes, isLoading } = useQuery({
@@ -86,6 +88,15 @@ export default function KnowledgeBase() {
     }
     return list;
   }, [articles, activeCategory, canManage]);
+
+  const articleFromQuery = searchParams.get("article");
+  useEffect(() => {
+    if (!articleFromQuery || !articles.length) return;
+    const match = articles.find((article) => article.id === articleFromQuery);
+    if (!match) return;
+    setSelectedArticle(match);
+    setSearchParams({}, { replace: true });
+  }, [articleFromQuery, articles, setSearchParams]);
 
   // Group articles by category for the ToC sidebar
   const articlesByCategory = useMemo(() => {
@@ -197,9 +208,9 @@ export default function KnowledgeBase() {
   const handleDeleteArticle = (article) => {
     if (!article?.id) {
       toast.error("Unable to delete article: missing article ID");
-      return;
+      return Promise.reject();
     }
-    deleteMutation.mutate(article.id);
+    return deleteMutation.mutateAsync(article.id);
   };
 
   const openEdit = (record) => {
@@ -261,6 +272,7 @@ export default function KnowledgeBase() {
       Network: "#059669",
       Security: "#DC2626",
       Cameras: "#7C3AED",
+      "CCTV and ID": "#7C3AED",
     };
     return map[name] || "#616161";
   };
@@ -425,20 +437,23 @@ export default function KnowledgeBase() {
           </Button>
           <Button
             size="small"
+            loading={updateMutation.isPending}
             onClick={() => togglePublished(article)}
           >
             {article.isPublished ? "Unpublish" : "Publish"}
           </Button>
-          {canDelete && (
+          {canManage && (
             <Button
               size="small"
               danger
               icon={<LuTrash2 className="text-xs" />}
+              loading={deleteMutation.isPending}
               onClick={() =>
                 Modal.confirm({
                   title: "Delete Article",
-                  content: "This article will be soft-deleted. Continue?",
+                  content: "This article will be removed from the knowledge base. Continue?",
                   okType: "danger",
+                  okText: "Delete",
                   onOk: () => handleDeleteArticle(article),
                 })
               }
@@ -641,8 +656,12 @@ export default function KnowledgeBase() {
 
           {/* Article reader or grid */}
           {isLoading ? (
-            <div className="flex h-64 items-center justify-center text-sm text-gray-400">
-              Loading articles...
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="rounded-2xl border border-[#E0E0E0] bg-white p-5">
+                  <Skeleton active title={{ width: "60%" }} paragraph={{ rows: 3 }} />
+                </div>
+              ))}
             </div>
           ) : selectedArticle ? (
             <ArticleReader article={selectedArticle} />

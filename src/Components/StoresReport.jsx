@@ -27,7 +27,7 @@ const REPORT_LABELS = {
 };
 
 const DEFAULT_REPORT_FILTERS = {
-  reportType: "stock_issued",
+  reportType: "stock_levels",
 };
 
 const StoresReport = () => {
@@ -331,7 +331,7 @@ const StoresReport = () => {
         ) : !reportRows.length ? (
           <div className="rounded-3xl border border-dashed border-[#E0E0E0] bg-[#F9FAFB] px-6 py-12">
             <Empty
-              description="No records found for the selected filters."
+              description="No records found. Try Stock Levels or another report type from Filter."
               image={Empty.PRESENTED_IMAGE_SIMPLE}
             />
           </div>

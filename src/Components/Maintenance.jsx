@@ -1,10 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, DatePicker, Dropdown, Form, Input, InputNumber, Modal, Select, Spin, Table, Tabs, Tag } from "antd";
-import { MoreOutlined, SearchOutlined } from "@ant-design/icons";
+import { Button, DatePicker, Dropdown, Empty, Form, Input, InputNumber, Modal, Select, Spin, Table, Tabs, Tag } from "antd";
+import { FilterOutlined, MoreOutlined, SearchOutlined } from "@ant-design/icons";
 import { Link } from "react-router-dom";
 import { LuArrowRight, LuChartBar, LuHistory, LuPackagePlus, LuPlus, LuUserCheck } from "react-icons/lu";
 import { toast } from "react-toastify";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import api from "../utils/config";
 import { Edit } from "./icons/icons.components";
 import PageShell from "./ui/page-shell";
@@ -109,7 +122,7 @@ const Maintenance = () => {
   });
 
   const [analyticsFilters, setAnalyticsFilters] = useState({});
-  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  const [analyticsFilterOpen, setAnalyticsFilterOpen] = useState(false);
   const [analyticsForm] = Form.useForm();
 
   const { data: slaConfigsRes } = useQuery({
@@ -133,7 +146,7 @@ const Maintenance = () => {
   const { data: analyticsRes, isFetching: analyticsLoading, refetch: fetchAnalytics } = useQuery({
     queryKey: ["maintenanceAnalytics", analyticsFilters],
     queryFn: () => api.get("/hardware/reports/analytics", { params: analyticsFilters }),
-    enabled: analyticsOpen,
+    enabled: !!canViewMTTR,
   });
 
   const analytics = analyticsRes?.data || null;
@@ -185,6 +198,11 @@ const Maintenance = () => {
         label: "Open Tickets",
         value: tickets.length,
         caption: "Current maintenance queue",
+      },
+      {
+        label: "SLA Overdue",
+        value: tickets.filter((row) => row.slaOverdue || isOverdue(row)).length,
+        caption: "Jobs past resolution time",
       },
       {
         label: "Technicians",
@@ -287,6 +305,24 @@ const Maintenance = () => {
           {formatMaintenanceStatus(value)}
         </Tag>
       ),
+    },
+    {
+      title: "SLA",
+      key: "sla",
+      render: (_, row) => {
+        if (row.dateResolved) return <span className="text-xs text-[#9E9E9E]">—</span>;
+        const dueAt = row.slaDueAt;
+        if (!dueAt) return <span className="text-xs text-[#9E9E9E]">No SLA</span>;
+        const minsLeft = Math.floor((new Date(dueAt) - Date.now()) / 60000);
+        if (minsLeft < 0 || row.slaOverdue) {
+          const hoursLate = Math.max(1, Math.abs(Math.round(minsLeft / 60)));
+          return <Tag className="rounded-full border-0 bg-[#FFEBEE] px-3 text-[#D32F2F] font-semibold">Overdue {hoursLate}h</Tag>;
+        }
+        if (minsLeft < 60) {
+          return <Tag className="rounded-full border-0 bg-[#FFF7ED] px-3 text-[#C2410C] font-semibold">{minsLeft}m left</Tag>;
+        }
+        return <Tag className="rounded-full border-0 bg-[#ECFDF3] px-3 text-[#166534] font-semibold">{Math.round(minsLeft / 60)}h left</Tag>;
+      },
     },
     {
       title: "Date Logged",
@@ -493,6 +529,7 @@ const Maintenance = () => {
       title="Maintenance Desk"
       description="Log repair jobs, assign technicians, and clear the open queue from one structured maintenance workspace."
       stats={stats}
+      loading={ticketsLoading}
       actions={
         <>
           <Input
@@ -936,172 +973,228 @@ const Maintenance = () => {
         </Form>
       </Modal>
 
-      {canViewOpenJobs && workload.length > 0 && (
-        <section className="responsive-data-card rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
+      {canViewOpenJobs && (
+        <section className="responsive-data-card mt-6 rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] sm:mt-8 md:p-6">
           <div className="mb-6 flex items-center justify-between">
             <div>
               <p className="text-sm font-semibold text-[#616161]">Technician Workload</p>
-              <h3 className="text-xl font-bold text-[#212121]">Open jobs per technician</h3>
+              <h3 className="text-xl font-bold text-[#212121]">Current open jobs per technician</h3>
             </div>
             <span className="rounded-full bg-[#FFF7ED] px-3 py-1 text-xs font-semibold text-[#C2410C]">
-              Live snapshot
+              {workload.length} technician{workload.length === 1 ? "" : "s"} with open jobs
             </span>
           </div>
-          <Table
-            rowKey="technicianId"
-            size="small"
-            pagination={false}
-            dataSource={workload}
-            columns={[
-              { title: "Technician", dataIndex: "name", key: "name", render: (v) => <span className="font-semibold">{v}</span> },
-              { title: "Staff ID", dataIndex: "staffId", key: "staffId" },
-              { title: "Open Jobs", dataIndex: "openTickets", key: "openTickets", render: (v) => <Tag className="rounded-full border-0 bg-[#FFEBEE] px-3 text-[#D32F2F] font-semibold">{v}</Tag> },
-              { title: "Resolved", dataIndex: "resolvedTickets", key: "resolvedTickets", render: (v) => <Tag className="rounded-full border-0 bg-[#ECFDF3] px-3 text-[#166534] font-semibold">{v}</Tag> },
-              { title: "Avg Resolution (hrs)", dataIndex: "avgResolutionHours", key: "avgResolutionHours", render: (v) => v != null ? `${v}h` : "—" },
-            ]}
-          />
+          {workload.length ? (
+            <Table
+              rowKey="technicianId"
+              size="small"
+              pagination={false}
+              dataSource={workload}
+              columns={[
+                { title: "Technician", dataIndex: "name", key: "name", render: (v) => <span className="font-semibold">{v}</span> },
+                { title: "Staff ID", dataIndex: "staffId", key: "staffId" },
+                { title: "Open Jobs", dataIndex: "openTickets", key: "openTickets", render: (v) => <Tag className="rounded-full border-0 bg-[#FFEBEE] px-3 text-[#D32F2F] font-semibold">{v}</Tag> },
+                { title: "Resolved", dataIndex: "resolvedTickets", key: "resolvedTickets", render: (v) => <Tag className="rounded-full border-0 bg-[#ECFDF3] px-3 text-[#166534] font-semibold">{v}</Tag> },
+                { title: "Avg Resolution (hrs)", dataIndex: "avgResolutionHours", key: "avgResolutionHours", render: (v) => v != null ? `${v}h` : "—" },
+              ]}
+            />
+          ) : (
+            <Empty description="No technicians currently have open jobs" />
+          )}
         </section>
       )}
 
       {canViewMTTR && (
-        <section className="responsive-data-card rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
-          <div className="mb-6 flex items-center justify-between">
+        <section className="responsive-data-card mt-6 rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] sm:mt-8 md:p-6">
+          <div className="mb-6 flex items-center justify-between gap-3">
             <div>
               <p className="text-sm font-semibold text-[#616161]">MTTR Analytics</p>
               <h3 className="text-xl font-bold text-[#212121]">Mean Time To Repair</h3>
             </div>
-            <Button icon={<LuChartBar />} onClick={() => { setAnalyticsOpen(true); fetchAnalytics(); }}>
-              {analyticsOpen ? "Refresh" : "Load Analytics"}
-            </Button>
+            <div className="flex items-center gap-2">
+              {(analyticsFilters.startDate || analyticsFilters.technicianId || analyticsFilters.deviceType) && (
+                <span className="rounded-full bg-[#FFF7ED] px-3 py-1 text-xs font-semibold text-[#C2410C]">
+                  Filtered
+                </span>
+              )}
+              <Button icon={<FilterOutlined />} onClick={() => setAnalyticsFilterOpen(true)} />
+              <Button icon={<LuChartBar />} onClick={() => fetchAnalytics()} />
+            </div>
           </div>
 
-          {analyticsOpen && (
+          {analyticsLoading ? <Spin /> : analytics ? (
             <>
-              <Form
-                form={analyticsForm}
-                layout="inline"
-                className="mb-4 flex flex-wrap gap-2"
-                onFinish={(values) => {
-                  const params = {};
-                  if (values.dateRange?.[0]) params.startDate = values.dateRange[0].toISOString();
-                  if (values.dateRange?.[1]) params.endDate = values.dateRange[1].toISOString();
-                  if (values.technicianId) params.technicianId = values.technicianId;
-                  if (values.deviceType) params.deviceType = values.deviceType;
-                  setAnalyticsFilters(params);
-                }}
-              >
-                <Form.Item name="dateRange">
-                  <DatePicker.RangePicker size="small" />
-                </Form.Item>
-                <Form.Item name="technicianId">
-                  <Select placeholder="Technician" allowClear size="small" style={{ minWidth: 160 }}>
-                    {technicians?.data?.map((t) => (
-                      <Select.Option key={t.id} value={t.id}>{t.name}</Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-                <Form.Item>
-                  <Button htmlType="submit" size="small" type="primary">Filter</Button>
-                </Form.Item>
-                <Form.Item>
-                  <Button size="small" onClick={() => { analyticsForm.resetFields(); setAnalyticsFilters({}); }}>Clear</Button>
-                </Form.Item>
-              </Form>
-
-              {analyticsLoading ? <Spin /> : analytics ? (
-                <Tabs
-                  items={[
-                    {
-                      key: "summary",
-                      label: "Summary",
-                      children: (
-                        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                          <div className="rounded-2xl bg-[#F9FAFB] p-4 text-center">
-                            <p className="text-2xl font-bold text-[#212121]">{analytics.totalResolved}</p>
-                            <p className="text-xs text-[#757575]">Total Resolved</p>
-                          </div>
-                          <div className="rounded-2xl bg-[#F9FAFB] p-4 text-center">
-                            <p className="text-2xl font-bold text-[#212121]">{analytics.overallMTTR}h</p>
-                            <p className="text-xs text-[#757575]">Overall MTTR</p>
-                          </div>
+              <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+                <div className="rounded-2xl bg-[#FFF7F7] p-4 text-center">
+                  <p className="text-3xl font-bold text-[#D32F2F]">{analytics.overallMTTR}h</p>
+                  <p className="text-xs text-[#757575]">Overall MTTR</p>
+                </div>
+                <div className="rounded-2xl bg-[#F0FDFA] p-4 text-center">
+                  <p className="text-3xl font-bold text-[#0D9488]">{analytics.totalResolved}</p>
+                  <p className="text-xs text-[#757575]">Jobs repaired</p>
+                </div>
+                <div className="rounded-2xl bg-[#EFF6FF] p-4 text-center">
+                  <p className="text-3xl font-bold text-[#1D4ED8]">{analytics.byTechnician?.length || 0}</p>
+                  <p className="text-xs text-[#757575]">Technicians measured</p>
+                </div>
+                <div className="rounded-2xl bg-[#FFF7ED] p-4 text-center">
+                  <p className="text-3xl font-bold text-[#C2410C]">{analytics.byDeviceType?.length || 0}</p>
+                  <p className="text-xs text-[#757575]">Device types</p>
+                </div>
+              </div>
+              <Tabs
+                items={[
+                  {
+                    key: "byTech",
+                    label: "By Technician",
+                    children: (
+                      <div className="h-[320px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={analytics.byTechnician || []} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="technicianName" tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} unit="h" />
+                            <Tooltip formatter={(value) => [`${value}h`, "MTTR"]} />
+                            <Legend />
+                            <Bar dataKey="avgResolutionHours" name="MTTR (hours)" fill="#D32F2F" radius={[8, 8, 0, 0]} />
+                            <Bar dataKey="resolvedCount" name="Resolved jobs" fill="#64748B" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "byIssue",
+                    label: "By Issue Type",
+                    children: (
+                      <div className="grid gap-6 md:grid-cols-2">
+                        <div className="h-[280px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                              <Pie data={analytics.byIssueType || []} dataKey="resolvedCount" nameKey="issueType" cx="50%" cy="50%" outerRadius={90} label>
+                                {(analytics.byIssueType || []).map((entry, index) => (
+                                  <Cell key={entry.issueType} fill={["#D32F2F", "#1D4ED8", "#0D9488", "#F59E0B"][index % 4]} />
+                                ))}
+                              </Pie>
+                              <Tooltip />
+                              <Legend />
+                            </PieChart>
+                          </ResponsiveContainer>
                         </div>
-                      ),
-                    },
-                    {
-                      key: "byTech",
-                      label: "By Technician",
-                      children: (
-                        <Table
-                          size="small"
-                          rowKey="technicianId"
-                          pagination={false}
-                          dataSource={analytics.byTechnician}
-                          columns={[
-                            { title: "Technician", dataIndex: "technicianName", key: "name" },
-                            { title: "Resolved", dataIndex: "resolvedCount", key: "count" },
-                            { title: "Avg Hours", dataIndex: "avgResolutionHours", key: "avg", render: (v) => `${v}h` },
-                          ]}
-                        />
-                      ),
-                    },
-                    {
-                      key: "byIssue",
-                      label: "By Issue Type",
-                      children: (
-                        <Table
-                          size="small"
-                          rowKey="issueType"
-                          pagination={false}
-                          dataSource={analytics.byIssueType}
-                          columns={[
-                            { title: "Issue Type", dataIndex: "issueType", key: "type" },
-                            { title: "Resolved", dataIndex: "resolvedCount", key: "count" },
-                            { title: "Avg Hours", dataIndex: "avgResolutionHours", key: "avg", render: (v) => `${v}h` },
-                          ]}
-                        />
-                      ),
-                    },
-                    {
-                      key: "byDevice",
-                      label: "By Device Type",
-                      children: (
-                        <Table
-                          size="small"
-                          rowKey="deviceType"
-                          pagination={false}
-                          dataSource={analytics.byDeviceType}
-                          columns={[
-                            { title: "Device Type", dataIndex: "deviceType", key: "type" },
-                            { title: "Resolved", dataIndex: "resolvedCount", key: "count" },
-                            { title: "Avg Hours", dataIndex: "avgResolutionHours", key: "avg", render: (v) => `${v}h` },
-                          ]}
-                        />
-                      ),
-                    },
-                    {
-                      key: "trend",
-                      label: "Monthly Trend",
-                      children: (
-                        <Table
-                          size="small"
-                          rowKey="month"
-                          pagination={false}
-                          dataSource={analytics.monthlyTrend}
-                          columns={[
-                            { title: "Month", dataIndex: "month", key: "month" },
-                            { title: "Resolved", dataIndex: "resolvedCount", key: "count" },
-                            { title: "Avg Hours", dataIndex: "avgResolutionHours", key: "avg", render: (v) => `${v}h` },
-                          ]}
-                        />
-                      ),
-                    },
-                  ]}
-                />
-              ) : null}
+                        <div className="h-[280px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={analytics.byIssueType || []}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis dataKey="issueType" tick={{ fontSize: 11 }} />
+                              <YAxis tick={{ fontSize: 11 }} unit="h" />
+                              <Tooltip formatter={(value) => [`${value}h`, "MTTR"]} />
+                              <Bar dataKey="avgResolutionHours" name="MTTR (hours)" fill="#1D4ED8" radius={[8, 8, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "byDevice",
+                    label: "By Device Type",
+                    children: (
+                      <div className="h-[320px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={analytics.byDeviceType || []} layout="vertical" margin={{ left: 24 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis type="number" tick={{ fontSize: 11 }} unit="h" />
+                            <YAxis type="category" dataKey="deviceType" tick={{ fontSize: 11 }} width={90} />
+                            <Tooltip formatter={(value) => [`${value}h`, "MTTR"]} />
+                            <Bar dataKey="avgResolutionHours" name="MTTR (hours)" fill="#0D9488" radius={[0, 8, 8, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "trend",
+                    label: "Monthly Trend",
+                    children: (
+                      <div className="h-[320px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={analytics.monthlyTrend || []}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                            <YAxis tick={{ fontSize: 11 }} unit="h" />
+                            <Tooltip formatter={(value) => [`${value}h`, "MTTR"]} />
+                            <Legend />
+                            <Bar dataKey="avgResolutionHours" name="MTTR (hours)" fill="#7C3AED" radius={[8, 8, 0, 0]} />
+                            <Bar dataKey="resolvedCount" name="Resolved jobs" fill="#94A3B8" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ),
+                  },
+                ]}
+              />
             </>
+          ) : (
+            <Empty description="No resolved jobs in this period" />
           )}
         </section>
       )}
+
+      <Modal
+        title="Filter MTTR Analytics"
+        open={analyticsFilterOpen}
+        onCancel={() => setAnalyticsFilterOpen(false)}
+        footer={null}
+        destroyOnClose
+      >
+        <Form
+          form={analyticsForm}
+          layout="vertical"
+          onFinish={(values) => {
+            const params = {};
+            if (values.dateRange?.[0]) params.startDate = values.dateRange[0].toISOString();
+            if (values.dateRange?.[1]) params.endDate = values.dateRange[1].toISOString();
+            if (values.technicianId) params.technicianId = values.technicianId;
+            if (values.deviceType) params.deviceType = values.deviceType;
+            setAnalyticsFilters(params);
+            setAnalyticsFilterOpen(false);
+          }}
+        >
+          <Form.Item name="dateRange" label="Date range">
+            <DatePicker.RangePicker className="w-full" />
+          </Form.Item>
+          <Form.Item name="technicianId" label="Technician">
+            <Select placeholder="All technicians" allowClear>
+              {technicians?.data?.map((t) => (
+                <Select.Option key={t.id} value={t.id}>{t.name}</Select.Option>
+              ))}
+            </Select>
+          </Form.Item>
+          <Form.Item name="deviceType" label="Device type">
+            <Select placeholder="All device types" allowClear>
+              <Select.Option value="LAPTOP">Laptop</Select.Option>
+              <Select.Option value="DESKTOP">Desktop</Select.Option>
+              <Select.Option value="PRINTER">Printer</Select.Option>
+              <Select.Option value="OTHER">Other</Select.Option>
+            </Select>
+          </Form.Item>
+          <div className="flex gap-2">
+            <Button
+              className="flex-1"
+              onClick={() => {
+                analyticsForm.resetFields();
+                setAnalyticsFilters({});
+                setAnalyticsFilterOpen(false);
+              }}
+            >
+              Clear
+            </Button>
+            <Button type="primary" htmlType="submit" className="flex-1" loading={analyticsLoading}>
+              Apply
+            </Button>
+          </div>
+        </Form>
+      </Modal>
     </PageShell>
   );
 };

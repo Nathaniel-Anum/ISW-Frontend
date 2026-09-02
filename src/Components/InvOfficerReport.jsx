@@ -3,16 +3,20 @@ import { FilterOutlined, SearchOutlined } from "@ant-design/icons";
 import {
   Button,
   DatePicker,
+  Drawer,
   Form,
   Input,
   Modal,
   Select,
   Spin,
   Table,
+  Tag,
 } from "antd";
 import api from "../utils/config";
-import * as XLSX from "xlsx";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "react-toastify";
+import { downloadApiFile } from "../utils/download";
+import PageShell from "./ui/page-shell";
 
 const { Option } = Select;
 const DEFAULT_REPORT_FILTERS = { reportType: "inventory" };
@@ -29,6 +33,8 @@ const InvOfficerReport = () => {
   const [form] = Form.useForm();
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const deferredSearch = useDeferredValue(searchText.trim());
 
   const { data } = useQuery({
@@ -58,7 +64,7 @@ const InvOfficerReport = () => {
     [departments]
   );
 
-  const { data: reportResponse, isFetching: reportLoading } = useQuery({
+  const { data: reportResponse, isLoading, isFetching: reportLoading } = useQuery({
     queryKey: ["inventoryReport", submittedFilters, deferredSearch],
     queryFn: () =>
       api.get("/inventory/reports", {
@@ -123,146 +129,91 @@ const InvOfficerReport = () => {
   const getColumns = () => {
     if (selectedReport === "inventory") {
       return [
+        { title: "Asset ID", dataIndex: "assetId", key: "assetId", render: (value) => <span className="font-semibold">{value}</span> },
+        { title: "User", dataIndex: "userName", key: "userName" },
+        { title: "Department", dataIndex: "departmentName", key: "departmentName" },
         {
-          title: "No",
-          key: "index",
-          render: (_text, _record, index) => index + 1,
-        },
-        {
-          title: "User Name",
-          dataIndex: "userName",
-          key: "userName",
-        },
-        {
-          title: "User Email",
-          dataIndex: "userEmail",
-          key: "userEmail",
-        },
-        {
-          title: "Department",
-          dataIndex: "departmentName",
-          key: "departmentName",
-        },
-        {
-          title: "Unit Name",
-          dataIndex: "unitName",
-          key: "unitName",
-        },
-        {
-          title: "Asset ID",
-          dataIndex: "assetId",
-          key: "assetId",
-        },
-        {
-          title: "Category",
-          dataIndex: "categoryName",
-          key: "categoryName",
-        },
-        {
-          title: "Device Type",
-          dataIndex: "deviceType",
-          key: "deviceType",
-        },
-        { title: "Brand", dataIndex: "brand", key: "brand" },
-        { title: "Model", dataIndex: "model", key: "model" },
-
-        {
-          title: "Serial Number",
-          dataIndex: "serialNumber",
-          key: "serialNumber",
+          title: "Device",
+          key: "device",
+          render: (_, record) => `${record.brand || "-"} ${record.model || ""}`.trim(),
         },
         {
           title: "Status",
           dataIndex: "status",
           key: "status",
+          render: (value) => (
+            <Tag className={`rounded-full border-0 px-3 font-semibold ${value === "ACTIVE" ? "bg-[#ECFDF3] text-[#166534]" : "bg-[#FFF7ED] text-[#C2410C]"}`}>
+              {value || "-"}
+            </Tag>
+          ),
         },
-
-        {
-          title: "Warranty Period",
-          dataIndex: "warrantyPeriod",
-          key: "warrantyPeriod",
-        },
-
-        {
-          title: "Purchase Date",
-          dataIndex: "purchaseDate",
-          key: "purchaseDate",
-          render: (date) => new Date(date).toLocaleDateString(),
-        },
-        ...attributeColumns.map((column) => ({
-          title: column.label,
-          key: `attr-${column.key}`,
-          render: (_, record) => record.dynamicAttributes?.[column.key] || "-",
-        })),
+        { title: "Category", dataIndex: "categoryName", key: "categoryName" },
       ];
     }
+    return [];
   };
 
-  const downloadExcel = () => {
-    if (!reportRows.length) return;
-
-    let cleanData = [];
-
-    if (selectedReport === "inventory") {
-      cleanData = reportRows.map((item, index) => ({
-          No: index + 1,
-          AssetId: item?.assetId || "-",
-          UserName: item?.userName || "-",
-          Email: item?.userEmail || "-",
-          Department: item?.departmentName || "-",
-          UnitName: item?.unitName || "-",
-          Category: item?.categoryName || "-",
-          DeviceType: item?.deviceType || "-",
-          Brand: item?.brand || "-",
-          Model: item?.model || "-",
-          SerialNumber: item?.serialNumber || "-",
-          Status: item?.status || "-",
-          WarrantyPeriod: item?.warrantyPeriod || "-",
-          PurchaseDate: item?.purchaseDate
-            ? new Date(item.purchaseDate).toLocaleDateString()
-            : "-",
-          ...attributeColumns.reduce((result, column) => {
-            result[column.label] = item?.dynamicAttributes?.[column.key] || "-";
-            return result;
-          }, {}),
-        }));
+  const downloadExcel = async () => {
+    try {
+      setExporting(true);
+      await downloadApiFile(
+        api,
+        "/inventory/reports/export",
+        {
+          ...submittedFilters,
+          ...(deferredSearch ? { search: deferredSearch } : {}),
+        },
+        "inventory-report.csv"
+      );
+    } catch (error) {
+      toast.error(error?.message || "Failed to export report");
+    } finally {
+      setExporting(false);
     }
-
-    const worksheet = XLSX.utils.json_to_sheet(cleanData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Report");
-
-    XLSX.writeFile(workbook, `${selectedReport || "report"}.xlsx`);
   };
   return (
-    <div className="px-[3rem] py-[2rem]">
-      <div className=" px-[7rem] flex gap-2">
-        <Button
-          icon={<FilterOutlined />}
-          onClick={openFilterModal}
-        >
-          Filter
-        </Button>
-        <Input
-          disabled={!selectedReport}
-          placeholder="Search..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          prefix={<SearchOutlined />}
-          style={{ width: "200px" }}
-        />
-
-        <Button
-          type="primary"
-          onClick={downloadExcel}
-          disabled={!reportRows.length}
-        >
-          Download
-        </Button>
-      </div>
-      <div className="pl-[6rem] pt-6">
-        {reportLoading ? (
-          <div className="flex justify-center items-center h-[300px]">
+    <PageShell
+      eyebrow="Reporting Workspace"
+      title="Inventory Report"
+      description="Review assigned assets and device records. Click a row for serial numbers, warranty, and other details."
+      loading={isLoading}
+      actions={
+        <>
+          <Button icon={<FilterOutlined />} onClick={openFilterModal}>
+            Filter
+          </Button>
+          <Input
+            disabled={!selectedReport}
+            placeholder="Search report"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            allowClear
+            prefix={<SearchOutlined />}
+            className="w-full md:w-[240px]"
+          />
+          <Button
+            type="primary"
+            onClick={downloadExcel}
+            loading={exporting}
+            disabled={!reportRows.length}
+          >
+            Download
+          </Button>
+        </>
+      }
+    >
+      <section className="responsive-data-card rounded-[28px] border border-[#E0E0E0] bg-white p-5 shadow-[0_18px_40px_rgba(15,23,42,0.06)] md:p-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-[#616161]">Asset Output</p>
+            <h3 className="text-xl font-bold text-[#212121]">Inventory records</h3>
+          </div>
+          <span className="rounded-full bg-[#FFEBEE] px-3 py-1 text-xs font-semibold text-[#D32F2F]">
+            Click a row for details
+          </span>
+        </div>
+        {isLoading ? (
+          <div className="flex h-[300px] items-center justify-center">
             <Spin size="large" />
           </div>
         ) : (
@@ -270,17 +221,26 @@ const InvOfficerReport = () => {
             columns={getColumns()}
             dataSource={reportRows}
             rowKey={(record) => record.id || record.key}
+            loading={reportLoading}
+            scroll={{ x: "max-content" }}
+            tableLayout="fixed"
+            onRow={(record) => ({
+              onClick: () => setSelectedRow(record),
+              className: "cursor-pointer",
+            })}
             pagination={{
               current: currentPage,
               pageSize: pageSize,
-              onChange: (page, pageSize) => {
+              showSizeChanger: true,
+              pageSizeOptions: ["10", "20", "50"],
+              onChange: (page, nextSize) => {
                 setCurrentPage(page);
-                setPageSize(pageSize);
+                setPageSize(nextSize);
               },
             }}
           />
         )}
-      </div>
+      </section>
       <Modal
         title="Filter"
         open={open}
@@ -400,7 +360,41 @@ const InvOfficerReport = () => {
           </Form>
         </div>
       </Modal>
-    </div>
+      <Drawer
+        open={!!selectedRow}
+        onClose={() => setSelectedRow(null)}
+        title={selectedRow ? selectedRow.assetId : "Asset details"}
+        width={480}
+      >
+        {selectedRow && (
+          <div>
+            {[
+              ["User", selectedRow.userName],
+              ["Email", selectedRow.userEmail],
+              ["Department", selectedRow.departmentName],
+              ["Unit", selectedRow.unitName],
+              ["Category", selectedRow.categoryName],
+              ["Device type", selectedRow.deviceType],
+              ["Brand", selectedRow.brand],
+              ["Model", selectedRow.model],
+              ["Serial number", selectedRow.serialNumber],
+              ["Status", selectedRow.status],
+              ["Warranty (months)", selectedRow.warrantyPeriod],
+              ["Purchase date", selectedRow.purchaseDate ? new Date(selectedRow.purchaseDate).toLocaleDateString() : "-"],
+              ["Supplier", selectedRow.supplier?.name],
+              ["LPO reference", selectedRow.lpoReference],
+              ["Voucher", selectedRow.voucherNumber],
+              ...attributeColumns.map((column) => [column.label, selectedRow.dynamicAttributes?.[column.key]]),
+            ].map(([label, value]) => (
+              <div key={label} className="border-b border-[#F1F1F1] py-3 last:border-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#9CA3AF]">{label}</p>
+                <p className="mt-1 text-sm text-[#212121] whitespace-pre-wrap">{value || "-"}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Drawer>
+    </PageShell>
   );
 };
 

@@ -30,6 +30,7 @@ import {
   Cell,
 } from "recharts";
 import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "antd";
 
 const RED = "#D32F2F";
 const DARK_RED = "#B71C1C";
@@ -68,6 +69,12 @@ const SERVICE_DESK_DISTRIBUTION_ORDER = [
 ];
 
 const formatLabel = (value) => value?.replaceAll("_", " ") || "-";
+
+const SummaryCardSkeleton = () => (
+  <div className="rounded-xl border border-[#E0E0E0] bg-white p-6">
+    <Skeleton active title={{ width: "50%" }} paragraph={{ rows: 2, width: ["80%", "40%"] }} />
+  </div>
+);
 
 const SummaryCard = ({ card }) => {
   const Icon = card.icon;
@@ -145,7 +152,7 @@ const Dashboard = () => {
   }, [setUser]);
 
   // ── Requisitions (all roles except specialist-only roles) ──────────────────
-  const { data: requisitions } = useQuery({
+  const { data: requisitions, isLoading: reqLoading } = useQuery({
     queryKey: ["requisitions"],
     queryFn: () => api.get("/user/requisitions"),
     enabled: showReqSection,
@@ -158,7 +165,7 @@ const Dashboard = () => {
   const reqPendingITD = reqs.filter((i) => i.status === "PENDING_ITD_APPROVAL");
 
   // ── Dept Approval Queue ────────────────────────────────────────────────────
-  const { data: deptQueueRes } = useQuery({
+  const { data: deptQueueRes, isLoading: deptQueueLoading } = useQuery({
     queryKey: ["dept-queue"],
     queryFn: () => api.get("/dept/requisitions"),
     enabled: showDeptQueue,
@@ -166,7 +173,7 @@ const Dashboard = () => {
   const deptQueue = deptQueueRes?.data || [];
 
   // ── ITD Approval Queue ─────────────────────────────────────────────────────
-  const { data: itdQueueRes } = useQuery({
+  const { data: itdQueueRes, isLoading: itdQueueLoading } = useQuery({
     queryKey: ["itd-queue"],
     queryFn: () => api.get("/itd/requisitions"),
     enabled: showITDQueue,
@@ -174,7 +181,7 @@ const Dashboard = () => {
   const itdQueue = itdQueueRes?.data || [];
 
   // ── Hardware Tickets ───────────────────────────────────────────────────────
-  const { data: hwOpenRes } = useQuery({
+  const { data: hwOpenRes, isLoading: hwOpenLoading } = useQuery({
     queryKey: ["hw-tickets-open"],
     queryFn: () => api.get("/hardware/tickets?status=OPEN"),
     enabled: showHardware,
@@ -194,7 +201,7 @@ const Dashboard = () => {
   const hwResolved = hwResolvedRes?.data || [];
 
   // ── Service Desk Tickets ───────────────────────────────────────────────────
-  const { data: sdRes } = useQuery({
+  const { data: sdRes, isLoading: sdLoading } = useQuery({
     queryKey: ["sd-tickets-dash", sdScope],
     queryFn: () => api.get(`/service-desk/tickets?scope=${sdScope}`),
   });
@@ -205,7 +212,7 @@ const Dashboard = () => {
   const sdUnassigned = sdTickets.filter((t) => !t.assignedToId);
 
   // ── Stock ──────────────────────────────────────────────────────────────────
-  const { data: stockRes } = useQuery({
+  const { data: stockRes, isLoading: stockLoading } = useQuery({
     queryKey: ["stores-stock-dash"],
     queryFn: () => api.get("/stores/stock"),
     enabled: showStock,
@@ -223,7 +230,7 @@ const Dashboard = () => {
   const approvedReqs = approvedReqsRes?.data || [];
 
   // ── Inventory ──────────────────────────────────────────────────────────────
-  const { data: inventoryRes } = useQuery({
+  const { data: inventoryRes, isLoading: inventoryLoading } = useQuery({
     queryKey: ["inventory-dash"],
     queryFn: () => api.get("/inventory/all"),
     enabled: showInventory,
@@ -414,11 +421,15 @@ const Dashboard = () => {
     };
   }, [sdTickets]);
 
-  const renderCards = (cards) => (
+  const renderCards = (cards, loading = false) => (
     <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-      {cards.map((card) => (
-        <SummaryCard key={card.title} card={card} />
-      ))}
+      {loading
+        ? Array.from({ length: Math.max(cards.length, 3) }).map((_, index) => (
+            <SummaryCardSkeleton key={index} />
+          ))
+        : cards.map((card) => (
+            <SummaryCard key={card.title} card={card} />
+          ))}
     </div>
   );
 
@@ -647,7 +658,7 @@ const Dashboard = () => {
             title="Department Approval Queue"
             subtitle="Requisitions awaiting your departmental sign-off"
           />
-          {renderCards(deptQueueCards)}
+          {renderCards(deptQueueCards, deptQueueLoading)}
         </section>
       )}
 
@@ -658,7 +669,7 @@ const Dashboard = () => {
             title="ITD Approval Queue"
             subtitle="Requisitions awaiting IT directorate review"
           />
-          {renderCards(itdQueueCards)}
+          {renderCards(itdQueueCards, itdQueueLoading)}
         </section>
       )}
 
@@ -673,7 +684,7 @@ const Dashboard = () => {
                 : "Status breakdown for all submitted requests"
             }
           />
-          {renderCards(reqCards)}
+          {renderCards(reqCards, reqLoading)}
         </section>
       )}
 
@@ -684,7 +695,7 @@ const Dashboard = () => {
             title="Maintenance Jobs"
             subtitle="Hardware repair and maintenance ticket status"
           />
-          {renderCards(hwCards)}
+          {renderCards(hwCards, hwOpenLoading)}
         </section>
       )}
 
@@ -695,7 +706,7 @@ const Dashboard = () => {
             title="Service Desk Overview"
             subtitle="All active support tickets across the system"
           />
-          {renderCards(sdAllCards)}
+          {renderCards(sdAllCards, sdLoading)}
         </section>
       )}
 
@@ -806,7 +817,7 @@ const Dashboard = () => {
             title="My Service Desk Tickets"
             subtitle="Support requests raised by you"
           />
-          {renderCards(sdMyCards)}
+          {renderCards(sdMyCards, sdLoading)}
         </section>
       )}
 
@@ -817,7 +828,7 @@ const Dashboard = () => {
             title="Stock Overview"
             subtitle="IT stock levels, approved requisitions, and replenishment status"
           />
-          {renderCards(stockCards)}
+          {renderCards(stockCards, stockLoading)}
         </section>
       )}
 
@@ -828,7 +839,7 @@ const Dashboard = () => {
             title="IT Asset Inventory"
             subtitle="Tracked devices, status, and assigned users"
           />
-          {renderCards(inventoryCards)}
+          {renderCards(inventoryCards, inventoryLoading)}
         </section>
       )}
 
